@@ -1,0 +1,84 @@
+Git Clone
+
+Docker Compose Up
+
+Docker Compose Down
+
+docker compose up -d --build {for build again}
+
+docker compose exec app [Command]
+
+docker exec -it backend-app-1 bash {to open bash and run artisan commands}
+docker exec -it viralforgebackend-app-1 bash
+
+http://localhost:8085 //backend url
+http://localhost:8086/index.php //db url
+
+DB_CONNECTION=mysql
+DB_HOST=mysql
+DB_PORT=3306
+DB_DATABASE=backend
+DB_USERNAME=backend
+DB_PASSWORD=secret
+
+---------------------------------- for docker ------------------------------------------
+
+php artisan serve {for local server}
+php artisan migrate {for migration}
+php artisan db:seed {for seed}
+
+can enable or disbale a module through module.json file
+
+docker exec backend-worker-1 php artisan queue:monitor default
+docker exec backend-worker-1 php artisan queue:monitor video-processing
+truncate -s 0 /var/www/storage/logs/laravel.log
+tail -100 /var/www/storage/logs/laravel.log
+php artisan queue:work --queue=video-processing --sleep=1 --tries=3
+
+If the link already exists and is broken, first remove it:
+
+Linux VPS
+rm -rf public/storage
+
+Then recreate:
+
+php artisan storage:link
+
+How to use mixpost in your website
+
+1. Use a Laravel app as the host
+   Your real app is the Laravel project in backend, not the mixpost folder.
+
+2. Install mixpost into that Laravel app
+   You can add it via Composer like a normal package.
+
+If you want to use the local folder in this repo, add this to composer.json:
+
+Then run from backend:
+
+This tells Composer to use the local mixpost package source.
+
+3. Publish assets and migrations
+   After installation, you normally run:
+
+(The exact publish tags depend on the package, but package docs usually tell you.)
+
+4. Access the Mixpost UI
+   Once installed into Laravel, Mixpost routes are available under:
+
+http://<your-backend-host>/mixpost
+Example:
+
+http://localhost:8000/mixpost if using php artisan serve
+http://localhost:8085/mixpost if using Docker for the backend
+What it means in this repo
+Right now, mixpost is a package source folder. It is not the website root because:
+
+it has no artisan
+it has no Laravel app structure
+it has its own composer.json for package metadata
+So the correct way to “use it in our website” is:
+
+host it inside the backend Laravel app
+install it as a package
+then open mixpost on that Laravel app URL

@@ -1,0 +1,9 @@
+{
+  "name": "Auth",
+  "enabled": true,
+  "version": "1.0.0",
+  "description": "Auth management module",
+  "providers": [
+    "Modules\\Auth\\ModuleServiceProvider"
+  ]
+}

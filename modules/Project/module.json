@@ -1,0 +1,16 @@
+{
+    "name": "Project",
+    "version": "1.0.0",
+    "description": "Video project management module for creating and processing video content",
+    "author": "ViralForge Team",
+    "providers": [
+        "Modules\\Project\\ModuleServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": [],
+    "migrations": [
+        "Database/migrations/2025_05_04_000001_create_projects_table.php",
+        "Database/migrations/2025_05_04_000002_create_project_activities_table.php"
+    ]
+}

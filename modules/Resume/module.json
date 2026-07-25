@@ -1,0 +1,9 @@
+{
+  "name": "Resume",
+  "enabled": true,
+  "version": "1.0.0",
+  "description": "Resume management module",
+  "providers": [
+    "Modules\\Resume\\ModuleServiceProvider"
+  ]
+}

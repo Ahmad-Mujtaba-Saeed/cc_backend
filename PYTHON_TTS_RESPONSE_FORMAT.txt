@@ -1,0 +1,36 @@
+<?php
+
+// Expected response format from Python AI /tts endpoint:
+
+// WITHOUT word_timing:
+{
+    "success": true,
+    "audio_path": "/app/storage/app/public/projects/outputs/output_3_123456_narration.wav"
+}
+
+// WITH word_timing=true:
+{
+    "success": true,
+    "audio_path": "/app/storage/app/public/projects/outputs/output_3_123456_narration.wav",
+    "word_timings": [
+        {
+            "word": "hello",
+            "start": 0.0,
+            "end": 0.5
+        },
+        {
+            "word": "world",
+            "start": 0.5,
+            "end": 1.2
+        },
+        ...
+    ]
+}
+
+// Current issue: Python service is returning malformed JSON
+// Error: "Extra data: line 6 column 3 (char 71)"
+// This usually means:
+// 1. Multiple JSON objects on one line
+// 2. Non-JSON text mixed with JSON
+// 3. Incomplete response
+

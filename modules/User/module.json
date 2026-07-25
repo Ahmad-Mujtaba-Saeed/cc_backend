@@ -1,0 +1,9 @@
+{
+  "name": "User",
+  "enabled": true,
+  "version": "1.0.0",
+  "description": "User management module",
+  "providers": [
+    "Modules\\User\\ModuleServiceProvider"
+  ]
+}

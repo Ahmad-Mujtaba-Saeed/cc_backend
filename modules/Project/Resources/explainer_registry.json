@@ -1,0 +1,1645 @@
+{
+  "version": 40,
+  "motion_styles": {
+    "default": "auto",
+    "styles": {
+      "crisp": {
+        "label": "Crisp Editorial",
+        "base_f": 13,
+        "stagger_f": 3,
+        "ease": "expo_out",
+        "overshoot": 0.02,
+        "entrance": "rise_mask",
+        "exit_ratio": 0.6,
+        "use_when": "default modern look; news, tech, product topics"
+      },
+      "classic": {
+        "label": "Classic Documentary",
+        "base_f": 20,
+        "stagger_f": 5,
+        "ease": "sine_in_out",
+        "overshoot": 0,
+        "entrance": "fade_settle",
+        "exit_ratio": 0.7,
+        "use_when": "history, biography, serious/dramatic topics; pairs with serif font pack"
+      },
+      "bounce": {
+        "label": "Energetic",
+        "base_f": 10,
+        "stagger_f": 2,
+        "ease": "spring_pop",
+        "overshoot": 0.06,
+        "entrance": "pop_rise",
+        "exit_ratio": 0.5,
+        "use_when": "upbeat social topics, gaming, entertainment"
+      },
+      "elegant": {
+        "label": "Elegant",
+        "base_f": 24,
+        "stagger_f": 6,
+        "ease": "quint_in_out",
+        "overshoot": 0,
+        "entrance": "tracking_in",
+        "exit_ratio": 0.7,
+        "use_when": "luxury, art, calm/inspirational topics"
+      },
+      "swiss": {
+        "label": "Swiss Minimal",
+        "base_f": 8,
+        "stagger_f": 2,
+        "ease": "quint_out",
+        "overshoot": 0,
+        "entrance": "column_snap",
+        "exit_ratio": 0.5,
+        "use_when": "technical, data-heavy, tense/analytical topics"
+      }
+    },
+    "mood_defaults": {
+      "neutral": "crisp",
+      "upbeat": "bounce",
+      "calm": "elegant",
+      "dramatic": "classic",
+      "tense": "swiss",
+      "inspirational": "elegant",
+      "suspense": "classic"
+    },
+    "font_defaults": {
+      "crisp": "editorial",
+      "classic": "classic",
+      "bounce": "editorial",
+      "elegant": "classic",
+      "swiss": "tech"
+    }
+  },
+  "skins": {
+    "default": "flat",
+    "options": {
+      "flat": {
+        "label": "Flat",
+        "use_when": "the house look: solid colour fields, opaque panels",
+        "overrides_theme": false
+      },
+      "outline": {
+        "label": "Outline",
+        "use_when": "technical feel: transparent panels, 1px hairline borders",
+        "overrides_theme": false
+      },
+      "print": {
+        "label": "Print",
+        "use_when": "editorial magazine feel: serif display, footnote rules, quieter accents",
+        "overrides_theme": false
+      },
+      "blueprint": {
+        "label": "Blueprint",
+        "use_when": "engineer's drawing feel for how-it-works, engineering or architecture topics: fixed deep-navy field with a white hairline grid, drafting-box panels, mono labels — replaces the colour scheme entirely",
+        "overrides_theme": true
+      }
+    }
+  },
+  "board_styles": {
+    "default": "slate",
+    "options": {
+      "slate": {
+        "label": "Slate",
+        "use_when": "the video's own colour theme on the graph-paper board",
+        "overrides_theme": false
+      },
+      "chalk": {
+        "label": "Chalkboard",
+        "use_when": "deep-green board, chalk-white writing — classic lecture feel",
+        "overrides_theme": true
+      },
+      "notebook": {
+        "label": "Notebook",
+        "use_when": "ruled paper, ink-navy writing, red margin line — homework feel",
+        "overrides_theme": true
+      }
+    }
+  },
+  "fps": 30,
+  "default_scene_seconds": 6,
+  "composition_modes": [
+    "hybrid",
+    "canvas_journey",
+    "slides"
+  ],
+  "default_composition_mode": "hybrid",
+  "ai_images": {
+    "max_total": 8,
+    "max_illustrations": 7,
+    "max_slot_fills": 8
+  },
+  "math_mode": {
+    "max_per_video": {
+      "math_steps": 10,
+      "geometry_diagram": 8,
+      "function_plot": 6
+    }
+  },
+  "chapters": {
+    "modes": [
+      "canvas",
+      "slides"
+    ],
+    "min_canvas_chapter_scenes": 2,
+    "max_chapters": 6,
+    "default_chapter_transition": "zoom_through",
+    "covers": {
+      "min_video_seconds": 60,
+      "min_chapters": 2,
+      "duration_seconds": 3.0
+    },
+    "mode_descriptions": {
+      "canvas": "A connected run of ideas the camera flies between on one canvas — arguments, cause-and-effect chains, journeys, tours.",
+      "slides": "Discrete punchy beats cut scene-to-scene — hooks, big statements, montages, lists, openers and closers."
+    }
+  },
+  "canvas": {
+    "journey_patterns": [
+      "timeline",
+      "zigzag",
+      "arc",
+      "hub"
+    ],
+    "default_journey_pattern": "zigzag",
+    "treatments": {
+      "hero_open": "Opening beat: the camera starts tight inside this scene's visual and settles back to frame it. Use ONLY for scene 1.",
+      "canvas_hop": "The camera lifts off the previous scene and flies across the canvas to this one. The default move between distinct ideas.",
+      "zoom_nest": "This scene physically lives INSIDE a focal point of the previous scene's visual, tiny until the camera dives straight into it. Use when this scene is a detail, consequence, or 'inside' the previous idea. Needs nest.fx / nest.fy (0..1 focal point in the previous region).",
+      "overlay_focus": "The camera lands on this scene, then slowly pushes INTO its focal point and eases back out — a guided tour of one strong visual. Use when one image deserves a closer look (pairs well with callouts).",
+      "kinetic_break": "A SMASH CUT: the flight into this scene is short and hard, landing with an impact. Use for a punchy stat or a turning point — best on a typography-only scene. At most twice per video.",
+      "pull_reveal": "The camera pulls out wide so the previous scene and this one share the frame before settling here. Use for consequences or 'bigger picture' beats."
+    },
+    "default_treatment": "canvas_hop",
+    "relations": {
+      "opening": "Scene 1 only: the cold open that establishes the world.",
+      "continues": "The next step of the same thread of thought. The default flow.",
+      "elaborates": "Digs INTO a detail of the previous scene — a closer look, a hidden cause, the inside of the idea. The camera dives into the previous visual (zoom_nest).",
+      "consequence": "The direct RESULT of the previous scene — cause and effect. A bold arrow draws from the previous scene and the camera rides along it.",
+      "contrast": "The OPPOSITE or counterpart of the previous scene. Both scenes share the frame for a beat before the camera commits to this one.",
+      "callback": "Returns to an idea from an EARLIER scene (not the previous one). Give callback_to with that scene's id — a guide line runs from it and the camera takes one long soaring flight.",
+      "new_chapter": "A topic shift — a new act of the story. Placed far away; the camera pulls right out to travel, marking the break."
+    },
+    "default_relation": "continues",
+    "max_arrows": 3,
+    "max_consecutive_treatment": 2,
+    "connector_styles": [
+      "dotted",
+      "arrow",
+      "none"
+    ],
+    "default_connector_style": "dotted",
+    "prop_animations": [
+      "float",
+      "pulse",
+      "orbit",
+      "pop_spring",
+      "drift",
+      "draw_in"
+    ],
+    "default_prop_animation": "float",
+    "max_props_per_scene": 0,
+    "nest_scale": 0.15,
+    "hold_moves": [
+      "breathe",
+      "push_in",
+      "drift",
+      "orbit",
+      "rise",
+      "sway",
+      "settle_back"
+    ],
+    "default_hold_move": "breathe",
+    "min_card_size": 640,
+    "max_card_size": 3000,
+    "min_gap": 480,
+    "max_rotation_deg": 0,
+    "base_card": {
+      "16:9": {
+        "w": 1560,
+        "h": 1000
+      },
+      "9:16": {
+        "w": 1000,
+        "h": 1560
+      },
+      "1:1": {
+        "w": 1240,
+        "h": 1240
+      }
+    }
+  },
+  "content_types": {
+    "image": {
+      "label": "Image",
+      "required": [
+        "asset_request"
+      ],
+      "supports_camera_move": true,
+      "description": "A still image the user will upload (or that was uploaded). Always describe what is needed in asset_request.description."
+    },
+    "video": {
+      "label": "Video Clip",
+      "required": [
+        "asset_request"
+      ],
+      "supports_camera_move": true,
+      "description": "A short video clip the user will upload. Describe what is needed in asset_request.description."
+    },
+    "text_block": {
+      "label": "Text / Bullets",
+      "required": [
+        "heading",
+        "bullets"
+      ],
+      "supports_camera_move": false,
+      "description": "A heading plus 1-5 short bullet points. Bullets animate in one at a time, timed to the narration."
+    },
+    "explanation_box": {
+      "label": "Explanation Box",
+      "required": [
+        "heading",
+        "body"
+      ],
+      "supports_camera_move": false,
+      "description": "A floating frosted-glass card with a short heading and a 1-2 sentence body. Use to explain or point out part of a background image/video."
+    },
+    "versus": {
+      "label": "Versus Data",
+      "required": [
+        "left",
+        "right"
+      ],
+      "supports_camera_move": false,
+      "description": "The two sides of a head-to-head: left/right each carry {label, stats: [up to 3 very short lines]}, plus an optional one-line verdict. Numbers in stats animate."
+    },
+    "chart": {
+      "label": "Chart Data",
+      "required": [
+        "chart_type",
+        "values"
+      ],
+      "supports_camera_move": false,
+      "description": "Native animated chart data: chart_type one of bar | line | area | donut | pie | scatter | radar | counter, values (2-8 numbers; radar needs 3+), labels (same count, 1-2 words each), optional unit (\"%\", \"$B\"), optional caption (one support line), optional highlight_index (0-based, the value that matters), optional source (\"Source: ...\"). Pick by meaning: bar compares categories, line/area show change over time (area when the accumulation IS the point), donut is ONE share of a whole, pie is the whole composition of 3-6 shares, scatter shows correlation across a sequence, radar compares 3-8 dimensions of one thing. NEVER request a screenshot or photo of a chart/table/graph — always emit this native chart data instead."
+    },
+    "proscons": {
+      "label": "Pros / Cons",
+      "required": [
+        "pros"
+      ],
+      "supports_camera_move": false,
+      "description": "A checklist: pros (1-4 very short lines) and optionally cons (up to 4). With cons it renders two columns; without, a single checklist. Optional heading."
+    },
+    "icons": {
+      "label": "Icon Grid Items",
+      "required": [
+        "items"
+      ],
+      "supports_camera_move": false,
+      "description": "3-9 items of {icon, label}: icon is a name from the ICON LIBRARY list, label is 1-2 words. Optional highlight_index (0-based) marks the one cell drawn in the accent colour."
+    },
+    "timeline_nodes": {
+      "label": "Timeline Nodes",
+      "required": [
+        "nodes"
+      ],
+      "supports_camera_move": false,
+      "description": "3-6 nodes of {date, label}: date is a short marker (\"1969\", \"Mar 2024\"), label is <=6 words. Optional heading."
+    },
+    "steps": {
+      "label": "Process Steps",
+      "required": [
+        "items"
+      ],
+      "supports_camera_move": false,
+      "description": "3-5 process steps of {label, icon?}: label <=4 words, icon (optional) from the ICON LIBRARY. Optional heading."
+    },
+    "ranking": {
+      "label": "Ranking Items",
+      "required": [
+        "items"
+      ],
+      "supports_camera_move": false,
+      "description": "3-6 ranked items (strings, <=6 words each), BEST LAST — they reveal as a countdown ending on #1. Optional heading."
+    },
+    "meter": {
+      "label": "Progress Meter",
+      "required": [
+        "value_pct",
+        "label"
+      ],
+      "supports_camera_move": false,
+      "description": "One percentage that fills a meter: value_pct (0-100), label (what it measures), optional unit (default \"%\")."
+    },
+    "map": {
+      "label": "Map Pins",
+      "required": [
+        "pins"
+      ],
+      "supports_camera_move": false,
+      "description": "1-2 geographic pins on a flat world map: pins is [{label: <=3 words, lat, lon}] with real approximate coordinates. Optional region (world | europe | asia | africa | north_america | south_america | oceania) frames the map; with 2 pins an optional route: true draws an arc between them. Optional heading."
+    },
+    "headlines": {
+      "label": "Headline Chips",
+      "required": [
+        "items"
+      ],
+      "supports_camera_move": false,
+      "description": "2-3 headline chips of {text: a short quoted headline or reaction (<=70 chars), source: where it ran (\"WIRED\", \"Reddit\", 1-3 words)}. Optional heading."
+    },
+    "pictogram": {
+      "label": "Pictogram",
+      "required": [
+        "filled",
+        "of"
+      ],
+      "supports_camera_move": false,
+      "description": "A people-share: {filled: numerator (decimals fine, e.g. 6.4), of: denominator 2-20 (usually 10), label: who the share is (\"of gamers finish the story\"), unit?: \"%\" to show the clean percentage instead of \"X in Y\"}. Optional heading."
+    },
+    "myth_fact": {
+      "label": "Myth vs Fact",
+      "required": [
+        "myth",
+        "fact"
+      ],
+      "supports_camera_move": false,
+      "description": "The belief and its correction: {myth: the claim exactly as people repeat it (<=140 chars), fact: what is actually true, with the receipts (<=140 chars)}. Optional heading."
+    },
+    "spectrum": {
+      "label": "Spectrum",
+      "required": [
+        "axis",
+        "spectrum_items"
+      ],
+      "supports_camera_move": false,
+      "description": "Items placed along one labelled axis: axis = {left_label, right_label} — the two poles, <=18 chars each (\"Cheap\"/\"Expensive\", \"Safe\"/\"Risky\"); spectrum_items = 2-5 of {label <=20, position: 0..1 from the LEFT pole — a real judgement, spread the items out}; highlight_index?: which item is THE subject of the question (it takes the accent). Optional heading; optional caption under the axis."
+    },
+    "quadrant": {
+      "label": "Quadrant Map",
+      "required": [
+        "x_axis",
+        "y_axis",
+        "quadrant_items"
+      ],
+      "supports_camera_move": false,
+      "description": "Items placed on TWO labelled axes — the 2x2 matrix. x_axis = {left_label, right_label} and y_axis = {bottom_label, top_label}, the four poles, <=18 chars each (\"Low effort\"/\"High effort\", \"Low impact\"/\"High impact\"). quadrant_items = 3-6 of {label <=20, x: 0..1 from the LEFT pole, y: 0..1 from the BOTTOM pole — real judgements, spread them across the square rather than clustering in one corner}. zones? = optional names for the four boxes {top_left, top_right, bottom_left, bottom_right}, <=16 chars each (\"Quick wins\", \"Money pit\") — they print faintly behind the items and are what makes the matrix readable. highlight_index?: which item the beat is actually about (it takes the accent). Optional heading; optional caption."
+    },
+    "scale": {
+      "label": "Scale Comparison",
+      "required": [
+        "scale_items"
+      ],
+      "supports_camera_move": false,
+      "description": "How big X really is, next to something the viewer knows: scale_items = 2-3 of {label <=24, value: a plain NUMBER in ONE shared unit — heights, masses, distances, whatever the beat compares, note?: <=40}; unit?: <=8 printed after the numbers (\"m\", \"kg\", \"years\"); shape?: \"square\" (default) or \"circle\"; highlight_index?: the one the beat is about; optional heading; optional caption. The shapes are drawn at TRUE relative size, computed from your values — but only while the biggest is at most 40x the smallest. Past that the smallest is a speck no frame can show, so the card stops drawing to scale and states the ratio instead (\"x1,200 smaller\"). Give real figures in one unit and never pre-scale them.",
+      "label_hint": "Use when the point is HOW BIG something is compared with something else — a whale beside a bus, Jupiter beside Earth, a megabyte beside a terabyte. Parts of one whole are proportion_flow; unrelated measured series are animated_chart."
+    },
+    "evidence": {
+      "label": "Evidence",
+      "required": [
+        "source",
+        "finding"
+      ],
+      "supports_camera_move": false,
+      "description": "The \"according to...\" beat, drawn as a citation the viewer can trust: source = the study, institution or publication behind the claim <=48 (\"The Lancet\", \"Stanford University\", \"Pew Research\") — it MUST NAME someone, never \"studies\" or \"experts\"; finding = the one thing it found, in plain words <=160; year?: <=12 (\"2021\", \"2019–2023\"); sample?: what it looked at <=40 (\"12,000 adults\", \"n = 500\"); optional heading; optional caption for a caveat <=80. The finding lands as the headline and the provenance is cited beneath it. If you have no nameable source the card refuses and the beat becomes plain text — it will not dress an unsourced claim up as a citation.",
+      "label_hint": "Use when the beat leans on a SPECIFIC named source for its authority — a study, a report, an institution. The constructive counterpart of the no_source warning: real provenance earns this card, a vague \"research shows\" does not. A number that stands on its own is big_counter; a list of findings is checklist_card."
+    },
+    "proportion": {
+      "label": "Proportion Flow",
+      "required": [
+        "branches"
+      ],
+      "supports_camera_move": false,
+      "description": "One whole splitting into its parts: source_label = what is being divided <=24 chars (\"Every tax dollar\", \"A 24-hour day\"); branches = 2-5 of {label <=24, value: a plain NUMBER (its size, not its percentage), note?: <=40 chars}; unit?: <=6 (\"$\" prints before the number, \"hrs\" after it); highlight_index?: the branch the beat is about (it takes the accent); optional heading; optional caption. The SHARES ARE COMPUTED from the values here — never send percentages, they are recomputed and a supplied one is overwritten. total?: only when the source is a known whole that the branches do not fully cover; the leftover is drawn as its own \"Other\" branch rather than silently inflating the parts.",
+      "label_hint": "Use when a single whole DIVIDES — where the money goes, how a day is spent, what makes up the atmosphere by mass. A running list of figures that merely sums is receipt_card; unrelated quantities are animated_chart."
+    },
+    "layers": {
+      "label": "Layer Stack",
+      "required": [
+        "layers"
+      ],
+      "supports_camera_move": false,
+      "description": "The anatomy of something layered: layers = 3-6 of {label <=24 chars, caption?: <=44 chars saying what that layer does}, listed TOP FIRST exactly as they stack in reality — the order is the content, so it is never rearranged; highlight_index?: the one layer this beat is ABOUT (it takes the accent). Optional heading; optional caption under the stack. Repeated labels are legal (real stacks alternate materials).",
+      "label_hint": "Use when things sit ON TOP of each other — atmosphere layers, network stacks, soil horizons, what's inside a battery. A mere list with no vertical structure is checklist_card or icon_grid."
+    },
+    "decision": {
+      "label": "Decision Tree",
+      "required": [
+        "question",
+        "branches"
+      ],
+      "supports_camera_move": false,
+      "description": "A yes/no flowchart, at most two levels deep: question = the FIRST thing you ask (<=64 chars); branches = EXACTLY 2 of {label: the answer that takes this path (<=14, \"Yes\"/\"No\"/\"Under 10k\"), then EITHER outcome: what you do if the path ends here (<=40) OR question: a second question (<=48) plus its own branches of exactly 2 {label, outcome}}. So a path is either decided at level 1 or after one more question — never deeper. Optional heading; optional caption under the tree.",
+      "label_hint": "Use when the beat is genuinely a CHOICE the viewer makes by answering questions. A list of options with no branching is icon_grid or checklist_card; a linear process is step_flow."
+    },
+    "hierarchy": {
+      "label": "Hierarchy",
+      "required": [
+        "root",
+        "children"
+      ],
+      "supports_camera_move": false,
+      "description": "How something is STRUCTURED, drawn as an org chart: root = the one thing at the top (<=28 chars, \"The UN\", \"A cell\", \"Government\"); children = 2-4 of {label: a branch under the root (<=22 chars), caption?: <=40 chars saying what it is or does, children?: 2-4 of {label <=18 chars} for a SECOND level of sub-parts hanging under that branch}. So the tree is at most two levels below the root. highlight_index?: the top-level branch this beat is ABOUT (it takes the accent); optional heading; optional caption. Use it for a genuine parent-of-children structure — an org chart, a taxonomy, the parts-of-parts of a system.",
+      "label_hint": "Use for \"how is X organised/structured\" — one thing that BRANCHES into named parts, optionally with sub-parts. A yes/no path the viewer walks is decision_tree; things stacked ON TOP of each other are layer_stack; a flat list that does not branch is icon_grid or checklist_card."
+    },
+    "receipt": {
+      "label": "Receipt",
+      "required": [
+        "rows"
+      ],
+      "supports_camera_move": false,
+      "description": "An itemised breakdown that adds up to a total: rows = 2-8 of {label: what the line is (<=28 chars), value: a NUMBER — negative for a discount or saving}; total?: the sum — LEAVE IT OUT and the card computes it, and if you supply one that disagrees with the rows the ROWS WIN; total_label?: <=20 (default \"Total\"); unit?: <=6 — a currency symbol prints before the number (\"$\", \"£\"), a word after it (\"hrs\", \"kg\"); heading? sits above like a shop name; caption? <=80 for the period or caveat (\"per month\"). Values are plain numbers: no symbols, no thousands separators inside them — the card formats.",
+      "label_hint": "Use when the beat BREAKS A TOTAL DOWN into named parts that sum. Unrelated figures are animated_chart; one headline number is big_counter."
+    },
+    "mistake": {
+      "label": "Common Mistake",
+      "required": [
+        "wrong",
+        "correct"
+      ],
+      "supports_camera_move": false,
+      "description": "The trap, then the fix: wrong = the line people actually write (<=60 chars, LINEAR MATH NOTATION like math_steps when it is maths); correct = the same move done correctly (<=60) — the two must be the SAME step, not two different topics, so the viewer sees exactly what changed; why?: one plain line naming the error (<=100, \"a square root does not split over a sum\"); heading?: <=60; caption?: <=80 for when the trap bites. Both lines are CHECKED: pure arithmetic is evaluated, and a card whose \"wrong\" line is actually true — or whose \"correct\" line is arithmetically false — is thrown away rather than shown.",
+      "label_hint": "Use for the ONE error a viewer is most likely to make with what was just taught. Two unrelated tips are checklist_card; a false belief about the world is myth_fact."
+    },
+    "practice": {
+      "label": "Practice Problem",
+      "required": [
+        "prompt",
+        "answer"
+      ],
+      "supports_camera_move": false,
+      "description": "One problem handed to the VIEWER to solve, then the answer: prompt = the problem itself (<=90 chars) — in the same LINEAR MATH NOTATION as math_steps when it is maths (frac{a}{b}, sqrt{...}, x^2, pi), plain words otherwise; answer = the worked result (<=40, \"x = 7\", \"38 km\") — REQUIRED, and it must be genuinely correct because the card substitutes numeric answers back into the prompt and REFUSES to print one that does not check out; hint?: one nudge, not a solution (<=70, \"start by squaring both sides\"); heading?: <=60; caption?: <=80 tying it back (\"same move as step 2\"). The problem lands, a pause bar runs while the viewer works, then the answer stamps in — so the narration must actually pause before it says the answer.",
+      "label_hint": "Use ONCE, near the end, when the video asks the viewer to try one themselves. A problem the NARRATOR solves is math_steps; a rhetorical question is not this card."
+    },
+    "term": {
+      "label": "Term",
+      "required": [
+        "term",
+        "definition"
+      ],
+      "supports_camera_move": false,
+      "description": "One word defined, dictionary-style: term = the word or phrase itself (<=28 chars); definition = ONE plain sentence a beginner would understand (<=120 chars, no jargon inside the definition of jargon); phonetic?: how it sounds (<=32 chars, either IPA \"/ˈen.trə.prə.nɜːr/\" or respelling \"on-truh-pruh-NUR\"); part_of_speech?: noun/verb/adjective (<=16); caption?: one extra beat — origin, literal meaning, or a warning (<=80). Optional heading above it all.",
+      "label_hint": "Use when the script STOPS to define a word the viewer needs before continuing. A list of several terms is icon_grid or checklist_card."
+    },
+    "venn": {
+      "label": "Venn",
+      "required": [
+        "sets"
+      ],
+      "supports_camera_move": false,
+      "description": "What two or three things SHARE: sets = 2-3 of {label: <=20 chars naming the group (\"Mammals\", \"Startups\"), caption?: <=32 chars for what is unique to it}; overlap_label?: <=28 chars naming what sits in the middle (\"Both\", \"Whales\", \"The sweet spot\") — the whole point of the card, so give it one. Optional heading; optional caption under the diagram. Two sets overlap side by side, three sit in a triangle with the shared middle tinted.",
+      "label_hint": "Only for genuine OVERLAP — shared traits, common ground, the intersection of requirements. Two things merely being compared is versus_card."
+    },
+    "cycle": {
+      "label": "Cycle",
+      "required": [
+        "items"
+      ],
+      "supports_camera_move": false,
+      "description": "A repeating loop of 3-6 stages: items = [{label: <=4 words naming the stage, icon?: from the ICON LIBRARY (droplet, cloud, sun, factory, truck...)}] IN LOOP ORDER — the card places them clockwise on a ring and draws the arrows around, closing back to stage 1. Optional heading; optional caption (<=60 chars) sits in the ring's centre (\"repeats every ~9 days\")."
+    },
+    "formula": {
+      "label": "Formula Anatomy",
+      "required": [
+        "formula",
+        "parts"
+      ],
+      "supports_camera_move": false,
+      "description": "One equation with its pieces explained: formula (<=80 chars) in the LINEAR MATH NOTATION (frac{a}{b}, sqrt{...}, x^2, x_1; pi theta +- <= >= -> and * become real symbols), parts = 2-4 of {match: an EXACT substring of formula naming the piece (\"-4.9\", \"b^2 - 4*a*c\", \"h_0\"), label: what that piece means in THIS problem (<=48 chars, \"half of gravity, pulling down\")}. Every match must appear character-for-character inside formula — the card finds the piece in the typeset line, underlines it and hangs the label off it with a leader line. Optional heading."
+    },
+    "math_steps": {
+      "label": "Worked Math Steps",
+      "required": [
+        "steps"
+      ],
+      "supports_camera_move": false,
+      "description": "A worked solution: steps = 2-4 lines of {expr, note?} forming a CHAIN — consecutive lines of the same working, each line being the previous one after ONE move (a single-line card is always wrong; the card exists to show a line turning into the next, and it accents exactly what changed). expr (<=60 chars) is LINEAR MATH NOTATION: frac{a}{b} stacked fraction, sqrt{...} radical, x^2 or x^{n+1} powers, x_1 subscripts; pi theta deg +- <= >= != -> and * become real symbols (π θ ° ± ≤ ≥ ≠ → ×). note (optional) <=6 words naming the move (\"subtract 5 from both sides\"). arrows (optional, per step, <=3) = [{from, to}] pen strokes drawn from an atom of the PREVIOUS line to an atom of THIS line: use them whenever a term MOVES (sides of an equation: from: \"5\", to: \"-5\") or a product DISTRIBUTES onto its results (from: \"x\", to: \"x^2\") — the viewer literally sees where each piece went. from/to are short tokens exactly as written in each line. Steps land in order and the LAST step is stamped as the answer — make it the final result. rule (optional) = {name, formula?, why?} — the named rule/law/identity these steps apply, shown in a panel beside the working: name (<=40 chars, \"Product rule of logarithms\"), formula (<=60 chars, the rule STATED GENERALLY in the same linear notation, \"log_b(m) + log_b(n) = log_b(mn)\"), why (<=120 chars, one plain line on what it does, \"adding logs multiplies what is inside\"). The steps show WHAT happened; the rule says WHY it was allowed — fill it whenever a card applies a named rule. Optional heading."
+    },
+    "geometry": {
+      "label": "Geometry Figure",
+      "required": [
+        "shape"
+      ],
+      "supports_camera_move": false,
+      "description": "A native animated geometry figure: shape one of triangle | right_triangle | rectangle | square | polygon | circle | angle | number_line | coordinate_plane | fraction_bar | unit_circle. POLYGON FAMILY (triangle/right_triangle/rectangle/square/polygon/angle): points = 3-8 of {x, y, label?} normalized 0..1 with y UP (for angle: [arm, vertex, arm]); right_triangle/rectangle/square may omit points (a clean default is drawn). side_labels: one measurement per edge in point order (\"6 cm\", \"x + 2\"). angle_marks: [{at: vertex index, label?: \"60°\", right?: true for the right-angle square}]. side_ticks: equal-side hash marks per edge (0-3, e.g. [1,1,0] marks the first two sides equal). side_arrows: parallel-side chevrons per edge (0-2). side_squares: a square erected OUTWARD on an edge, labelled with its area, positional per edge (\"\" = none, e.g. [\"a^2\", \"b^2\", \"c^2\"] stands a labelled square on all three sides of a right triangle) — the figure re-frames itself to fit them; this is how an area argument is drawn, never an uploaded picture. extra_points: named points ON an edge [{on_side: edge index, t: 0..1 along it, label}] for midpoints/feet. highlight_side: edge index drawn in the accent. fill: true shades the interior. CIRCLE: radius_label (\"r = 5 cm\") + center_label (\"O\"), fill. UNIT_CIRCLE (trigonometry, complex numbers, polar form, rotations): angle_deg = the angle in DEGREES, swung counter-clockwise from the positive x-axis; angle2_deg = a SECOND angle drawn after it, so the beat can show one angle becoming another (n*theta for De Moivre, a rotation, an angle sum) — the first stays in ink for comparison; angle_label/angle2_label name them (\"theta\", \"n theta\"); point_label names the point on the circle (\"cos(theta) + i sin(theta)\"); show_coords labels it with its real (cos, sin) values instead. Angles wrap, so 400 IS 40. NUMBER_LINE: marks [{x, label?}] plot values; segment {from, to} draws an accent interval (inequalities, absolute value); x_min/x_max optional. COORDINATE_PLANE: rise_run: true (with line_through) draws the dashed slope triangle between the two points, its Δx and Δy legs labelled with the real differences — ALWAYS set it on a slope problem. coords [{x, y, label?}] are REAL values (not normalized) — the renderer frames them; line_through: [i, j] draws the line through two of those points (slope/midpoint/distance). FRACTION_BAR: numerator + denominator draw a partitioned bar with numerator cells filled (fractions, proportions). Every shape takes optional heading, caption. NEVER request an uploaded image of a figure — it is always drawn natively from this data."
+    },
+    "function_plot": {
+      "label": "Function Plot",
+      "required": [
+        "expression"
+      ],
+      "supports_camera_move": false,
+      "description": "A native animated graph of y = f(x). expression is calculator syntax in x: + - * / ^ ( ), functions sin cos tan sqrt abs log ln exp, constants pi and e (e.g. \"x^2 - 4\", \"sin(x)\", \"2^x\", \"1/x\"). x_min / x_max (numbers, default -5..5) frame the domain. marks (optional, <=3): [{x, label?}] points that pop onto the curve (roots, vertex, intersections). expression2 (optional): a SECOND curve in the same syntax, drawn in ink — for comparing two functions or showing an intersection. tangent_at (optional number): draws the tangent line where the curve is touched at that x (slope/derivative beats). shade (optional {from, to}): shades the region under the curve between two x values (area/integral beats). Optional heading, caption. NEVER request a screenshot of a graph — the curve is plotted natively."
+    },
+    "scenario": {
+      "label": "Scenario Setup",
+      "required": [
+        "entities"
+      ],
+      "supports_camera_move": false,
+      "description": "The word-problem SETUP drawn as a schematic: layout = the SHAPE of the sketch, pick the ONE that looks like the situation — \"arc\" when the thing goes up and comes back down (projectiles, thrown balls: a real parabola with the peak on top and a dashed trajectory — NEVER draw a projectile as a flat chain), \"climb\" when it rises (ascent, tanks filling, growth), \"fall\" when it drops (released objects, draining), \"compare\" when two or more rivals are weighed side by side (A vs B, which is faster/cheaper, when equal — ONE entity per parallel lane), \"split\" when one source fans out into outcomes (probability trees, ways something can happen, work shared, a whole divided — the FIRST entity is the source, the rest are the branches), \"cycle\" when a closed loop of stages returns to the start (a repeating process, a clock/orbit/lap — entities are the stages in loop order), \"line\" (default) for flat left-to-right stories (two things approaching, A to B distance). entities = 2-4 actors ordered by the layout (arc: launch → peak → landing; split: source first) [{label <=16 (\"Car\", \"Tank A\", \"Destination\"), sprite?: a concrete drawable OBJECT in <=8 words (\"a red hatchback car, side view\", \"a water tank\") — the system draws it as a cut-out image that sits ON the diagram in place of the icon box; give a sprite to EVERY actor that is a concrete thing (a scene of real objects beats a row of boxes), and leave it out only for an abstract place/stage. icon?: from the ICON LIBRARY (car, map-pin, flag, truck, clock, droplet, users...), value?: the GIVEN value written under the box in math notation (\"v = 20 km/min\", \"t = 20 min\"), emphasis?: \"key\" on the SINGLE entity the question is really about (the FIND, the winner, the pay-off branch) — an accent frame lifts it out of the crowd}]. connectors = one per gap (positional) [{label?: what the connection means — the motion (\"distance d\", \"rises\"), the branch's probability/share for split (\"0.6\", \"3/4\"), the rate/price driving a compare lane (\"60 km/h\"), sub?: a value or \"?\" riding under the line, style?: arrow|line|both (both = two things moving toward each other)}]. question?: the thing being asked, stamped as an accent chip (\"d = ?\"). Boxes pop in order, connectors draw between them along the shape — the problem is assembled on screen before the algebra starts."
+    },
+    "stock_video": {
+      "label": "Stock B-Roll",
+      "required": [
+        "query"
+      ],
+      "supports_camera_move": true,
+      "description": "FREE stock footage fetched automatically: usable in any slot that accepts video. Set query to a 2-4 word generic search (\"city skyline aerial\", \"hands typing keyboard\", \"crowd cheering stadium\"). ONLY for generic atmosphere b-roll — anything specific or named stays an image/video asset_request. At most 3 per video."
+    }
+  },
+  "stock_video": {
+    "max_per_video": 3
+  },
+  "camera_moves": [
+    "static",
+    "slow_zoom_in",
+    "slow_zoom_out",
+    "pan_left",
+    "pan_right",
+    "pan_up",
+    "pan_down",
+    "ken_burns",
+    "ken_burns_reverse",
+    "push_in",
+    "pull_out",
+    "tilt_zoom",
+    "zoom_in_snap",
+    "pan_up_zoom_in",
+    "hover",
+    "arc_pan",
+    "whip_settle",
+    "pedestal_up",
+    "pedestal_down"
+  ],
+  "default_camera_move": "ken_burns",
+  "transitions": [
+    "none",
+    "fade",
+    "push_left",
+    "push_right",
+    "push_up",
+    "push_down",
+    "wipe",
+    "wipe_up",
+    "zoom_through",
+    "zoom_out_in",
+    "whip_pan",
+    "mask_wipe_circle",
+    "mask_wipe_diagonal",
+    "column_reveal",
+    "split_slide",
+    "stack_push",
+    "line_sweep",
+    "match_dissolve"
+  ],
+  "default_transition": "fade",
+  "transition_meanings": {
+    "mask_wipe_circle": "A detail opens out of the previous idea — a circular reveal from the focal point. The signature for elaboration.",
+    "mask_wipe_diagonal": "The crisp editorial default cut: a tilted edge sweeps the new scene in with an accent hairline riding it.",
+    "column_reveal": "Five staggered vertical strips — analytical, data-heavy, Swiss-minimal beats.",
+    "split_slide": "The frame takes two sides: the old scene splits at a centre seam and its halves depart in opposite directions. The signature for contrast.",
+    "stack_push": "The new idea slides in over the old, which recedes under a flat dim. The signature forward cut for continuation.",
+    "line_sweep": "One hairline sweeps across; everything behind it IS the next scene. The hard minimal act-break.",
+    "match_dissolve": "A slow crossfade on a shared scale path — one camera breath. The signature for callbacks and reflective beats."
+  },
+  "peak_templates": [
+    "versus_card",
+    "animated_chart",
+    "big_counter",
+    "math_steps",
+    "function_plot",
+    "geometry_diagram"
+  ],
+  "peak_interval_seconds": 45,
+  "relation_signatures": {
+    "opening": "none",
+    "continues": "stack_push",
+    "elaborates": "mask_wipe_circle",
+    "consequence": "whip_pan",
+    "contrast": "split_slide",
+    "callback": "match_dissolve",
+    "new_chapter": "line_sweep"
+  },
+  "font_packs": {
+    "default": "auto",
+    "packs": {
+      "editorial": {
+        "label": "Editorial",
+        "display": "Bricolage Grotesque",
+        "body": "Instrument Sans",
+        "mono": "Space Mono",
+        "use_when": "default modern look; news, tech, product topics"
+      },
+      "classic": {
+        "label": "Classic Serif",
+        "display": "Fraunces",
+        "body": "Instrument Sans",
+        "mono": "Space Mono",
+        "use_when": "history, biography, serious or dramatic topics"
+      },
+      "tech": {
+        "label": "Tech",
+        "display": "Space Grotesk",
+        "body": "Inter",
+        "mono": "JetBrains Mono",
+        "use_when": "technical, data-heavy, analytical topics"
+      }
+    }
+  },
+  "moods": [
+    "neutral",
+    "upbeat",
+    "calm",
+    "dramatic",
+    "tense",
+    "inspirational",
+    "suspense"
+  ],
+  "default_mood": "neutral",
+  "color_schemes": [
+    {
+      "name": "carbon",
+      "label": "Carbon",
+      "bg_from": "#0D0D0F",
+      "bg_to": "#0D0D0F",
+      "accent": "#C8F02E",
+      "accent2": "#96C21F",
+      "text": "#F2F1EE",
+      "muted": "#8E8D89",
+      "panel": "#17171A"
+    },
+    {
+      "name": "ink",
+      "label": "Ink",
+      "bg_from": "#101013",
+      "bg_to": "#101013",
+      "accent": "#FF5A36",
+      "accent2": "#FF9E45",
+      "text": "#F4F2EE",
+      "muted": "#94918C",
+      "panel": "#1A1A1F"
+    },
+    {
+      "name": "paper",
+      "label": "Paper",
+      "bg_from": "#F7F2E8",
+      "bg_to": "#F7F2E8",
+      "accent": "#E0442A",
+      "accent2": "#C4842A",
+      "text": "#16130F",
+      "muted": "#6E655A",
+      "panel": "#EFE8DA"
+    },
+    {
+      "name": "slate",
+      "label": "Slate",
+      "bg_from": "#0F1419",
+      "bg_to": "#0F1419",
+      "accent": "#34C7E0",
+      "accent2": "#6FD9EF",
+      "text": "#ECF1F5",
+      "muted": "#8795A0",
+      "panel": "#182027"
+    },
+    {
+      "name": "bone",
+      "label": "Bone",
+      "bg_from": "#F4F3ED",
+      "bg_to": "#F4F3ED",
+      "accent": "#1E8A5B",
+      "accent2": "#3FAE79",
+      "text": "#121714",
+      "muted": "#6A7068",
+      "panel": "#E9E8E0"
+    },
+    {
+      "name": "midnight",
+      "label": "Midnight",
+      "bg_from": "#0A0F1E",
+      "bg_to": "#0A0F1E",
+      "accent": "#FFB020",
+      "accent2": "#FF7A45",
+      "text": "#EDF0F8",
+      "muted": "#838CA2",
+      "panel": "#121A2E"
+    },
+    {
+      "name": "plum",
+      "label": "Plum",
+      "bg_from": "#150F1B",
+      "bg_to": "#150F1B",
+      "accent": "#E879A6",
+      "accent2": "#B57BE0",
+      "text": "#F4EEF6",
+      "muted": "#9A8FA3",
+      "panel": "#1F1728"
+    },
+    {
+      "name": "sand",
+      "label": "Sand",
+      "bg_from": "#F0E8DB",
+      "bg_to": "#F0E8DB",
+      "accent": "#0F7C7B",
+      "accent2": "#C25E3B",
+      "text": "#14201F",
+      "muted": "#6E6558",
+      "panel": "#E4DBCB"
+    },
+    {
+      "name": "royal",
+      "label": "Royal",
+      "bg_from": "#101630",
+      "bg_to": "#101630",
+      "accent": "#F5C542",
+      "accent2": "#D9A521",
+      "text": "#F4F2EA",
+      "muted": "#8B90A8",
+      "panel": "#1A2140"
+    },
+    {
+      "name": "blossom",
+      "label": "Blossom",
+      "bg_from": "#FAF1EC",
+      "bg_to": "#FAF1EC",
+      "accent": "#D95970",
+      "accent2": "#B84760",
+      "text": "#221A18",
+      "muted": "#8A7A75",
+      "panel": "#F3E6DF"
+    },
+    {
+      "name": "terminal",
+      "label": "Terminal",
+      "bg_from": "#050807",
+      "bg_to": "#050807",
+      "accent": "#33FF66",
+      "accent2": "#22CC52",
+      "text": "#D8FFE3",
+      "muted": "#4E7A5E",
+      "panel": "#0B120E"
+    },
+    {
+      "name": "glacier",
+      "label": "Glacier",
+      "bg_from": "#F4F8FB",
+      "bg_to": "#F4F8FB",
+      "accent": "#3E8FD8",
+      "accent2": "#2C6FB0",
+      "text": "#14202B",
+      "muted": "#7C8B98",
+      "panel": "#E9F0F6"
+    },
+    {
+      "name": "ember",
+      "label": "Ember",
+      "bg_from": "#17130F",
+      "bg_to": "#17130F",
+      "accent": "#FF7A29",
+      "accent2": "#D95F14",
+      "text": "#F5EFE8",
+      "muted": "#94897D",
+      "panel": "#221C15"
+    },
+    {
+      "name": "orchid",
+      "label": "Orchid",
+      "bg_from": "#10201F",
+      "bg_to": "#10201F",
+      "accent": "#A87CF0",
+      "accent2": "#8A5CD6",
+      "text": "#EEF2F0",
+      "muted": "#7E948F",
+      "panel": "#182B29"
+    }
+  ],
+  "templates": {
+    "single_focus": {
+      "label": "Single Focus",
+      "description": "One full-frame visual (or one text card). Use for a plain establishing shot, a single hero image, or a single headline/stat with no competing overlay.",
+      "slots": {
+        "slot_main": {
+          "label": "Main",
+          "allowed": [
+            "image",
+            "video",
+            "text_block"
+          ]
+        }
+      }
+    },
+    "split_side_by_side": {
+      "label": "Split Side by Side",
+      "description": "Two equal columns, left and right. Use for any comparison or pairing: image+image, image+bullets, bullets+image, or bullets+bullets.",
+      "slots": {
+        "slot_left": {
+          "label": "Left",
+          "allowed": [
+            "image",
+            "video",
+            "text_block"
+          ]
+        },
+        "slot_right": {
+          "label": "Right",
+          "allowed": [
+            "image",
+            "video",
+            "text_block"
+          ]
+        }
+      }
+    },
+    "split_top_bottom": {
+      "label": "Split Top / Bottom",
+      "description": "Two stacked rows, top and bottom. Like split_side_by_side but vertical — good for 'map on top, facts below' or before/after stacked.",
+      "slots": {
+        "slot_top": {
+          "label": "Top",
+          "allowed": [
+            "image",
+            "video",
+            "text_block"
+          ]
+        },
+        "slot_bottom": {
+          "label": "Bottom",
+          "allowed": [
+            "image",
+            "video",
+            "text_block"
+          ]
+        }
+      }
+    },
+    "full_bleed_with_side_panel": {
+      "label": "Full Image + Side Panel",
+      "description": "One big full-screen image or video with a floating frosted-glass explanation box on one side. Use to point out or explain part of a single visual. This is the 'explanation box over the side of an image' layout.",
+      "slots": {
+        "slot_background": {
+          "label": "Background",
+          "allowed": [
+            "image",
+            "video"
+          ]
+        },
+        "slot_panel": {
+          "label": "Panel",
+          "allowed": [
+            "explanation_box",
+            "text_block"
+          ],
+          "dock_options": [
+            "left",
+            "right"
+          ],
+          "default_dock": "right",
+          "default_width_pct": 33,
+          "min_width_pct": 24,
+          "max_width_pct": 38
+        }
+      }
+    },
+    "full_bleed_with_banner": {
+      "label": "Full Image + Banner",
+      "description": "One big full-screen image or video with a heading/stat banner across the top or bottom. Use for a hero shot with a title or a key stat.",
+      "slots": {
+        "slot_background": {
+          "label": "Background",
+          "allowed": [
+            "image",
+            "video"
+          ]
+        },
+        "slot_banner": {
+          "label": "Banner",
+          "allowed": [
+            "text_block",
+            "explanation_box"
+          ],
+          "dock_options": [
+            "top",
+            "bottom"
+          ],
+          "default_dock": "bottom"
+        }
+      }
+    },
+    "stat_spotlight": {
+      "label": "Stat Spotlight",
+      "description": "A single number, statistic or very short claim filling the whole screen as giant typography, with up to 2 small support lines. Use ONLY when the scene's entire point is one figure ('$4.2 billion', '12% of global trade') — the heading IS the stat. At most twice per video.",
+      "slots": {
+        "slot_stat": {
+          "label": "Stat",
+          "allowed": [
+            "text_block"
+          ]
+        }
+      }
+    },
+    "quote_card": {
+      "label": "Quote Card",
+      "description": "A verbatim quotation or aphorism set as a giant typographic pull-quote with an attribution line. Use ONLY when the scene quotes someone or lands a memorable one-liner. Put the quote in the body (or heading), the source in the heading. At most twice per video.",
+      "slots": {
+        "slot_quote": {
+          "label": "Quote",
+          "allowed": [
+            "explanation_box",
+            "text_block"
+          ]
+        }
+      }
+    },
+    "outro_card": {
+      "label": "Outro Card",
+      "description": "Auto-appended closing end card: title recap, follow CTA chip, optional handle. NEVER choose this template yourself - the system appends it automatically after the final scene.",
+      "slots": {
+        "slot_outro": {
+          "label": "Outro",
+          "allowed": [
+            "text_block"
+          ]
+        }
+      }
+    },
+    "versus_card": {
+      "label": "Versus Card",
+      "description": "A head-to-head showdown: two media panels slide in against a centre seam, a VS badge slams in, short stat rows alternate under each side, and an optional verdict row floods the frame. use_when: the narration explicitly compares two NAMED things (products, games, cities, eras). Needs an image for EACH side. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_left": {
+          "label": "Left Side",
+          "allowed": [
+            "image",
+            "video"
+          ]
+        },
+        "slot_right": {
+          "label": "Right Side",
+          "allowed": [
+            "image",
+            "video"
+          ]
+        },
+        "slot_versus": {
+          "label": "Versus Data",
+          "allowed": [
+            "versus"
+          ]
+        }
+      }
+    },
+    "animated_chart": {
+      "label": "Animated Chart",
+      "description": "A native animated chart: bars grow, a line/area draws itself, a donut or pie sweeps, scatter dots land with a trend line, a radar polygon draws its web — values count up as they land. use_when: the narration lists 3+ comparable numbers (market shares, scores, years vs values). ALWAYS use this instead of requesting a chart screenshot. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_chart": {
+          "label": "Chart",
+          "allowed": [
+            "chart"
+          ]
+        }
+      }
+    },
+    "big_counter": {
+      "label": "Big Counter",
+      "description": "One colossal number odometer-rolls up to its value, its unit stamps in after, with a kicker above and one support line below. use_when: one number IS the story and deserves more drama than stat_spotlight (records, totals, milestones). At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_counter": {
+          "label": "Counter",
+          "allowed": [
+            "chart",
+            "text_block"
+          ]
+        }
+      }
+    },
+    "checklist_card": {
+      "label": "Checklist / Pros & Cons",
+      "description": "Rows stamp in with checks drawing themselves: two columns (pros vs cons) split by a hairline, or a single checklist. use_when: requirements, do's and don'ts, advantages vs disadvantages, 'what you need'. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_checklist": {
+          "label": "Checklist",
+          "allowed": [
+            "proscons"
+          ]
+        }
+      }
+    },
+    "icon_grid": {
+      "label": "Icon Grid",
+      "description": "A 2x2 to 3x3 grid of line icons that draw themselves in, each with a 1-2 word label. use_when: enumerating parts, features, categories, ingredients, players — 'the five things that make X work'. Icons come ONLY from the ICON LIBRARY list. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_icons": {
+          "label": "Icons",
+          "allowed": [
+            "icons"
+          ]
+        }
+      }
+    },
+    "chapter_cover": {
+      "label": "Chapter Cover",
+      "description": "Auto-inserted act-break cover: a full-bleed solid field with a huge chapter numeral and the chapter title. NEVER choose this template yourself - the system inserts covers at chapter boundaries automatically.",
+      "slots": {
+        "slot_cover": {
+          "label": "Cover",
+          "allowed": [
+            "text_block"
+          ]
+        }
+      }
+    },
+    "timeline_card": {
+      "label": "Timeline",
+      "description": "A hairline timeline draws across the frame and 3-6 dated nodes pop on in sequence, the strip gliding so the active node stays in focus. use_when: history of something, a roadmap, release dates, eras. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_timeline": {
+          "label": "Timeline",
+          "allowed": [
+            "timeline_nodes"
+          ]
+        }
+      }
+    },
+    "step_flow": {
+      "label": "Step Flow",
+      "description": "3-5 numbered nodes connected by a drawing hairline, each with an icon and a <=4 word label — the line leads, nodes pop on arrival. use_when: how it works, a process, a recipe, a pipeline. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_steps": {
+          "label": "Steps",
+          "allowed": [
+            "steps"
+          ]
+        }
+      }
+    },
+    "spectrum_card": {
+      "label": "Spectrum",
+      "description": "A labelled axis (cheap ↔ expensive, safe ↔ risky) with 2-5 items dropped onto it at their real positions — the axis draws, poles land at the ends, each item's dot pops with its label as the narration names it, and the highlighted item (the question's subject) takes the accent. use_when: the beat asks WHERE something sits relative to others — pricing, risk, difficulty, political lean, sweetness. Positions are judgements you commit to (0 = left pole, 1 = right). Never for time (that is timeline_card) or measured data series (animated_chart). At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_spectrum": {
+          "label": "Spectrum",
+          "allowed": [
+            "spectrum"
+          ]
+        }
+      }
+    },
+    "quadrant_map": {
+      "label": "Quadrant Map",
+      "description": "A 2x2 matrix: two labelled axes crossing, the four zones optionally named, and 3-6 items dropped at their real coordinates — each dot pops with its label as the narration names it, and the item the beat is about takes the accent. use_when: the beat sorts things by TWO independent judgements at once — effort vs impact, urgency vs importance, risk vs reward, cost vs quality. Coordinates are judgements you commit to (x: 0 = left pole, y: 0 = bottom pole). Never for ONE dimension (that is spectrum_card), never for measured data series (animated_chart), never for a chronology (timeline_card). At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_quadrant": {
+          "label": "Quadrant Map",
+          "allowed": [
+            "quadrant"
+          ]
+        }
+      }
+    },
+    "scale_comparison": {
+      "label": "Scale Comparison",
+      "description": "Two or three things drawn at TRUE relative size on one baseline, so the viewer feels the difference instead of being told it: each shape grows into place as the narration names it, its figure counting up beside it, and the one the beat is about takes the accent. The sizes are computed from the values server-side. use_when: the beat is HOW BIG something is next to something else — a blue whale beside a bus, Jupiter beside Earth, a gigabyte beside a terabyte. Beyond a 40x spread the smallest thing cannot be drawn honestly in one frame, so the card stops pretending and states the ratio (\"x1,200 smaller\") instead. Parts of ONE whole are proportion_flow; a measured series is animated_chart; two things compared feature by feature is versus_card. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_scale": {
+          "label": "Scale Comparison",
+          "allowed": [
+            "scale"
+          ]
+        }
+      }
+    },
+    "evidence_card": {
+      "label": "Evidence",
+      "description": "The credible citation beat: one finding stated as the headline, with its source, year and sample cited beneath it like a reference the viewer could go and check. The finding reveals as the narration speaks it, then the attribution stamps in. use_when: the beat's authority rests on a SPECIFIC named source — \"According to a 2021 Lancet study…\", \"Stanford researchers found…\". The card is the constructive counterpart of the no_source warning: it will only render when the source actually names someone, and refuses (falling back to plain text) rather than wrap \"studies show\" in a citation frame it has not earned. A number that stands alone is big_counter; a myth being corrected is myth_fact; a list of findings is checklist_card. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_evidence": {
+          "label": "Evidence",
+          "allowed": [
+            "evidence"
+          ]
+        }
+      }
+    },
+    "proportion_flow": {
+      "label": "Proportion Flow",
+      "description": "The whole, and then the split: one full-width source bar divides into 2-5 proportional segments, each segment landing with its own legend row as the narration names it, the branch the beat is about taking the accent. use_when: the beat breaks ONE whole into its parts — where the tax dollar goes, how the day is spent, what the atmosphere is made of. The share of every branch is COMPUTED from its value server-side, so the bar can never disagree with the numbers beside it. A list of figures that merely adds up to a total is receipt_card; unrelated quantities side by side are animated_chart; one headline share is pictogram_percent. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_proportion": {
+          "label": "Proportion Flow",
+          "allowed": [
+            "proportion"
+          ]
+        }
+      }
+    },
+    "layer_stack": {
+      "label": "Layer Stack",
+      "description": "The \"what's inside X\" beat drawn as what it is: 3-6 flat slabs stacked top-to-bottom in their REAL order, each landing with its label (and an optional one-line caption) as the narration reaches it, deeper layers shading progressively darker, the highlighted layer taking the accent. use_when: things genuinely sit ON TOP of each other — atmosphere layers, the OSI/network stack, soil horizons, a battery's insides, a tech stack. The order is the content: layers are listed TOP FIRST and never rearranged. A list with no vertical structure is checklist_card or icon_grid; a repeating loop is cycle_diagram. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_layers": {
+          "label": "Layer Stack",
+          "allowed": [
+            "layers"
+          ]
+        }
+      }
+    },
+    "decision_tree": {
+      "label": "Decision Tree",
+      "description": "A yes/no flowchart that draws itself: the opening question sits at the top, two labelled connectors sweep down to the answers, and a path that needs one more question splits again into its two outcomes. Outcomes land in accent — they are what the viewer came for. At most two levels, so at most four endings. use_when: the beat is genuinely a CHOICE the viewer makes by answering questions (\"which one should you use?\", \"do you need X?\"). A list of options that do not branch is icon_grid or checklist_card; a linear process is step_flow. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_decision": {
+          "label": "Decision",
+          "allowed": [
+            "decision"
+          ]
+        }
+      }
+    },
+    "hierarchy_card": {
+      "label": "Hierarchy",
+      "description": "A structure drawn as an org chart: the root sits at the top, connectors sweep down to a row of 2-4 branches, and any branch that has sub-parts drops a short spine to its own stacked children. Each branch lands as the narration names it, the one this beat is about taking the accent. use_when: the beat is a genuine PARENT-OF-CHILDREN structure — how an organisation is organised, the parts of a system and their parts, a taxonomy. A yes/no path the viewer walks by answering is decision_tree; things sitting ON TOP of each other are layer_stack; a flat list that does not branch is icon_grid or checklist_card. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_hierarchy": {
+          "label": "Hierarchy",
+          "allowed": [
+            "hierarchy"
+          ]
+        }
+      }
+    },
+    "receipt_card": {
+      "label": "Receipt",
+      "description": "A till receipt in mono type: itemised rows print one by one with the figure right-aligned over a dotted leader, a double rule closes the list, and the total stamps in below in accent. The card ADDS THE ROWS UP ITSELF, so the total on screen is always the truth. use_when: the beat breaks a total down into named parts that sum — a cost breakdown, where the hours went, what a tax actually funds, a price after discounts. Unrelated figures belong in animated_chart; a single headline number is big_counter. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_receipt": {
+          "label": "Receipt",
+          "allowed": [
+            "receipt"
+          ]
+        }
+      }
+    },
+    "common_mistake": {
+      "label": "Common Mistake",
+      "description": "The trap beat: the line people actually write lands first, marked with a muted cross; as the narration turns, a strike draws through it and the correct line stamps in below on an accent rule with a tick, and one plain sentence names the error. Both lines are typeset like real working, so the viewer compares the MOVE, not two paragraphs about it. use_when: there is one error a viewer is very likely to make with what was just taught — a sign flipped, a root split over a sum, a rule applied where it does not hold. A false belief about the world is myth_fact; a list of tips is checklist_card. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_mistake": {
+          "label": "Common Mistake",
+          "allowed": [
+            "mistake"
+          ]
+        }
+      }
+    },
+    "practice_card": {
+      "label": "Practice Problem",
+      "description": "The \"now you try one\" beat: a kicker reads YOUR TURN, the problem is typeset large, an optional hint sits under it, and an accent pause bar runs across the frame while the viewer works — then the answer stamps in on an accent chip. The card never prints a numeric answer it could not verify against the problem. use_when: the video hands the viewer a problem to solve themselves, almost always as the last teaching beat before the outro. A problem the narrator works through is math_steps; a rhetorical question is a text scene. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_practice": {
+          "label": "Practice Problem",
+          "allowed": [
+            "practice"
+          ]
+        }
+      }
+    },
+    "term_card": {
+      "label": "Term",
+      "description": "A dictionary entry, full frame: the word lands large with an accent underline that draws under it, the pronunciation and part of speech settle beneath, a hairline rule sweeps across, and the one-sentence definition types on. use_when: the script STOPS to define a word the viewer needs before the explanation can continue — jargon, a loanword, a technical term. Defining several words at once is icon_grid or checklist_card; a term plus its formula is formula_anatomy. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_term": {
+          "label": "Term",
+          "allowed": [
+            "term"
+          ]
+        }
+      }
+    },
+    "venn_card": {
+      "label": "Venn",
+      "description": "2-3 outlined circles overlap and the shared middle tints in accent, each set's label landing as the narration names it and the overlap label stamping in last — the punchline of the beat. use_when: the point is what things have IN COMMON, or what sits at the intersection of requirements (\"cheap, fast, good — pick two\"). Two things merely being compared side by side is versus_card; a list of shared traits with no groups is checklist_card. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_venn": {
+          "label": "Venn",
+          "allowed": [
+            "venn"
+          ]
+        }
+      }
+    },
+    "cycle_diagram": {
+      "label": "Cycle Diagram",
+      "description": "3-6 stages on a ring: accent discs (icon or number) with labels outside, joined by arrows that draw clockwise around the circle and CLOSE THE LOOP back to stage 1 — each stage lands as the narration names it. use_when: a process that REPEATS — water cycle, habit loop, supply chain, product lifecycle, feedback loop. A one-way process that ends is step_flow, not a cycle. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_cycle": {
+          "label": "Cycle",
+          "allowed": [
+            "cycle"
+          ]
+        }
+      }
+    },
+    "before_after": {
+      "label": "Before / After",
+      "description": "Two images in one frame: an accent wipe line sweeps across once and back, revealing AFTER over BEFORE. use_when: transformations, redesigns, restorations, upgrades — needs an image for each state. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_before": {
+          "label": "Before",
+          "allowed": [
+            "image"
+          ]
+        },
+        "slot_after": {
+          "label": "After",
+          "allowed": [
+            "image"
+          ]
+        }
+      }
+    },
+    "list_ranking": {
+      "label": "Ranking Countdown",
+      "description": "Ranked rows slide in as a countdown N -> 1, rank badges in solid accent squares; the #1 row lands with a stamp and an accent flood. use_when: top 5 lists, best-of rankings, power rankings. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_ranking": {
+          "label": "Ranking",
+          "allowed": [
+            "ranking"
+          ]
+        }
+      }
+    },
+    "progress_meter": {
+      "label": "Progress Meter",
+      "description": "One horizontal meter fills to a percentage while the number counts up. use_when: \"78% of players said...\", completion rates, adoption shares — one percentage IS the scene. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_meter": {
+          "label": "Meter",
+          "allowed": [
+            "meter"
+          ]
+        }
+      }
+    },
+    "quote_portrait": {
+      "label": "Quote + Portrait",
+      "description": "A pull-quote with a round-masked portrait of its source and an attribution line, the quote tinting word by word with the voice. use_when: a quotation from a specific person whose face matters — needs a portrait image upload. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_portrait": {
+          "label": "Portrait",
+          "allowed": [
+            "image"
+          ]
+        },
+        "slot_quote": {
+          "label": "Quote",
+          "allowed": [
+            "explanation_box",
+            "text_block"
+          ]
+        }
+      }
+    },
+    "phone_mockup": {
+      "label": "Device Mockup",
+      "description": "A screenshot or screen recording presented inside a flat CSS device frame — a phone (rounded bezel + notch dot) or a browser window (flat bar + three dots + URL). Set \"frame\": \"phone\" or \"browser\" on the slot. use_when: apps, websites, UI, posts, messages — any screen content. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_screen": {
+          "label": "Screen",
+          "allowed": [
+            "image",
+            "video"
+          ]
+        }
+      }
+    },
+    "photo_stack": {
+      "label": "Photo Stack",
+      "description": "2-4 photos presented as physical prints (paper border, slight rotations) stacked on the field; the top print slides away to reveal the next, timed to the narration. use_when: a sequence of related photos — eras, examples, evidence shots. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_photo_1": {
+          "label": "Photo 1",
+          "allowed": [
+            "image"
+          ]
+        },
+        "slot_photo_2": {
+          "label": "Photo 2",
+          "allowed": [
+            "image"
+          ]
+        },
+        "slot_photo_3": {
+          "label": "Photo 3",
+          "allowed": [
+            "image"
+          ],
+          "optional": true
+        },
+        "slot_photo_4": {
+          "label": "Photo 4",
+          "allowed": [
+            "image"
+          ],
+          "optional": true
+        }
+      }
+    },
+    "map_card": {
+      "label": "Map",
+      "description": "A flat vector world map (muted country strokes on the paper field); 1-2 labelled pins drop in, and with two pins an optional route arc draws between them. use_when: WHERE something is/happened, distances, spread between two places (slot_map {pins: [{label, lat, lon}], region?, route?, heading?}). At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_map": {
+          "label": "Map",
+          "allowed": [
+            "map"
+          ]
+        }
+      }
+    },
+    "headline_ticker": {
+      "label": "Headline Ticker",
+      "description": "2-3 press/reaction headline chips stack in one after another — solid panels with a mono source label, text clip-revealing in. use_when: \"the internet reacted\", press coverage, community response beats (slot_headlines {items: [{text, source}], heading?}). At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_headlines": {
+          "label": "Headlines",
+          "allowed": [
+            "headlines"
+          ]
+        }
+      }
+    },
+    "pictogram_percent": {
+      "label": "Pictogram",
+      "description": "A people-stat drawn as people: \"7 in 10\" renders as a row of person silhouettes filling in accent one by one (a fractional share clips the last person part-way). use_when: a statistic about a SHARE OF PEOPLE — \"7 in 10 gamers\", \"1 in 4 adults\", \"64% of users\" (slot_pictogram {filled: the numerator (decimals fine, 6.4), of: the denominator (usually 10), label: who/what the share is, unit?: \"%\" to display the clean percentage, heading?}). Abstract percentages that are not about people stay on progress_meter. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_pictogram": {
+          "label": "Pictogram",
+          "allowed": [
+            "pictogram"
+          ]
+        }
+      }
+    },
+    "myth_fact": {
+      "label": "Myth vs Fact",
+      "description": "The debunk beat: the common belief is presented straight, then an ✗ draws, a strike-through crosses it out and the FACT panel stamps in beneath with its ✓ — timed to the narration's pivot word (\"actually…\"). use_when: the script corrects a widespread belief (\"everyone thinks…\", \"you've been told…\", \"actually…\") (slot_myth_fact {myth: the belief as people say it <=140, fact: the correction <=140, heading?}). Never for mere comparisons — that is versus_card. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_myth_fact": {
+          "label": "Myth vs Fact",
+          "allowed": [
+            "myth_fact"
+          ]
+        }
+      }
+    },
+    "labeled_diagram": {
+      "label": "Labeled Diagram",
+      "description": "One hero illustration shown WHOLE (never cropped) with 2-4 leader-line part labels popping in as the narration names each part. use_when: \"how X works\", parts of a machine/organ/system/place, anatomy of anything (slot_diagram {content_type image, asset_request.description: ONE clean centered subject on a plain background, heading?, callout_suggestions: [2-4 short part names]}). The labels are drawn natively — the image itself must contain no text. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_diagram": {
+          "label": "Diagram",
+          "allowed": [
+            "image"
+          ]
+        }
+      }
+    },
+    "formula_anatomy": {
+      "label": "Formula Anatomy",
+      "description": "One formula typeset large with 2-4 of its pieces underlined and labelled via leader lines, each label landing as the narration names it (\"the -4.9 is half of gravity, pulling down\"). use_when: a beat pivots on ONE driving equation — in ANY subject: E = m*c^2 in a physics story, compound interest in a finance one, the model equation before a maths solve. Introduce the equation's anatomy; never a substitute for a derivation (that is math_steps), and never for a formula the video only mentions in passing. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_formula": {
+          "label": "Formula",
+          "allowed": [
+            "formula"
+          ]
+        }
+      }
+    },
+    "math_steps": {
+      "label": "Worked Math",
+      "description": "A worked solution, line by line: each step typeset natively (stacked fractions, radicals, powers), an optional margin note names the move, landed steps dim, and the final line stamps in on an accent chip as the answer. use_when: solving an equation, deriving or applying a formula, any \"here is how you get the answer\" beat. Split long solutions across consecutive math_steps scenes (2-4 steps each) so the working tracks the narration. At most 4 per video.",
+      "max_per_video": 4,
+      "slots": {
+        "slot_math": {
+          "label": "Worked Steps",
+          "allowed": [
+            "math_steps"
+          ]
+        }
+      }
+    },
+    "geometry_diagram": {
+      "label": "Geometry Diagram",
+      "description": "A dynamic geometry figure on faint graph paper: the shape draws itself stroke-first, vertex letters land, side measurements fade in at each edge, angle arcs sweep (right angles get the square marker), and one side can be highlighted in the accent. use_when: the problem involves a triangle, rectangle, circle, polygon or angle — label sides/angles with the GIVEN values from the question. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_geometry": {
+          "label": "Figure",
+          "allowed": [
+            "geometry"
+          ]
+        }
+      }
+    },
+    "function_plot": {
+      "label": "Function Plot",
+      "description": "y = f(x) drawn live on graph paper: axes land, the curve draws itself left to right (asymptotes break it honestly), and labelled points pop onto the curve. use_when: a function, curve, slope, parabola, trig wave or growth/decay is discussed — plot the actual expression. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_plot": {
+          "label": "Plot",
+          "allowed": [
+            "function_plot"
+          ]
+        }
+      }
+    },
+    "scenario_diagram": {
+      "label": "Scenario Setup",
+      "description": "The word-problem setup drawing: each actor of the problem is a labelled box (with an icon and its GIVEN value), arrows carry the relationship between them, and the question lands as an accent chip. use_when: a MATHS word problem with actors and quantities — motion/velocity/distance, work rates, mixtures, filling tanks, two things approaching. Draw it FIRST, before any algebra, so the working that follows has a picture to point back at. Maths videos only. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_scenario": {
+          "label": "Scenario",
+          "allowed": [
+            "scenario"
+          ]
+        }
+      }
+    }
+  },
+  "icon_grid": {
+    "icons": [
+      "activity",
+      "alarm-clock",
+      "anchor",
+      "antenna",
+      "archive",
+      "arrow-down",
+      "arrow-right",
+      "arrow-up",
+      "atom",
+      "award",
+      "axe",
+      "badge-check",
+      "banknote",
+      "battery-charging",
+      "bell",
+      "bike",
+      "bolt",
+      "book-open",
+      "box",
+      "brain",
+      "briefcase",
+      "bug",
+      "building",
+      "building-2",
+      "bus",
+      "calculator",
+      "calendar",
+      "camera",
+      "car",
+      "check",
+      "chef-hat",
+      "circle-dollar-sign",
+      "clock",
+      "cloud",
+      "cloud-rain",
+      "code",
+      "cog",
+      "coins",
+      "compass",
+      "cpu",
+      "credit-card",
+      "crown",
+      "database",
+      "dna",
+      "dollar-sign",
+      "download",
+      "droplet",
+      "dumbbell",
+      "earth",
+      "eye",
+      "factory",
+      "feather",
+      "file-text",
+      "film",
+      "flag",
+      "flame",
+      "flask-conical",
+      "gamepad-2",
+      "gauge",
+      "gavel",
+      "gem",
+      "gift",
+      "graduation-cap",
+      "hammer",
+      "hand-coins",
+      "heart",
+      "heart-pulse",
+      "home",
+      "hourglass",
+      "key",
+      "landmark",
+      "laptop",
+      "leaf",
+      "lightbulb",
+      "link",
+      "lock",
+      "magnet",
+      "mail",
+      "map",
+      "map-pin",
+      "megaphone",
+      "message-circle",
+      "mic",
+      "microscope",
+      "moon",
+      "mountain",
+      "music",
+      "newspaper",
+      "package",
+      "palette",
+      "pencil",
+      "phone",
+      "piggy-bank",
+      "pill",
+      "plane",
+      "plug",
+      "puzzle",
+      "radio",
+      "recycle",
+      "rocket",
+      "satellite",
+      "scale",
+      "scissors",
+      "search",
+      "server",
+      "shield",
+      "ship",
+      "shopping-cart",
+      "smartphone",
+      "sprout",
+      "star",
+      "stethoscope",
+      "sun",
+      "target",
+      "telescope",
+      "tent",
+      "thermometer",
+      "timer",
+      "tractor",
+      "train-front",
+      "trees",
+      "trending-down",
+      "trending-up",
+      "trophy",
+      "truck",
+      "umbrella",
+      "users",
+      "wallet",
+      "wand-sparkles",
+      "watch",
+      "wifi",
+      "wrench",
+      "x",
+      "zap"
+    ]
+  }
+}

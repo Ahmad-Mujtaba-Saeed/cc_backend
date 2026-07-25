@@ -1,0 +1,9 @@
+{
+  "name": "AccessControl",
+  "enabled": true,
+  "version": "1.0.0",
+  "description": "AccessControl management module",
+  "providers": [
+    "Modules\\AccessControl\\ModuleServiceProvider"
+  ]
+}

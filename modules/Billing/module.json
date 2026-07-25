@@ -1,0 +1,9 @@
+{
+  "name": "Billing",
+  "enabled": true,
+  "version": "1.0.0",
+  "description": "Billing management module",
+  "providers": [
+    "Modules\\Billing\\ModuleServiceProvider"
+  ]
+}
