@@ -808,7 +808,7 @@ class RemotionRenderService
         return [
             'url' => $this->publicUrl($track),
             // Quiet bed: the Remotion side also ducks this under narration.
-            'volume' => (float) ($settings['music_volume'] ?? 0.09),
+            'volume' => (float) ($settings['music_volume'] ?? PixabayMusicService::DEFAULT_VOLUME),
             'mood' => $dominantMood,
         ];
     }

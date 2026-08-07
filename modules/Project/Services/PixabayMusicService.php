@@ -37,6 +37,14 @@ class PixabayMusicService
     ];
 
     /**
+     * Default mix level for the explainer's music bed — quiet, because the
+     * Remotion side ducks it under narration on top of this. One source of
+     * truth for the renderer, the controller and the editor's slider, which
+     * otherwise each carried their own copy of the number.
+     */
+    public const DEFAULT_VOLUME = 0.09;
+
+    /**
      * Local-library fallback (storage/app/public/audio/{dir}) for when the
      * Pixabay AUDIO API is unavailable — audio access is approved separately
      * from the regular image key and returns 403 until granted. Categories

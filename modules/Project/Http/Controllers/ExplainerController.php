@@ -16,6 +16,7 @@ use Modules\Project\Models\Project;
 use Modules\Project\Services\CanvasDirectorService;
 use Modules\Project\Services\CompositionDirectorService;
 use Modules\Project\Services\ExplainerScriptWriterService;
+use Modules\Project\Services\PixabayMusicService;
 use Modules\Project\Services\TemplateSettingsService;
 use Modules\Project\Support\CanvasPlanValidator;
 use Modules\Project\Support\ChapterPlanValidator;
@@ -507,7 +508,20 @@ class ExplainerController extends Controller
     }
 
     /**
-     * Toggle curated background music for the whole project.
+     * Background music for the whole project: on/off, the Pixabay category,
+     * the mix volume, and optionally ONE specific track.
+     *
+     * Every field is applied only when PRESENT, so the original one-key call
+     * (`{enabled: false}`) keeps working untouched while the storyboard's
+     * music panel can send any subset.
+     *
+     * `category` accepts the two pseudo-values the renderer already
+     * understands — 'auto' (pick from the storyboard's dominant mood) and
+     * 'none' (silent) — plus any real Pixabay category.
+     *
+     * `track_id` is never a path. PixabayMusicService only ever RESOLVES it
+     * against the live search hits or the local library listing and falls back
+     * to the seeded pick when it matches nothing, so an unknown id is inert.
      */
     public function toggleMusic(Request $request, Project $project): JsonResponse
     {
@@ -515,12 +529,57 @@ class ExplainerController extends Controller
             return $denied;
         }
 
-        $enabled = filter_var($request->input('enabled', true), FILTER_VALIDATE_BOOLEAN);
         $settings = $project->settings ?? [];
-        $settings['music_enabled'] = $enabled;
+
+        if ($request->has('enabled')) {
+            $settings['music_enabled'] = filter_var($request->input('enabled'), FILTER_VALIDATE_BOOLEAN);
+        }
+
+        if ($request->has('category')) {
+            $category = strtolower(trim((string) $request->input('category')));
+            $allowed = array_merge(['auto', 'none'], PixabayMusicService::CATEGORIES);
+            if (!in_array($category, $allowed, true)) {
+                return response()->json(['success' => false, 'message' => 'Invalid music category'], 422);
+            }
+
+            // A track belongs to the category it was auditioned in — keeping a
+            // 'horror' id after a switch to 'corporate' would silently resolve
+            // to nothing and fall back to the seeded pick, which reads as "the
+            // picker ignored me". Changing category clears the track unless
+            // this same request names a new one.
+            if ($category !== ($settings['music_category'] ?? 'auto') && !$request->has('track_id')) {
+                unset($settings['music_track_id']);
+            }
+            $settings['music_category'] = $category;
+        }
+
+        if ($request->has('volume')) {
+            $volume = $request->input('volume');
+            if (!is_numeric($volume)) {
+                return response()->json(['success' => false, 'message' => 'Invalid music volume'], 422);
+            }
+            // Clamped, not rejected: the slider's ends are meaningful and a
+            // stray 1.5 should quieten to a legal mix, never 422 the panel.
+            $settings['music_volume'] = round(max(0.0, min(1.0, (float) $volume)), 3);
+        }
+
+        if ($request->has('track_id')) {
+            $trackId = trim((string) $request->input('track_id'));
+            if ($trackId === '') {
+                unset($settings['music_track_id']); // back to the seeded pick
+            } else {
+                $settings['music_track_id'] = mb_substr($trackId, 0, 64);
+            }
+        }
+
         $project->update(['settings' => $settings]);
 
-        return response()->json(['success' => true, 'data' => ['music_enabled' => $enabled]]);
+        return response()->json(['success' => true, 'data' => [
+            'music_enabled' => $settings['music_enabled'] ?? true,
+            'music_category' => $settings['music_category'] ?? 'auto',
+            'music_volume' => $settings['music_volume'] ?? PixabayMusicService::DEFAULT_VOLUME,
+            'music_track_id' => $settings['music_track_id'] ?? null,
+        ]]);
     }
 
     /**
@@ -1034,6 +1093,16 @@ class ExplainerController extends Controller
             'color_schemes' => ExplainerRegistry::colorSchemes(),
             'narration_enabled' => $project->settings['narration_enabled'] ?? true,
             'music_enabled' => $project->settings['music_enabled'] ?? true,
+            // Background music, editable from the storyboard. 'auto' lets the
+            // renderer map the dominant scene mood onto a category; a null
+            // track means the deterministic per-project pick.
+            'music_category' => $project->settings['music_category'] ?? 'auto',
+            'music_volume' => (float) ($project->settings['music_volume'] ?? PixabayMusicService::DEFAULT_VOLUME),
+            'music_track_id' => $project->settings['music_track_id'] ?? null,
+            'music_categories' => PixabayMusicService::CATEGORIES,
+            // Without a Pixabay key the picker still works off the local
+            // library, so the UI says so instead of offering dead controls.
+            'music_configured' => (new PixabayMusicService())->isConfigured(),
             'analysis_attempts' => $project->settings['analysis_attempts'] ?? null,
             'script_skeleton' => $project->settings['script_skeleton'] ?? null,
             'auto_visuals' => $autoVisuals,
