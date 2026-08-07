@@ -35,12 +35,29 @@ class ScriptSkeletonService
         'journey' => ['hook', 'origin', 'era', 'turning_point', 'legacy'],
         'compare' => ['hook', 'contenders', 'round', 'verdict', 'payoff'],
         'countdown' => ['hook', 'setup', 'ranking_reveal', 'number_one', 'payoff'],
+        // A product walkthrough / tutorial had no home here, so the planner
+        // picked `argument` — the closest fit — and `argument` REQUIRES a
+        // counter and a resolution. That is how project 135, a Vreato demo,
+        // grew a quote card reading "Some may doubt AI's editing quality":
+        // the shape demanded an objection the script never made. A demo does
+        // not argue, it SHOWS, so it gets its own spine.
+        'demo' => ['hook', 'problem', 'product_intro', 'demo_step', 'result', 'second_feature', 'payoff'],
         'generic' => ['hook', 'context', 'aspect', 'payoff'],
     ];
     /** Which intents may repeat, per shape. */
-    private const GENERIC_REPEATS = ['point' => 5, 'era' => 5, 'round' => 4, 'aspect' => 5];
+    private const GENERIC_REPEATS = [
+        'point' => 5,
+        'era' => 5,
+        'round' => 4,
+        'aspect' => 5,
+        // The walkthrough IS the video — a demo that collapses "paste the
+        // link, pick a template, tune the settings, hit generate, watch it
+        // work" into one card has thrown away everything worth watching.
+        'demo_step' => 8,
+        'second_feature' => 3,
+    ];
     /** Which intents may be dropped when the model does not use them. */
-    private const GENERIC_OPTIONAL = ['counter', 'turning_point'];
+    private const GENERIC_OPTIONAL = ['counter', 'turning_point', 'second_feature', 'problem', 'result'];
 
     private const MAX_REPEAT = 5; // work phases cap (argument steps get 6)
     /** Board sections a solve may occupy. Each becomes ONE math card carrying
@@ -152,7 +169,7 @@ PROMPT;
      *
      * @return array<int, array{intent: string, brief: string}> may be []
      */
-    public function planGeneric(string $script): array
+    public function planGeneric(string $script, string $guide = '', int $targetSeconds = 60): array
     {
         if (empty($this->apiKey) || trim($script) === '') {
             return [];
@@ -163,19 +180,43 @@ PROMPT;
   journey:   history / evolution / a life. Phases: hook, origin, era (2-5 chapters in time order), turning_point (optional), legacy.
   compare:   two named things head to head. Phases: hook, contenders (introduce both), round (2-4, one dimension each), verdict, payoff.
   countdown: a ranked top-N list. Phases: hook, setup (the criteria), ranking_reveal (the countdown itself), number_one (dwell on the winner), payoff.
+  demo:      a product / app / tool being SHOWN in use — a walkthrough, tutorial or launch video. Phases: hook, problem (optional: the pain it removes), product_intro (name it), demo_step (2-8 — ONE PHASE PER ACTUAL ACTION the script performs: copy the link, paste it, choose the template, change the settings, press generate, watch it process...), result (optional: what you end up with), second_feature (optional, 0-3: another capability the script pivots to), payoff.
   generic:   none of the above fits cleanly. Phases: hook, context, aspect (2-5 facets), payoff.
 SHAPES;
+
+        // Beat budget. Left unsaid, the planner returns its comfortable 6-8
+        // phases whatever the length — and since the composer writes exactly
+        // one scene per phase, a 90-second script came back as 8 cards of ~9s
+        // each. That is both monotonous AND lossy: project 135's entire demo
+        // walkthrough and its whole second-feature act vanished because there
+        // were no phases left to hold them.
+        $lo = max(4, (int) round($targetSeconds / 9));
+        $hi = max($lo + 2, (int) round($targetSeconds / 5.5));
 
         $system = <<<PROMPT
 You are the STRUCTURE planner for a short explainer video. Do not write scenes — pick the story SHAPE and decide the ACTS.
 
-Return ONLY JSON: {"shape": "argument|journey|compare|countdown|generic", "phases": [{"intent": "<a phase name of that shape>", "brief": "<=12 words, concrete to THIS script"}]}
+Return ONLY JSON: {"shape": "argument|journey|compare|countdown|demo|generic", "phases": [{"intent": "<a phase name of that shape>", "brief": "<=12 words, concrete to THIS script"}]}
 
 The shapes:
 {$shapeDefs}
 
-Rules: phases in story order; every brief specific, never filler; repeatable phases get one entry per beat.
+Rules:
+- Phases in story order; every brief specific to THIS script, never filler.
+- Repeatable phases get ONE ENTRY PER BEAT the script actually contains. Do not summarise several beats into one phase.
+- The video runs about {$targetSeconds}s, so return roughly {$lo}-{$hi} phases. COVER THE WHOLE SCRIPT: walk it start to finish and make sure its last act has phases of its own. A section of the script with no phase will not appear in the video at all.
+- Only claim a phase the SCRIPT supports. Never invent an objection, a statistic or a counter-argument the script does not make — if the shape offers a phase the script has no material for, and that phase is optional, leave it out.
 PROMPT;
+
+        // The user's brief outranks the generic shape advice: it routinely
+        // dictates structure ("show the earnings graph first, then the URL
+        // copy, then the settings screen") and it names the visuals they
+        // already have, which is exactly what the acts should be built around.
+        if (trim($guide) !== '') {
+            $system .= "\n\nTHE USER'S GUIDE for this video — it OUTRANKS the shape advice above. "
+                . "Where it asks for something to be shown, or shown in a particular order, give that its own phase, "
+                . "in that order:\n" . mb_substr(trim($guide), 0, 1200);
+        }
 
         try {
             $response = Http::withToken($this->apiKey)
@@ -187,7 +228,10 @@ PROMPT;
                         ['role' => 'user', 'content' => "SCRIPT / TOPIC:\n" . mb_substr(trim($script), 0, 2400)],
                     ],
                     'temperature' => 0.0,
-                    'max_tokens' => 400,
+                    // A long demo can legitimately plan 16 phases; the old
+                    // 400-token ceiling truncated the JSON and the tail acts
+                    // were lost before repairGeneric ever saw them.
+                    'max_tokens' => 900,
                     'response_format' => ['type' => 'json_object'],
                 ], 'low'));
             if (!$response->successful()) {
@@ -326,6 +370,11 @@ PROMPT;
             'ranking_reveal' => 'count down the list',
             'number_one' => 'dwell on the winner',
             'aspect' => 'the next facet of the topic',
+            'problem' => 'the pain the product removes',
+            'product_intro' => 'name the product and what it is',
+            'demo_step' => 'the next action performed on screen',
+            'result' => 'what the viewer ends up with',
+            'second_feature' => 'another thing it can do',
             default => 'the payoff worth remembering',
         };
     }

@@ -1,5 +1,5 @@
 {
-  "version": 40,
+  "version": 41,
   "motion_styles": {
     "default": "auto",
     "styles": {
@@ -1328,8 +1328,8 @@
     },
     "phone_mockup": {
       "label": "Device Mockup",
-      "description": "A screenshot or screen recording presented inside a flat CSS device frame — a phone (rounded bezel + notch dot) or a browser window (flat bar + three dots + URL). Set \"frame\": \"phone\" or \"browser\" on the slot. use_when: apps, websites, UI, posts, messages — any screen content. At most 2 per video.",
-      "max_per_video": 2,
+      "description": "A screenshot or screen recording presented inside a flat CSS device frame — a phone (rounded bezel + notch dot) or a browser window (flat bar + three dots + URL). Set \"frame\": \"phone\" or \"browser\" on the slot. use_when: apps, websites, UI, posts, messages — any screen content. At most 6 per video.",
+      "max_per_video": 6,
       "slots": {
         "slot_screen": {
           "label": "Screen",

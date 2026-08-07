@@ -24,6 +24,13 @@ namespace Modules\Project\Support;
  */
 class ChapterPlanValidator
 {
+    /** A chapter smaller than this is a beat, not an act — no cover. */
+    private const MIN_ACT_SCENES = 2;
+    /** ...and an act too short to signpost does not get a 3s full stop. */
+    private const MIN_ACT_SECONDS = 18.0;
+    /** Covers are punctuation. More than two in one short video is a tic. */
+    private const MAX_COVERS = 2;
+
     /** @var string[] */
     private array $warnings = [];
 
@@ -147,11 +154,24 @@ class ChapterPlanValidator
 
     /**
      * Chapter act breaks (copilot.md §5.5 / §3.4): insert a chapter_cover
-     * scene at every chapter boundary as its own single-scene slides
-     * mini-chapter, entered with the line_sweep act-break cut. Only fires on
-     * videos of ≥ the registry minimum length with ≥ the minimum chapter
-     * count; idempotent (an already-covered boundary is left alone); covers
-     * carry NO narration — the video breathes there instead.
+     * scene at a chapter boundary that has EARNED one, as its own single-scene
+     * slides mini-chapter entered with the line_sweep act-break cut.
+     * Idempotent (an already-covered boundary is left alone); covers carry NO
+     * narration — the video breathes there instead.
+     *
+     * A cover is a 3-second full stop with the voice-over silent. That is a
+     * strong editorial move and it was being spent on every boundary of every
+     * video over a minute — a 90s product demo picked up a "Chapter 02" card
+     * mid-walkthrough and a "Chapter 03" card immediately before its end card,
+     * neither of which the script asked for. So the bar is now a REAL act
+     * break, not merely a boundary:
+     *   · the video has enough acts to be worth numbering (>= 3 chapters);
+     *   · the incoming chapter is a substantial act (>= 2 scenes), never a
+     *     lone outro or a single stray card;
+     *   · the outgoing chapter was substantial too (>= 2 scenes), so covers
+     *     cannot pile up around short chapters;
+     *   · the act runs long enough to need signposting (>= MIN_ACT_SECONDS);
+     *   · and at most MAX_COVERS land in one video.
      *
      * @param  array  $plan    A validated chapter plan.
      * @param  array  $scenes  Full validated scene arrays, storyboard order.
@@ -166,7 +186,7 @@ class ChapterPlanValidator
         foreach ($scenes as $s) {
             $total += (float) ($s['duration_seconds'] ?? 0);
         }
-        if (count($chapters) < $conf['min_chapters'] || $total < $conf['min_video_seconds']) {
+        if (count($chapters) < max(3, $conf['min_chapters']) || $total < $conf['min_video_seconds']) {
             return ['plan' => $plan, 'scenes' => $scenes, 'inserted' => 0];
         }
 
@@ -174,6 +194,16 @@ class ChapterPlanValidator
         foreach ($scenes as $s) {
             $byId[(string) $s['scene_id']] = $s;
         }
+
+        /** Seconds of storyboard a chapter holds. */
+        $chapterSeconds = function (array $ch) use ($byId): float {
+            $sum = 0.0;
+            foreach ((array) ($ch['scene_ids'] ?? []) as $id) {
+                $sum += (float) ($byId[(string) $id]['duration_seconds'] ?? 0);
+            }
+
+            return $sum;
+        };
 
         $firstHeading = function (array $scene): string {
             foreach (($scene['slots'] ?? []) as $slot) {
@@ -208,13 +238,31 @@ class ChapterPlanValidator
                 continue;
             }
 
+            // Has this boundary earned a full stop? A chapter of one scene is
+            // not an act — the commonest case being the closing chapter that
+            // holds nothing but the outro card, which used to collect a cover
+            // announcing a "chapter" the viewer never gets to watch.
+            $isRealAct = count((array) ($ch['scene_ids'] ?? [])) >= self::MIN_ACT_SCENES
+                && count($prevIds) >= self::MIN_ACT_SCENES
+                && $chapterSeconds($ch) >= self::MIN_ACT_SECONDS;
+
+            if (!$isRealAct || $inserted >= self::MAX_COVERS) {
+                $newChapters[] = $ch;
+                continue;
+            }
+
             $ordinal = $k + 1;
             $coverId = "scene_cover_{$ordinal}";
+            // `reason` is the director's rationale, written for a log and not
+            // for a title card — it arrives lowercase ("ai solution tour").
+            // It still names the act better than anything else available, so
+            // it is capitalised rather than replaced.
             $title = mb_substr(
                 trim((string) ($ch['reason'] ?? '')) ?: $firstHeading($first) ?: "Chapter {$ordinal}",
                 0,
                 48
             );
+            $title = mb_strtoupper(mb_substr($title, 0, 1)) . mb_substr($title, 1);
 
             $insertBefore[$firstId] = [
                 'scene_id' => $coverId,

@@ -23,7 +23,7 @@ class GenericStoryboardComposerService
 {
     /** Per-intent template menus — L2 as data. First entry = degrade target hint. */
     private const MENUS = [
-        'hook' => ['single_focus', 'stat_spotlight', 'quote_card', 'full_bleed_with_banner'],
+        'hook' => ['single_focus', 'stat_spotlight', 'quote_card', 'full_bleed_with_banner', 'phone_mockup', 'split_side_by_side', 'animated_chart'],
         'context' => ['single_focus', 'full_bleed_with_side_panel', 'labeled_diagram', 'cycle_diagram', 'formula_anatomy', 'term_card', 'layer_stack', 'hierarchy_card'],
         'point' => ['single_focus', 'animated_chart', 'stat_spotlight', 'quote_card', 'myth_fact', 'pictogram_percent', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'spectrum_card', 'quadrant_map', 'venn_card', 'receipt_card', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack'],
         'counter' => ['single_focus', 'quote_card', 'myth_fact', 'common_mistake'],
@@ -39,7 +39,29 @@ class GenericStoryboardComposerService
         'ranking_reveal' => ['list_ranking'],
         'number_one' => ['single_focus', 'full_bleed_with_banner', 'stat_spotlight'],
         'aspect' => ['single_focus', 'split_side_by_side', 'animated_chart', 'icon_grid', 'phone_mockup', 'labeled_diagram', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'math_steps', 'venn_card', 'common_mistake', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card'],
-        'payoff' => ['single_focus', 'practice_card'],
+        'payoff' => ['single_focus', 'practice_card', 'icon_grid', 'checklist_card', 'full_bleed_with_banner'],
+
+        // The `demo` shape. A walkthrough is a SCREEN video: its natural cards
+        // are the device mockup, the split with the screenshot beside the
+        // instruction, and the photo stack for a set of results — not the wall
+        // of bullets a demo used to become.
+        'problem' => ['single_focus', 'stat_spotlight', 'myth_fact', 'common_mistake', 'icon_grid', 'pictogram_percent', 'animated_chart', 'checklist_card'],
+        'product_intro' => ['full_bleed_with_banner', 'single_focus', 'phone_mockup', 'term_card', 'icon_grid', 'split_side_by_side'],
+        // single_focus sits LAST here on purpose. A walkthrough step is a
+        // screen, and a screen belongs in a frame — offered first, the plain
+        // card swallowed six consecutive "paste the link / pick a template /
+        // press generate" beats and the walkthrough read as a bulleted list
+        // with pictures instead of a product actually being driven.
+        'demo_step' => ['phone_mockup', 'split_side_by_side', 'full_bleed_with_side_panel', 'before_after', 'step_flow', 'icon_grid', 'single_focus'],
+        'result' => ['photo_stack', 'phone_mockup', 'before_after', 'split_side_by_side', 'single_focus', 'checklist_card', 'big_counter', 'icon_grid'],
+        'second_feature' => ['phone_mockup', 'split_side_by_side', 'full_bleed_with_side_panel', 'step_flow', 'icon_grid', 'single_focus'],
+    ];
+
+    /** Templates that carry an uploadable/AI-generated visual. Used by the
+     *  anti-monotony pass and the media-coverage check below. */
+    private const MEDIA_TEMPLATES = [
+        'phone_mockup', 'split_side_by_side', 'full_bleed_with_banner', 'full_bleed_with_side_panel',
+        'before_after', 'photo_stack', 'labeled_diagram', 'single_focus',
     ];
 
     /** One-line content docs, only included when a menu offers the card. */
@@ -65,7 +87,9 @@ class GenericStoryboardComposerService
         'checklist_card' => 'slot_checklist: {content_type:"proscons", pros:[...], cons?:[...], heading?}',
         'list_ranking' => 'slot_ranking: {content_type:"ranking", items:[3-6 strings, BEST LAST], heading?}',
         'icon_grid' => 'slot_icons: {content_type:"icons", items:[3-9 {icon: a lucide name, label: 1-2 words}], heading?}',
-        'phone_mockup' => 'slot_screen: {content_type:"image", asset_request:{description: the SCREEN content}, frame:"phone"|"browser"}',
+        'phone_mockup' => 'slot_screen: {content_type:"image", asset_request:{description: the SCREEN content}, frame:"phone"|"browser"} — the card for ANY screen: a website, an app, a dashboard, a settings page, a progress bar. Use "browser" for a desktop/web UI and "phone" for a mobile app. A walkthrough may use it for several consecutive steps (up to 6 per video), but break up long runs with split_side_by_side or full_bleed_with_side_panel so the framing changes',
+        'step_flow' => 'slot_steps: {content_type:"steps", items:[3-5 {label: <=4 words naming the action, icon?: a lucide name}], heading?} — a one-way process drawn as connected nodes; use it ONCE to preview or recap a multi-action walkthrough, never in place of showing the actions themselves',
+        'photo_stack' => 'slot_photo_1, slot_photo_2 (+ optional slot_photo_3, slot_photo_4): each {content_type:"image", asset_request:{description}} — 2-4 related shots flipped through like prints. Ideal for showing several OUTPUTS at once (the clips it produced, the variants it made). At most 1 per video',
         'labeled_diagram' => 'slot_diagram: {content_type:"image", asset_request:{description: ONE clean centered subject on a plain background, no text}, heading?: <=40 chars, callout_suggestions:[2-4 short part names, <=4 words each]} — use for "how X works"/parts-of-X beats; the labels are drawn natively over the image',
         'myth_fact' => 'slot_myth_fact: {content_type:"myth_fact", myth: the belief as people say it (<=140), fact: the correction with the receipts (<=140), heading?: <=40} — use when the script debunks a widespread belief; never for mere comparisons',
         'pictogram_percent' => 'slot_pictogram: {content_type:"pictogram", filled: the numerator (decimals fine, 6.4), of: the denominator (usually 10), label: who the share is ("of gamers finish the story"), unit?: "%" to display the percentage} — ONLY for shares of PEOPLE; other percentages use progress_meter',
@@ -95,10 +119,24 @@ class GenericStoryboardComposerService
     private string $model;
     private int $attempts = 0;
 
+    /** The user's brief. This composer WRITES the narration and picks every
+     *  card, so anything the guide asked for — the order of the beats, the
+     *  screenshots they already have — only survives if it reaches this
+     *  prompt. It used to reach only the math composers. */
+    private string $guide = '';
+
     public function __construct()
     {
         $this->apiKey = config('services.openai.api_key') ?: env('OPENAI_API_KEY');
         $this->model = LlmModels::for('explainer');
+    }
+
+    /** Set the user's guide before composing; empty string clears it. */
+    public function setGuide(?string $guide): self
+    {
+        $this->guide = trim((string) $guide);
+
+        return $this;
     }
 
     public function attempts(): int
@@ -113,7 +151,7 @@ class GenericStoryboardComposerService
     }
 
     /** Compose a non-math storyboard from its skeleton. Null -> fallback. */
-    public function compose(string $script, array $skeleton): ?array
+    public function compose(string $script, array $skeleton, int $targetSeconds = 60): ?array
     {
         if (empty($this->apiKey) || trim($script) === '' || count($skeleton) < 3) {
             return null;
@@ -136,10 +174,19 @@ class GenericStoryboardComposerService
             }
         }
 
+        // A per-scene time budget, stated in the currency the model actually
+        // controls: WORDS. Told only "aim for a total near 90s" it wrote a
+        // comfortable two sentences per beat and overran by a third — the
+        // validator then paces each scene off its narration length, so the
+        // overrun is baked in by the time anyone could clamp it.
+        $phaseCount = max(1, count($skeleton));
+        $avgSeconds = round($targetSeconds / $phaseCount, 1);
+        $avgWords = max(6, (int) round($avgSeconds * 2.5));
+
         $system = <<<PROMPT
 You fill a PRE-DECIDED storyboard for a short explainer video. The phases and their allowed cards are fixed — you choose within each menu and write the content. Return ONLY JSON:
 
-{"scenes": [{"phase": <1-based phase number>, "layout_template": "<from THAT phase's menu>", "narration": "2-3 spoken sentences", "slots": {<the template's slots, shapes below>}}]}
+{"scenes": [{"phase": <1-based phase number>, "layout_template": "<from THAT phase's menu>", "seconds": <number>, "narration": "<the spoken line(s)>", "slots": {<the template's slots, shapes below>}}]}
 
 The phases, in order (one scene per phase):
 {$phaseLines}
@@ -147,10 +194,86 @@ Card content shapes:
 {$docs}
 Rules:
 - Exactly one scene per phase, same order. Never use a template a phase does not offer.
-- Every image asset_request.description is a concrete photographable subject — never text, charts, diagrams or screenshots of data.
 - Chart values are REAL numbers from the script with a source; never invent statistics.
-- Narration flows scene to scene like one voice telling one story.
+- Narration flows scene to scene like one voice telling one story, and stays faithful to the script — never assert something the script does not.
+
+PACING — the single biggest quality lever. A video whose every scene is the same length is exhausting to watch:
+- Write EVERY scene's narration to the length that beat deserves, then set "seconds" to match (~2.5 spoken words per second).
+- PUNCHY beats — a turn, a reveal, a one-liner, a name, a single action being performed — get ONE SHORT SENTENCE and 3-5 seconds.
+- TEACHING beats — the explanation, the payoff, a beat carrying 3+ bullets — get 2-4 sentences and 9-14 seconds.
+- Deliberately alternate. Never give three consecutive scenes the same length.
+- BUDGET: {$phaseCount} scenes must total about {$targetSeconds}s, so they average {$avgSeconds}s each — roughly {$avgWords} spoken words per scene. Spend the time unevenly across that budget, but do not blow through it: if you want a 13s teaching beat, pay for it with 4s beats elsewhere.
+
+VARIETY — never use the same layout_template twice in a row, and do not let "single_focus" take more than a third of the scenes. It is the fallback, not the default: whenever a beat qualifies for a real card in its menu, use the real card.
+
+VISUALS — a video of nothing but text cards is a slideshow, not an explainer. At least a third of the scenes must carry an image slot (content_type "image"). Reach for the media cards in the menus (phone_mockup, split_side_by_side, before_after, photo_stack, the full_bleed pair), and remember single_focus itself can be an image.
+- For a real-world subject, asset_request.description is a concrete photographable scene — never text, charts or diagrams.
+- For SCREEN content (a website, an app, a settings page, a result), describe the screen literally ("the Vreato dashboard with a YouTube URL pasted into the input field") and put it in a phone_mockup with the right frame. These are the shots a product owner already has and will upload.
 PROMPT;
+
+        // The guide is the brief from the person who commissioned the video.
+        // It routinely names the exact visuals they intend to supply — the
+        // whole reason the storyboard has upload slots at all — so it has to
+        // reach the call that decides whether any image slot exists.
+        if ($this->guide !== '') {
+            $system .= "\n\nTHE USER'S GUIDE for this video. It OUTRANKS the generic advice above — it is the brief from the "
+                . "person who commissioned this video, and they know their subject better than you do.\n"
+                . "Where the guide names something to SHOW, that beat MUST be a card with an image slot, and the "
+                . "asset_request.description must describe THAT EXACT SHOT in the user's own terms, so they can "
+                . "recognise it and upload the screenshot they already have. Keep the order the guide asks for. "
+                . "Never replace a visual the guide asked for with a text card.\n\nGUIDE:\n"
+                . mb_substr($this->guide, 0, 1500);
+        }
+
+        // One focused retry against a CRITIQUE of the model's own draft.
+        //
+        // The prompt asks for variety, media and pacing, but a prompt rule the
+        // model quietly ignores is worth nothing — project 135 came back as
+        // seven single_focus text cards at a flat 9s each, and the linter
+        // faithfully reported all three failures AFTER the storyboard had
+        // already shipped. Naming the specific violations back to the model and
+        // asking once more is the cheapest way to actually enforce them; the
+        // better of the two drafts wins, so a retry can never make it worse.
+        $best = null;
+        $bestFaults = null;
+        for ($pass = 0; $pass < 2; $pass++) {
+            $parsed = $this->request($system, $script, $pass === 0 ? '' : implode("\n", $bestFaults));
+            if ($parsed === null) {
+                break;
+            }
+
+            $scenes = $this->mapScenes($parsed, $skeleton);
+            $faults = $this->critique($scenes, $skeleton, $targetSeconds);
+
+            if ($best === null || count($faults) < count($bestFaults)) {
+                $best = $scenes;
+                $bestFaults = $faults;
+            }
+            if ($bestFaults === []) {
+                break;
+            }
+        }
+
+        if ($best === null || count($best) < max(3, (int) ceil(count($skeleton) * 0.6))) {
+            return null; // the model skipped too much — giant call does better
+        }
+
+        Log::info('GenericStoryboardComposer: storyboard composed by the tree', [
+            'scenes' => count($best),
+            'attempts' => $this->attempts,
+            'unresolved' => $bestFaults,
+        ]);
+
+        return ['scenes' => $best, 'summary' => ''];
+    }
+
+    /** One chat round. Null on any transport/parse failure. */
+    private function request(string $system, string $script, string $critique): ?array
+    {
+        if ($critique !== '') {
+            $system .= "\n\nYOUR PREVIOUS DRAFT BROKE THESE RULES. Fix every one of them in this draft, "
+                . "keeping everything that was already good:\n" . $critique;
+        }
 
         $this->attempts++;
         try {
@@ -163,11 +286,14 @@ PROMPT;
                         ['role' => 'user', 'content' => "SCRIPT / TOPIC:\n" . mb_substr(trim($script), 0, 2600)],
                     ],
                     'temperature' => 0.4,
-                    'max_tokens' => 2600,
+                    // More phases now reach this call (a 90s demo can plan 14),
+                    // and every scene carries slots — 2600 truncated the tail.
+                    'max_tokens' => 4000,
                     'response_format' => ['type' => 'json_object'],
                 ]);
         } catch (\Throwable $e) {
             Log::info('GenericStoryboardComposer: request failed', ['error' => $e->getMessage()]);
+
             return null;
         }
         if (!$response->successful()) {
@@ -176,25 +302,33 @@ PROMPT;
         CostTracker::recordChat($this->model, $response->json('usage'), 'tree_generic');
 
         $parsed = json_decode((string) $response->json('choices.0.message.content'), true);
-        if (!is_array($parsed) || !is_array($parsed['scenes'] ?? null)) {
-            return null;
-        }
 
+        return is_array($parsed) && is_array($parsed['scenes'] ?? null) ? $parsed['scenes'] : null;
+    }
+
+    /**
+     * Map the model's phase-numbered draft onto the skeleton, enforcing the
+     * menus. Templates outside a phase's menu degrade to a text scene.
+     *
+     * @param  array $raw       the model's `scenes` array
+     * @param  array $skeleton  the L1 phases
+     */
+    private function mapScenes(array $raw, array $skeleton): array
+    {
         $scenes = [];
         $n = 0;
         foreach (array_values($skeleton) as $i => $p) {
-            $intent = (string) ($p['intent'] ?? '');
-            $menu = self::menuFor($intent);
+            $menu = self::menuFor((string) ($p['intent'] ?? ''));
             // Find the model's scene for this phase (by index, tolerant of
             // its own numbering).
             $cand = null;
-            foreach ($parsed['scenes'] as $s) {
+            foreach ($raw as $s) {
                 if (is_array($s) && (int) ($s['phase'] ?? 0) === $i + 1) {
                     $cand = $s;
                     break;
                 }
             }
-            $cand = $cand ?? (is_array($parsed['scenes'][$i] ?? null) ? $parsed['scenes'][$i] : null);
+            $cand = $cand ?? (is_array($raw[$i] ?? null) ? $raw[$i] : null);
             if ($cand === null) {
                 continue;
             }
@@ -208,27 +342,163 @@ PROMPT;
                 $slots = ['slot_main' => ['content_type' => 'text_block', 'heading' => '', 'bullets' => []]];
             }
 
+            // Pacing. This used to be a hardcoded 9 for every single scene,
+            // and because the validator's paceDuration takes
+            // max(llm_estimate, content_estimate) that 9 became a FLOOR: every
+            // beat shorter than 9s was padded up to exactly 9.0 and the whole
+            // video ran at one unvarying tempo. A 0 here means "content
+            // decides", which is the honest default; the model's own number is
+            // honoured when it gave one, clamped to the card's sane range.
+            $secs = (float) ($cand['seconds'] ?? 0);
+            $secs = $secs > 0 ? max(3.0, min(14.0, $secs)) : 0.0;
+
             $n++;
             $scenes[] = [
                 'scene_id' => "scene_{$n}",
                 'order' => $n,
                 'layout_template' => $tpl,
-                'duration_seconds' => 9,
+                'duration_seconds' => $secs,
                 'narration' => ['text' => trim((string) ($cand['narration'] ?? '')) ?: (string) ($p['brief'] ?? '')],
                 'mood' => 'neutral',
                 'slots' => $slots,
             ];
         }
 
-        if (count($scenes) < max(3, (int) ceil(count($skeleton) * 0.6))) {
-            return null; // the model skipped too much — giant call does better
+        return $scenes;
+    }
+
+    /**
+     * The rules worth a second call: monotony, missing visuals, flat pacing,
+     * and dropped phases. Returns one plain-language line per violation —
+     * empty means the draft is good. Deliberately the same three failures the
+     * SceneBudgetLinter reports after the fact, checked while there is still
+     * time to fix them.
+     *
+     * @param  array|null $scenes  a mapped draft (null = nothing yet)
+     * @return array<int, string>
+     */
+    private function critique(?array $scenes, array $skeleton, int $targetSeconds = 0): array
+    {
+        if ($scenes === null || $scenes === []) {
+            return [];
+        }
+        $faults = [];
+        $total = count($scenes);
+
+        // Dropped phases: a phase with no scene is a chunk of the script that
+        // will not appear in the video at all.
+        if ($total < count($skeleton)) {
+            $missing = count($skeleton) - $total;
+            $faults[] = "- You skipped {$missing} phase(s). Return EXACTLY ONE scene for every phase, "
+                . 'numbered 1 to ' . count($skeleton) . '.';
         }
 
-        Log::info('GenericStoryboardComposer: storyboard composed by the tree', [
-            'scenes' => count($scenes),
-            'attempts' => $this->attempts,
-        ]);
+        // Monotony. Both flavours matter: the same card back to back, and one
+        // card dominating the whole video. A walkthrough that answers "stop
+        // using single_focus" with six identical browser frames in a row has
+        // not fixed anything — so the streak rule names the offending template
+        // and the phases that could carry something else.
+        $singles = 0;
+        $streak = 0;
+        $worstStreak = 0;
+        $worstTpl = '';
+        $worstAt = 0;
+        $counts = [];
+        $prev = null;
+        foreach ($scenes as $i => $s) {
+            $tpl = (string) $s['layout_template'];
+            $counts[$tpl] = ($counts[$tpl] ?? 0) + 1;
+            if ($tpl === 'single_focus') {
+                $singles++;
+            }
+            $streak = ($tpl === $prev) ? $streak + 1 : 1;
+            if ($streak > $worstStreak) {
+                $worstStreak = $streak;
+                $worstTpl = $tpl;
+                $worstAt = $i + 2 - $streak; // 1-based phase the run starts on
+            }
+            $prev = $tpl;
+        }
+        if ($worstStreak >= 3) {
+            $alts = [];
+            for ($p = $worstAt - 1; $p < min($worstAt - 1 + $worstStreak, count($skeleton)); $p++) {
+                foreach (self::menuFor((string) ($skeleton[$p]['intent'] ?? '')) as $m) {
+                    if ($m !== $worstTpl && $m !== 'single_focus') {
+                        $alts[$m] = true;
+                    }
+                }
+            }
+            $faults[] = "- \"{$worstTpl}\" runs {$worstStreak} scenes in a row starting at phase {$worstAt}. "
+                . 'Consecutive beats must not share a layout_template even when they show similar things — '
+                . 'keep showing the screen but change the framing, alternating with: '
+                . implode(', ', array_slice(array_keys($alts), 0, 5)) . '.';
+        }
+        if ($total >= 6 && $singles > (int) ceil($total / 3)) {
+            $faults[] = "- {$singles} of {$total} scenes are \"single_focus\". Use it for at most a third; "
+                . 'every other beat must take a real card from its menu.';
+        }
+        // Any card, not just single_focus, taken past half the video.
+        arsort($counts);
+        $topTpl = (string) array_key_first($counts);
+        if ($total >= 6 && $topTpl !== 'single_focus' && $counts[$topTpl] > (int) ceil($total / 2)) {
+            $faults[] = "- \"{$topTpl}\" is {$counts[$topTpl]} of {$total} scenes. No single card may carry "
+                . 'more than half the video — vary the layouts across the phases that allow it.';
+        }
 
-        return ['scenes' => $scenes, 'summary' => ''];
+        // Visuals.
+        $withMedia = 0;
+        foreach ($scenes as $s) {
+            foreach ((array) $s['slots'] as $slot) {
+                if (is_array($slot) && in_array((string) ($slot['content_type'] ?? ''), ['image', 'video'], true)) {
+                    $withMedia++;
+                    break;
+                }
+            }
+        }
+        $wantMedia = (int) ceil($total / 3);
+        if ($withMedia < $wantMedia) {
+            $faults[] = "- Only {$withMedia} of {$total} scenes carry an image slot; at least {$wantMedia} must. "
+                . 'Put the visual beats on media cards (phone_mockup, split_side_by_side, before_after, '
+                . 'photo_stack, the full_bleed pair, or single_focus with an image).';
+        }
+
+        // Flat pacing: near-identical durations across the whole video.
+        $secs = array_values(array_filter(array_map(
+            fn ($s) => (float) $s['duration_seconds'],
+            $scenes
+        ), fn ($v) => $v > 0));
+        if (count($secs) >= 4 && (max($secs) - min($secs)) < 3.0) {
+            $faults[] = sprintf(
+                '- Every scene runs %.0f-%.0fs. Vary it: punchy beats get 3-5s and one short sentence, '
+                . 'teaching beats get 9-14s. Rewrite the narration lengths to match.',
+                min($secs),
+                max($secs)
+            );
+        }
+
+        // Overrun. Mirror what ShotListValidator::paceDuration will actually
+        // do — max(the model's own seconds, narration length, a 3s floor) —
+        // rather than word count alone. Most of project 135's 30s of overrun
+        // came from the model padding three-word beats ("Paste the link.") out
+        // to six seconds, which a words-only estimate cannot see at all.
+        if ($targetSeconds > 0) {
+            $runtime = 0.0;
+            foreach ($scenes as $s) {
+                $words = str_word_count((string) ($s['narration']['text'] ?? ''));
+                $runtime += min(14.0, max(3.0, (float) $s['duration_seconds'], $words / 2.5));
+            }
+            if ($runtime > $targetSeconds * 1.2) {
+                $faults[] = sprintf(
+                    '- Your scenes total about %.0fs, well over the %ds target. Bring it back to ~%ds: '
+                    . 'a beat whose narration is a single short line must be 3-4 seconds, not 6 — do not '
+                    . 'pad "seconds" beyond what the words need, and do not delete scenes to save time.',
+                    $runtime,
+                    $targetSeconds,
+                    $targetSeconds
+                );
+            }
+        }
+
+        return $faults;
     }
 }

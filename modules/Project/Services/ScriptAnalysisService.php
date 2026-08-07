@@ -48,6 +48,7 @@ class ScriptAnalysisService
         $targetSeconds = (int) ($options['target_seconds'] ?? 60);
         $mathTopic = is_array($options['math_topic'] ?? null) ? $options['math_topic'] : [];
         $skeleton = is_array($options['skeleton'] ?? null) ? $options['skeleton'] : [];
+        $guide = trim((string) ($options['guide'] ?? ''));
         $this->title = (string) ($options['title'] ?? '');
         // A maths storyboard is structure-prescribed — variance only means
         // some runs forget the scenario and shatter the working (project 34
@@ -61,7 +62,7 @@ class ScriptAnalysisService
             $this->model = LlmModels::for('math');
         }
 
-        $systemPrompt = $this->buildSystemPrompt($aspectRatio, $targetSeconds, $mathTopic, $skeleton);
+        $systemPrompt = $this->buildSystemPrompt($aspectRatio, $targetSeconds, $mathTopic, $skeleton, $guide);
         $userPrompt = "SCRIPT / TOPIC:\n" . trim($script);
 
         Log::info('ScriptAnalysisService: requesting shot list', [
@@ -369,6 +370,41 @@ class ScriptAnalysisService
      * (every non-math video today). This is the tree's first level doing
      * its job: the giant call stops deciding structure and only fills it.
      */
+    /**
+     * The user's own brief for this video, as a hard directive.
+     *
+     * The guide used to reach only the script WRITER and the math composers,
+     * so a user who supplied their own script and a guide saying "here are the
+     * seven screenshots I want placed" had that guide read out of settings and
+     * silently discarded by every path that builds a storyboard. Empty when
+     * the user wrote no guide.
+     */
+    private function buildGuideDirective(string $guide): string
+    {
+        $guide = trim($guide);
+        if ($guide === '') {
+            return '';
+        }
+        $guide = mb_substr($guide, 0, 1500);
+
+        return <<<GUIDE
+
+
+=== THE USER'S GUIDE (HIGHEST PRIORITY) ===
+This is the brief from the person who commissioned the video. Where it conflicts with the generic
+advice below, THE GUIDE WINS. Cover everything it asks for, in the order it asks.
+When the guide names something to SHOW, that beat MUST be a scene with an image or video slot, and
+its asset_request.description must describe THAT EXACT SHOT in the user's own terms so they
+recognise it and upload the file they already have. Never swap a visual the guide asked for for a
+text card, and never ask for an AI illustration of a screen the user clearly owns a screenshot of —
+use phone_mockup (frame "browser" for a web UI, "phone" for an app).
+
+{$guide}
+=== END OF GUIDE ===
+
+GUIDE;
+    }
+
     private function buildSkeletonDirective(array $skeleton): string
     {
         if ($skeleton === []) {
@@ -405,6 +441,14 @@ class ScriptAnalysisService
             'ranking_reveal' => 'list_ranking ONLY — the countdown is one card.',
             'number_one' => 'dwell on the winner — image scene / stat_spotlight.',
             'aspect' => 'the facet\'s best card — image, chart, icon_grid, cycle_diagram for a repeating process, layer_stack when the facet is a layered structure, hierarchy_card when the facet is a branching org chart / taxonomy, proportion_flow when the facet is one whole divided into parts, scale_comparison when the facet is sheer size, evidence_card when the facet rests on a specific named study, function_plot/formula_anatomy/math_steps when the facet is a real curve, equation or calculation, whatever the content earns.',
+            // The `demo` shape (product walkthroughs / tutorials). A demo is a
+            // SCREEN video: its beats are actions performed on a UI, so they
+            // cast to the device mockup and the splits, never to bullets.
+            'problem' => 'the pain the product removes — text, stat_spotlight, myth_fact or icon_grid.',
+            'product_intro' => 'name the product — full_bleed_with_banner over a hero shot, phone_mockup of its home screen, or a text scene.',
+            'demo_step' => 'phone_mockup ("browser" for a web UI, "phone" for an app) of the ACTUAL screen this action happens on, or split_side_by_side with that screenshot beside the instruction. One card per action.',
+            'result' => 'what the viewer ends up with — photo_stack of the outputs, before_after, phone_mockup of the finished result, or checklist_card.',
+            'second_feature' => 'the other capability — its own phone_mockup / split, never a bullet list.',
         ];
 
         $lines = [];
@@ -520,10 +564,12 @@ The math cards are the SPINE of this video, not a garnish. Non-negotiable:
 MATH;
     }
 
-    private function buildSystemPrompt(string $aspectRatio, int $targetSeconds, array $mathTopic = [], array $skeleton = []): string
+    private function buildSystemPrompt(string $aspectRatio, int $targetSeconds, array $mathTopic = [], array $skeleton = [], string $guide = ''): string
     {
         $reference = ExplainerRegistry::promptReference();
-        $mathDirective = $this->buildMathDirective($mathTopic) . $this->buildSkeletonDirective($skeleton);
+        $mathDirective = $this->buildMathDirective($mathTopic)
+            . $this->buildSkeletonDirective($skeleton)
+            . $this->buildGuideDirective($guide);
 
         // A maths scene is a SLOWER scene. A math_steps card carrying a 3-line
         // chain plus a rule panel needs 10-14s of narration to land; asked for

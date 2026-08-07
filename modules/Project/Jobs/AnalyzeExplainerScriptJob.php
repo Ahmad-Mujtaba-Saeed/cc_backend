@@ -125,16 +125,25 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
             // outline, so structure stops being one of the 400 decisions the
             // giant call keeps fumbling. Deterministically repaired — a
             // failed call still yields the canonical shape. Math only (yet).
+            // The user's brief for THIS video. It used to reach only the math
+            // planner and the math composers, so on an ordinary explainer with
+            // a user-supplied script the guide was read out of settings and
+            // then dropped on the floor — project 135 listed seven product
+            // screenshots to place and got a storyboard of pure text cards.
+            // Every planner and composer below now sees it.
+            $guide = (string) ($settings['guide'] ?? '');
+            $targetSeconds = (int) ($settings['target_seconds'] ?? 60);
+
             $skeleton = [];
             try {
                 $planner = new \Modules\Project\Services\ScriptSkeletonService();
                 // Math gets the guaranteed canonical skeleton; everything
                 // else gets a story shape (argument/journey/compare/
-                // countdown) when the planner can see one — and NO directive
-                // when it can't, which is exactly today's behavior.
+                // countdown/demo) when the planner can see one — and NO
+                // directive when it can't, which is exactly today's behavior.
                 $skeleton = $mathTopic !== []
-                    ? $planner->plan($script, $mathTopic, (string) ($settings['guide'] ?? ''))
-                    : $planner->planGeneric($script);
+                    ? $planner->plan($script, $mathTopic, $guide)
+                    : $planner->planGeneric($script, $guide, $targetSeconds);
             } catch (Throwable $e) {
                 Log::info('AnalyzeExplainerScriptJob: skeleton planning unavailable', [
                     'project_id' => $this->project->id,
@@ -157,7 +166,6 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                     // user's guide has to reach it directly — otherwise their
                     // opening ("exercise and question number first") survives
                     // in the script and dies on the board.
-                    $guide = (string) ($settings['guide'] ?? '');
                     if ($kind === 'worked_problem') {
                         $composer = (new \Modules\Project\Services\MathStoryboardComposerService())->setGuide($guide);
                         $raw = $composer->compose($script, $skeleton, $mathTopic, (string) $this->project->title);
@@ -165,8 +173,9 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                         $composer = (new \Modules\Project\Services\MathStoryboardComposerService())->setGuide($guide);
                         $raw = $composer->composeProof($script, $skeleton, $mathTopic, (string) $this->project->title);
                     } else {
-                        $composer = new \Modules\Project\Services\GenericStoryboardComposerService();
-                        $raw = $composer->compose($script, $skeleton);
+                        $composer = (new \Modules\Project\Services\GenericStoryboardComposerService())
+                            ->setGuide($guide);
+                        $raw = $composer->compose($script, $skeleton, $targetSeconds);
                     }
                     if ($raw !== null) {
                         $settings['composed_by_tree'] = true;
@@ -185,9 +194,11 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                 $analysis = new ScriptAnalysisService();
                 $raw = $analysis->analyze($script, [
                     'aspect_ratio' => $this->project->aspect_ratio ?? '16:9',
-                    'target_seconds' => (int) ($settings['target_seconds'] ?? 60),
+                    'target_seconds' => $targetSeconds,
                     'math_topic' => $mathTopic,
                     'skeleton' => $skeleton,
+                    // The fallback path had the same blind spot as the tree.
+                    'guide' => $guide,
                     // The title often carries the literal function/equation
                     // the user typed — the plot synthesizer reads it when the
                     // storyboard's own steps never state the function.
