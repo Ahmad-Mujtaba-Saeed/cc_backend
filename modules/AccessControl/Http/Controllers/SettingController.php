@@ -9,6 +9,7 @@ use Modules\AccessControl\Models\ApiCredential;
 use Modules\AccessControl\Models\AppSetting;
 use Modules\Project\Processors\TemplateProcessorFactory;
 use Modules\Project\Services\TemplateSettingsService;
+use Modules\Project\Services\MusicProviderFactory;
 use Modules\Project\Services\YoutubeDownloaderFactory;
 use Modules\Project\Support\LlmModels;
 use Modules\Project\Support\TtsVoices;
@@ -56,6 +57,7 @@ class SettingController extends Controller
             'landing_variant' => ['sometimes', 'string', 'in:' . implode(',', self::LANDING_VARIANTS)],
             'theme_default' => ['sometimes', 'string', 'in:' . implode(',', self::THEMES)],
             'tts_provider' => ['sometimes', 'string', 'in:' . implode(',', TtsVoices::PROVIDERS)],
+            'music_provider' => ['sometimes', 'string', 'in:' . implode(',', MusicProviderFactory::PROVIDERS)],
             'llm_model' => ['sometimes', 'string', 'in:' . implode(',', array_merge([LlmModels::AUTO], array_keys(LlmModels::MODELS)))],
             'templates' => ['sometimes', 'array'],
             'templates.*.enabled' => ['sometimes', 'boolean'],
@@ -77,6 +79,10 @@ class SettingController extends Controller
 
         if (array_key_exists('tts_provider', $data)) {
             AppSetting::set(TtsVoices::SETTING_KEY, $data['tts_provider']);
+        }
+
+        if (array_key_exists('music_provider', $data)) {
+            AppSetting::set(MusicProviderFactory::SETTING_KEY, $data['music_provider']);
         }
 
         if (array_key_exists('llm_model', $data)) {
@@ -159,11 +165,38 @@ class SettingController extends Controller
      * Background-music (Pixabay) state: key pool for the admin UI. Templates
      * fall back to the legacy local library when no key is active.
      */
+    /**
+     * Background-music switch state. `provider` is what the admin selected;
+     * `effective_provider` is what renders actually use — a provider with no
+     * key configured degrades to the other one having keys, and failing that
+     * to the local audio library, so the UI can show when the selection is
+     * not really in force.
+     *
+     * Credentials are returned per provider (Pixabay API key / Jamendo
+     * client_id) so the key CRUD can manage both without switching first.
+     */
     private function musicState(): array
     {
+        $grouped = ApiCredential::groupedForAdmin();
+        $selected = MusicProviderFactory::provider();
+
+        $configured = [];
+        foreach (MusicProviderFactory::PROVIDERS as $provider) {
+            $configured[$provider] = ApiCredential::hasActive($provider);
+        }
+
         return [
-            'pixabay_configured' => ApiCredential::hasActive('pixabay'),
-            'credentials' => ApiCredential::groupedForAdmin()['pixabay'] ?? [],
+            'provider' => $selected,
+            'providers' => MusicProviderFactory::PROVIDERS,
+            'labels' => MusicProviderFactory::labels(),
+            'configured' => $configured,
+            'effective_provider' => $configured[$selected] ? $selected : null,
+            'credentials' => [
+                'pixabay' => $grouped['pixabay'] ?? [],
+                'jamendo' => $grouped['jamendo'] ?? [],
+            ],
+            // Retained for the existing stock/music UI that reads this key.
+            'pixabay_configured' => $configured['pixabay'] ?? false,
         ];
     }
 

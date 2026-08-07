@@ -168,4 +168,10 @@ return [
         'default' => env('YOUTUBE_DOWNLOADER', 'rapidapi'), // rapidapi | apify
     ],
 
+    // Background-music source. Only the fallback for a fresh install — the
+    // live value is the admin's `music_provider` app_setting.
+    'music' => [
+        'default' => env('MUSIC_PROVIDER', 'pixabay'), // pixabay | jamendo
+    ],
+
 ];

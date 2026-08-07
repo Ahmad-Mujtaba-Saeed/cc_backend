@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Modules\AccessControl\Models\ApiCredential;
+use Modules\Project\Contracts\MusicProviderInterface;
 
 /**
  * Background music from the Pixabay audio API (free, commercial use, no
@@ -23,26 +24,20 @@ use Modules\AccessControl\Models\ApiCredential;
  * YouTube downloader keys). No key / API failure returns null so every
  * caller can fall back to the legacy local library or render silent.
  */
-class PixabayMusicService
+class PixabayMusicService implements MusicProviderInterface
 {
     private const ENDPOINT = 'https://pixabay.com/api/audio/';
     private const CACHE_TTL = 21600; // 6h — search results churn slowly
     private const DOWNLOAD_DIR = 'audio/pixabay';
     private const PER_PAGE = 50;
 
-    /** Search vocabulary exposed to template settings. */
-    public const CATEGORIES = [
-        'horror', 'cinematic', 'emotional', 'sad', 'happy', 'vlog',
-        'technology', 'corporate', 'gaming', 'adventure', 'documentary', 'relaxing',
-    ];
-
-    /**
-     * Default mix level for the explainer's music bed — quiet, because the
-     * Remotion side ducks it under narration on top of this. One source of
-     * truth for the renderer, the controller and the editor's slider, which
-     * otherwise each carried their own copy of the number.
+    /*
+     * CATEGORIES and DEFAULT_VOLUME now live on MusicProviderInterface — they
+     * are the app's shared vocabulary, not Pixabay's, and Jamendo has to mean
+     * the same thing by them. They are still readable as
+     * PixabayMusicService::CATEGORIES (inherited), so existing callers are
+     * unaffected.
      */
-    public const DEFAULT_VOLUME = 0.09;
 
     /**
      * Local-library fallback (storage/app/public/audio/{dir}) for when the

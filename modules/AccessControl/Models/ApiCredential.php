@@ -19,7 +19,10 @@ use Illuminate\Support\Str;
  */
 class ApiCredential extends Model
 {
-    public const PROVIDERS = ['rapidapi', 'apify', 'pixabay', 'pexels'];
+    // `jamendo` holds a Jamendo API *client_id* — read-only calls need nothing
+    // else (OAuth2 is only for acting on a user's behalf), so it slots into the
+    // same pool/failover machinery as the other providers' keys.
+    public const PROVIDERS = ['rapidapi', 'apify', 'pixabay', 'pexels', 'jamendo'];
 
     protected $table = 'api_credentials';
 

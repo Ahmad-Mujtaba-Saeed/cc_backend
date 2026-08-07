@@ -797,8 +797,11 @@ class RemotionRenderService
             ? (string) $settings['music_track_id']
             : null;
 
+        // Whichever music source the admin selected (Pixabay or Jamendo),
+        // then the legacy local library, so installs with no provider key at
+        // all keep their old behaviour.
         $track = $settings['music_track']
-            ?? (new PixabayMusicService())->pickTrack($pixabayCategory, (int) $project->id, $chosenTrack)
+            ?? MusicProviderFactory::make()->pickTrack($pixabayCategory, (int) $project->id, $chosenTrack)
             ?? (new BackgroundMusicService())->pickTrackForMood($dominantMood, (int) $project->id, ExplainerRegistry::moods());
 
         if (!$track) {
@@ -808,7 +811,7 @@ class RemotionRenderService
         return [
             'url' => $this->publicUrl($track),
             // Quiet bed: the Remotion side also ducks this under narration.
-            'volume' => (float) ($settings['music_volume'] ?? PixabayMusicService::DEFAULT_VOLUME),
+            'volume' => (float) ($settings['music_volume'] ?? \Modules\Project\Contracts\MusicProviderInterface::DEFAULT_VOLUME),
             'mood' => $dominantMood,
         ];
     }

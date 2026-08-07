@@ -91,7 +91,7 @@ abstract class AbstractVideoProcessor
             $chosenTrack = isset($this->settings['music_track_id']) && $this->settings['music_track_id'] !== ''
                 ? (string) $this->settings['music_track_id']
                 : null;
-            $trackRelative = (new \Modules\Project\Services\PixabayMusicService())
+            $trackRelative = \Modules\Project\Services\MusicProviderFactory::make()
                 ->pickTrack($category, (int) $this->project->id, $chosenTrack);
             if (!$trackRelative) {
                 Log::info('applyBackgroundMusic: no track available — skipping', [

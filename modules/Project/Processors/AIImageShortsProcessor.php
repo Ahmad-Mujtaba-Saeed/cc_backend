@@ -575,7 +575,7 @@ class AIImageShortsProcessor extends AbstractVideoProcessor
                 $chosenTrack = isset($this->settings['music_track_id']) && $this->settings['music_track_id'] !== ''
                     ? (string) $this->settings['music_track_id']
                     : null;
-                $pixabayTrack = (new \Modules\Project\Services\PixabayMusicService())
+                $pixabayTrack = \Modules\Project\Services\MusicProviderFactory::make()
                     ->pickTrack($musicCategory, (int) $this->project->id, $chosenTrack);
                 if ($pixabayTrack) {
                     $musicVolume = (float) ($this->settings['music_volume'] ?? 0.15);

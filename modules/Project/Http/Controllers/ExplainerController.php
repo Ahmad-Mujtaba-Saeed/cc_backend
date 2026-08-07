@@ -16,7 +16,8 @@ use Modules\Project\Models\Project;
 use Modules\Project\Services\CanvasDirectorService;
 use Modules\Project\Services\CompositionDirectorService;
 use Modules\Project\Services\ExplainerScriptWriterService;
-use Modules\Project\Services\PixabayMusicService;
+use Modules\Project\Contracts\MusicProviderInterface;
+use Modules\Project\Services\MusicProviderFactory;
 use Modules\Project\Services\TemplateSettingsService;
 use Modules\Project\Support\CanvasPlanValidator;
 use Modules\Project\Support\ChapterPlanValidator;
@@ -117,7 +118,7 @@ class ExplainerController extends Controller
             'aspect_ratio' => 'sometimes|string|in:16:9,9:16,1:1',
             'target_seconds' => 'sometimes|integer|min:10|max:600',
             'tts_voice' => ['sometimes', 'string', 'in:' . implode(',', \Modules\Project\Support\TtsVoices::allIds())],
-            'music_category' => ['sometimes', 'string', 'in:' . implode(',', array_merge(['none', 'auto'], \Modules\Project\Services\PixabayMusicService::CATEGORIES))],
+            'music_category' => ['sometimes', 'string', 'in:' . implode(',', array_merge(['none', 'auto'], MusicProviderInterface::CATEGORIES))],
             'music_track_id' => ['sometimes', 'nullable', 'regex:/^[a-z0-9]{1,32}$/i'],
             'music_volume' => ['sometimes', 'numeric', 'min:0', 'max:1'],
         ]);
@@ -537,7 +538,7 @@ class ExplainerController extends Controller
 
         if ($request->has('category')) {
             $category = strtolower(trim((string) $request->input('category')));
-            $allowed = array_merge(['auto', 'none'], PixabayMusicService::CATEGORIES);
+            $allowed = array_merge(['auto', 'none'], MusicProviderInterface::CATEGORIES);
             if (!in_array($category, $allowed, true)) {
                 return response()->json(['success' => false, 'message' => 'Invalid music category'], 422);
             }
@@ -577,7 +578,7 @@ class ExplainerController extends Controller
         return response()->json(['success' => true, 'data' => [
             'music_enabled' => $settings['music_enabled'] ?? true,
             'music_category' => $settings['music_category'] ?? 'auto',
-            'music_volume' => $settings['music_volume'] ?? PixabayMusicService::DEFAULT_VOLUME,
+            'music_volume' => $settings['music_volume'] ?? MusicProviderInterface::DEFAULT_VOLUME,
             'music_track_id' => $settings['music_track_id'] ?? null,
         ]]);
     }
@@ -1097,12 +1098,13 @@ class ExplainerController extends Controller
             // renderer map the dominant scene mood onto a category; a null
             // track means the deterministic per-project pick.
             'music_category' => $project->settings['music_category'] ?? 'auto',
-            'music_volume' => (float) ($project->settings['music_volume'] ?? PixabayMusicService::DEFAULT_VOLUME),
+            'music_volume' => (float) ($project->settings['music_volume'] ?? MusicProviderInterface::DEFAULT_VOLUME),
             'music_track_id' => $project->settings['music_track_id'] ?? null,
-            'music_categories' => PixabayMusicService::CATEGORIES,
+            'music_categories' => MusicProviderInterface::CATEGORIES,
             // Without a Pixabay key the picker still works off the local
             // library, so the UI says so instead of offering dead controls.
-            'music_configured' => (new PixabayMusicService())->isConfigured(),
+            'music_configured' => MusicProviderFactory::make()->isConfigured(),
+            'music_provider' => MusicProviderFactory::provider(),
             'analysis_attempts' => $project->settings['analysis_attempts'] ?? null,
             'script_skeleton' => $project->settings['script_skeleton'] ?? null,
             'auto_visuals' => $autoVisuals,
