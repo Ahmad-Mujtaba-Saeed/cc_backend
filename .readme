@@ -11,6 +11,8 @@ docker compose exec app [Command]
 docker exec -it backend-app-1 bash {to open bash and run artisan commands}
 docker exec -it viralforgebackend-app-1 bash
 
+docker exec -it cc_backend-app-1 bash
+
 http://localhost:8085 //backend url
 http://localhost:8086/index.php //db url
 
@@ -32,7 +34,7 @@ can enable or disbale a module through module.json file
 docker exec backend-worker-1 php artisan queue:monitor default
 docker exec backend-worker-1 php artisan queue:monitor video-processing
 truncate -s 0 /var/www/storage/logs/laravel.log
-tail -100 /var/www/storage/logs/laravel.log
+tail -1000 /var/www/storage/logs/laravel.log
 php artisan queue:work --queue=video-processing --sleep=1 --tries=3
 
 If the link already exists and is broken, first remove it:
