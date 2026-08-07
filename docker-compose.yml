@@ -26,6 +26,16 @@ services:
     build:
       context: .
       dockerfile: docker/php/Dockerfile
+    # Run as www-data — the SAME user php-fpm serves web requests as.
+    #
+    # Both processes write into storage/app/public, and Laravel creates
+    # directories 0755 owned by whoever got there first. With the worker as
+    # root, any project folder the worker created first was root:root 0755, and
+    # the next web request (www-data) could not mkdir inside it:
+    # "Unable to create a directory at /var/www/storage/app/public/projects/4/
+    # explainer". 44 of 51 project folders were in that state. Matching the
+    # users is what actually fixes it; chowning only clears the backlog.
+    user: www-data
     # reap-stale runs on boot because a worker restart is the most common way a
     # project is orphaned mid-render, and this stack has no scheduler process.
     # `|| true` so a reap failure can never stop the queue from starting.
