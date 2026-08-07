@@ -44,21 +44,53 @@ class JamendoMusicService implements MusicProviderInterface
      * Several of our categories are not Jamendo tags at all ("vlog",
      * "documentary", "gaming"), which is exactly why this table exists: they
      * are translated into the musical qualities they actually mean.
+     *
+     * SPACE-separated, and that is not cosmetic. `fuzzytags` silently matches
+     * NOTHING when the tags are comma-separated — it returns HTTP 200,
+     * status "success" and zero results, so it looks exactly like a category
+     * with no music rather than a malformed query. (`tags` tolerates commas,
+     * which makes the trap easy to walk into.) Measured: comma form 0 results
+     * over 5 tries, space form 20/20. tagsFor() enforces this regardless of
+     * how anyone punctuates this table later.
      */
     private const TAG_MAP = [
-        'horror' => 'dark,horror,suspense,tension',
-        'cinematic' => 'cinematic,epic,soundtrack,orchestral',
-        'emotional' => 'emotional,touching,piano,melancholic',
-        'sad' => 'sad,melancholic,slow,piano',
-        'happy' => 'happy,upbeat,positive,funny',
-        'vlog' => 'upbeat,acoustic,pop,positive',
-        'technology' => 'electronic,futuristic,techno,minimal',
-        'corporate' => 'corporate,motivational,inspiring,positive',
-        'gaming' => 'chiptune,electronic,energetic,rock',
-        'adventure' => 'adventure,epic,cinematic,orchestral',
-        'documentary' => 'ambient,documentary,piano,atmospheric',
-        'relaxing' => 'relaxing,calm,ambient,chillout',
+        'horror' => 'dark horror suspense tension',
+        'cinematic' => 'cinematic epic soundtrack orchestral',
+        'emotional' => 'emotional touching piano melancholic',
+        'sad' => 'sad melancholic slow piano',
+        'happy' => 'happy upbeat positive funny',
+        'vlog' => 'upbeat acoustic pop positive',
+        'technology' => 'electronic futuristic techno minimal',
+        'corporate' => 'corporate motivational inspiring positive',
+        'gaming' => 'chiptune electronic energetic rock',
+        'adventure' => 'adventure epic cinematic orchestral',
+        'documentary' => 'ambient documentary piano atmospheric',
+        'relaxing' => 'relaxing calm ambient chillout',
     ];
+
+    /**
+     * How long an EMPTY result is cached. Jamendo intermittently answers a
+     * perfectly valid query with zero results — HTTP 200, status "success",
+     * code 0, no warning, no rate-limit header — roughly one request in six.
+     * An empty response is therefore NOT trustworthy evidence that a category
+     * has no music, so it must never be cached for the full TTL: doing so let
+     * one flaky response black out a category for six hours, which is exactly
+     * how this shipped and exactly what "No tracks available" meant.
+     */
+    private const EMPTY_CACHE_TTL = 300; // 5 min
+
+    /** Retries for that flake, before an empty answer is believed at all. */
+    private const EMPTY_RETRIES = 2;
+
+    /** Category -> the space-separated fuzzytags string Jamendo needs. */
+    private static function tagsFor(string $category): string
+    {
+        $raw = self::TAG_MAP[$category] ?? $category;
+
+        // Commas (and any other punctuation someone edits in) collapse to the
+        // single separator fuzzytags actually understands.
+        return trim((string) preg_replace('/[^a-z0-9]+/i', ' ', $raw));
+    }
 
     /** Local-library fallback, identical to the Pixabay provider's. */
     private const LOCAL_DIR = 'audio';
@@ -217,30 +249,31 @@ class JamendoMusicService implements MusicProviderInterface
             return $cached;
         }
 
-        $tags = self::TAG_MAP[$category] ?? $category;
+        $tags = self::tagsFor($category);
 
         foreach (ApiCredential::forProvider('jamendo') as $credential) {
-            try {
-                $response = Http::timeout(30)->get(self::ENDPOINT, [
-                    'client_id' => $credential->credential,
-                    'format' => 'json',
-                    'limit' => self::PER_PAGE,
-                    'fuzzytags' => $tags,
-                    // A bed with lyrics fights the voice-over for the same
-                    // frequencies and the same attention.
-                    'vocalinstrumental' => 'instrumental',
-                    // Long enough to sit under a whole video, short enough not
-                    // to download 20MB for a 90-second explainer.
-                    'durationbetween' => '45_300',
-                    'audioformat' => 'mp32',
-                    'order' => 'popularity_total_desc',
-                    'include' => 'licenses',
-                ]);
+            for ($attempt = 0; $attempt <= self::EMPTY_RETRIES; $attempt++) {
+                try {
+                    $response = Http::timeout(30)->get(self::ENDPOINT, [
+                        'client_id' => $credential->credential,
+                        'format' => 'json',
+                        'limit' => self::PER_PAGE,
+                        'fuzzytags' => $tags,
+                        // A bed with lyrics fights the voice-over for the same
+                        // frequencies and the same attention.
+                        'vocalinstrumental' => 'instrumental',
+                        // Long enough to sit under a whole video, short enough not
+                        // to download 20MB for a 90-second explainer.
+                        'durationbetween' => '45_300',
+                        'audioformat' => 'mp32',
+                        'order' => 'popularity_total_desc',
+                        'include' => 'licenses',
+                    ]);
 
-                if (!$response->successful()) {
-                    $credential->markFailure("HTTP {$response->status()}: " . substr($response->body(), 0, 200));
-                    continue;
-                }
+                    if (!$response->successful()) {
+                        $credential->markFailure("HTTP {$response->status()}: " . substr($response->body(), 0, 200));
+                        break; // next credential
+                    }
 
                 $body = $response->json();
                 $status = (string) ($body['headers']['status'] ?? '');
@@ -250,20 +283,27 @@ class JamendoMusicService implements MusicProviderInterface
                         (string) ($body['headers']['code'] ?? '?'),
                         (string) ($body['headers']['error_message'] ?? 'unknown')
                     ));
-                    continue;
+                    break; // next credential
                 }
 
                 $results = (array) ($body['results'] ?? []);
                 $credential->markSuccess();
 
                 if (empty($results)) {
-                    Log::info('JamendoMusicService: no tracks for category', [
+                    // Not necessarily a real miss — see EMPTY_CACHE_TTL. Ask
+                    // again before believing it; the flake does not repeat.
+                    if ($attempt < self::EMPTY_RETRIES) {
+                        usleep(300000);
+                        continue;
+                    }
+
+                    Log::info('JamendoMusicService: no tracks for category after retries', [
                         'category' => $category,
                         'tags' => $tags,
                     ]);
-                    // Cache the empty result too — a category with no matches
-                    // shouldn't burn a request on every render.
-                    Cache::put($cacheKey, [], self::CACHE_TTL);
+                    // Short TTL only: enough to stop a render loop hammering
+                    // the API, short enough that a flaky empty heals itself.
+                    Cache::put($cacheKey, [], self::EMPTY_CACHE_TTL);
 
                     return [];
                 }
@@ -273,6 +313,8 @@ class JamendoMusicService implements MusicProviderInterface
                 return $results;
             } catch (\Throwable $e) {
                 $credential->markFailure($e->getMessage());
+                break; // next credential
+            }
             }
         }
 

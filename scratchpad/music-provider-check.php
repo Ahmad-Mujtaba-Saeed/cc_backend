@@ -54,6 +54,37 @@ if ($missing !== []) {
 }
 check('… and invents no categories of its own', array_diff(array_keys($tagMap), MusicProviderInterface::CATEGORIES) === []);
 
+// REGRESSION (2026-08-07): `fuzzytags` silently matches NOTHING when the tags
+// are comma-separated — HTTP 200, status "success", zero results, so it looks
+// exactly like an empty category. Every category shipped with commas and the
+// picker showed "No tracks available" for all 12.
+$tagsFor = new ReflectionMethod(JamendoMusicService::class, 'tagsFor');
+$tagsFor->setAccessible(true);
+$commaFree = true;
+foreach (MusicProviderInterface::CATEGORIES as $category) {
+    $tags = $tagsFor->invoke(null, $category);
+    if (str_contains($tags, ',') || trim($tags) === '' || preg_match('/\s{2,}/', $tags)) {
+        $commaFree = false;
+        echo "      bad tags for {$category}: [{$tags}]\n";
+    }
+}
+check('every category becomes SPACE-separated fuzzytags', $commaFree);
+// The guarantee is normalisation, not the table's current punctuation: a
+// future edit adding commas back must not silently kill the category.
+check('a comma-punctuated category is normalised to spaces',
+    $tagsFor->invoke(null, 'a,b,c') === 'a b c');
+check('… and an unmapped category still yields usable tags',
+    $tagsFor->invoke(null, 'chillhop') === 'chillhop');
+
+// REGRESSION: an empty answer must not be cached for the full TTL — Jamendo
+// returns a valid-looking empty roughly 1 request in 6, and a 6h cache turned
+// one flake into a category that stayed dead all day.
+$ttl = (new ReflectionClass(JamendoMusicService::class))->getConstant('EMPTY_CACHE_TTL');
+$full = (new ReflectionClass(JamendoMusicService::class))->getConstant('CACHE_TTL');
+check('an empty result is cached briefly, not for the full TTL', is_int($ttl) && $ttl > 0 && $ttl <= 900 && $ttl < $full);
+check('an empty result is retried before it is believed',
+    (int) (new ReflectionClass(JamendoMusicService::class))->getConstant('EMPTY_RETRIES') >= 1);
+
 // --------------------------------------------------------------- the factory
 check('pixabay is the default', MusicProviderFactory::DEFAULT_PROVIDER === 'pixabay');
 
