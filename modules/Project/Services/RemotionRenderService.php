@@ -808,6 +808,20 @@ class RemotionRenderService
             return null;
         }
 
+        // Last line of defence: Remotion fails the ENTIRE render when an audio
+        // src 404s ("Could not play audio … MediaError"), so a bed whose file
+        // is not on disk must become silence here, never a URL. The providers
+        // already verify their downloads; this catches a file deleted between
+        // the pick and the render, and any future caller that forgets.
+        if (!(new MusicLibraryService())->isHealthy($track)) {
+            Log::warning('RemotionRenderService: music track missing on disk — rendering without a bed', [
+                'project_id' => $project->id,
+                'track' => $track,
+            ]);
+
+            return null;
+        }
+
         return [
             'url' => $this->publicUrl($track),
             // Quiet bed: the Remotion side also ducks this under narration.

@@ -36,6 +36,7 @@ class ModuleServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \Modules\Project\Console\ReapStaleProjectsCommand::class,
+                \Modules\Project\Console\CacheMusicLibraryCommand::class,
             ]);
         }
     }

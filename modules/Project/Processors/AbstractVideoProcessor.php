@@ -101,6 +101,17 @@ abstract class AbstractVideoProcessor
                 return;
             }
             $trackAbs = Storage::disk('public')->path($trackRelative);
+            clearstatcache(true, $trackAbs);
+            if (!is_file($trackAbs)) {
+                // The provider verifies its downloads, so this means the file
+                // was removed after the pick. Ship the video without a bed
+                // rather than burning an ffmpeg pass that can only fail.
+                Log::warning('applyBackgroundMusic: track missing on disk — skipping', [
+                    'project_id' => $this->project->id,
+                    'track' => $trackRelative,
+                ]);
+                return;
+            }
 
             $volume = (float) ($this->settings['music_volume'] ?? 0.12);
             $volume = max(0.0, min(1.0, $volume));

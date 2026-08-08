@@ -32,7 +32,8 @@ class JamendoMusicService implements MusicProviderInterface
 {
     private const ENDPOINT = 'https://api.jamendo.com/v3.0/tracks/';
     private const CACHE_TTL = 21600; // 6h — matches the Pixabay provider
-    private const DOWNLOAD_DIR = 'audio/jamendo';
+    /** Library namespace: files land in audio/jamendo/{category}/{id}.mp3. */
+    private const LIBRARY = 'jamendo';
     private const PER_PAGE = 50;
 
     /**
@@ -96,6 +97,13 @@ class JamendoMusicService implements MusicProviderInterface
     private const LOCAL_DIR = 'audio';
     private const LOCAL_ALIASES = ['relaxing' => 'calm'];
 
+    private MusicLibraryService $library;
+
+    public function __construct(?MusicLibraryService $library = null)
+    {
+        $this->library = $library ?? new MusicLibraryService();
+    }
+
     public function isConfigured(): bool
     {
         return ApiCredential::hasActive('jamendo');
@@ -116,7 +124,13 @@ class JamendoMusicService implements MusicProviderInterface
         if ($trackId !== null && $trackId !== '') {
             foreach ($hits as $hit) {
                 if ((string) ($hit['id'] ?? '') === (string) $trackId && !empty($hit['audio'])) {
-                    return $this->download($category, (string) $hit['id'], (string) $hit['audio']);
+                    $path = $this->download($category, $hit);
+                    if ($path !== null) {
+                        return $path;
+                    }
+                    // Download failed (CDN hiccup, unwritable library): a copy
+                    // from an earlier render still beats losing the user's pick.
+                    break;
                 }
             }
             foreach ($this->localTracks($category) as $local) {
@@ -124,7 +138,7 @@ class JamendoMusicService implements MusicProviderInterface
                     return $local['path'];
                 }
             }
-            Log::info('JamendoMusicService: chosen track no longer listed — using seeded pick', [
+            Log::info('JamendoMusicService: chosen track unavailable — using seeded pick', [
                 'category' => $category,
                 'track_id' => $trackId,
             ]);
@@ -134,11 +148,15 @@ class JamendoMusicService implements MusicProviderInterface
             // The search already asked for usable lengths; sorting by id keeps
             // the pick stable across cache refreshes for the same project.
             usort($hits, fn ($a, $b) => ((int) ($a['id'] ?? 0)) <=> ((int) ($b['id'] ?? 0)));
-            $hit = $hits[abs($seed) % count($hits)];
 
-            $audioUrl = (string) ($hit['audio'] ?? '');
-            if ($audioUrl !== '') {
-                return $this->download($category, (string) ($hit['id'] ?? md5($audioUrl)), $audioUrl);
+            // Walk on from the seeded hit when one won't download, so a single
+            // dead track can't silence the whole video.
+            $count = count($hits);
+            for ($i = 0; $i < min($count, 3); $i++) {
+                $path = $this->download($category, $hits[(abs($seed) + $i) % $count]);
+                if ($path !== null) {
+                    return $path;
+                }
             }
         }
 
@@ -163,21 +181,17 @@ class JamendoMusicService implements MusicProviderInterface
             if ($url === '') {
                 continue;
             }
-            // Jamendo names its tracks properly, so unlike Pixabay's tag soup
-            // there is a real title to show — with the artist, which the CC
-            // licence makes it good manners to credit.
-            $name = trim((string) ($hit['name'] ?? ''));
-            $artist = trim((string) ($hit['artist_name'] ?? ''));
-            $title = $name !== '' ? $name : 'Untitled track';
-            if ($artist !== '') {
-                $title .= ' — ' . $artist;
-            }
+            $id = (string) ($hit['id'] ?? md5($url));
+
+            // Audition the LOCAL copy when we already have one: same track,
+            // but it proves the file a render will use is actually playable.
+            $local = $this->library->path(self::LIBRARY, $category, $id);
 
             $tracks[] = [
-                'id' => (string) ($hit['id'] ?? md5($url)),
-                'title' => $title,
+                'id' => $id,
+                'title' => $this->titleFor($hit),
                 'duration' => (int) ($hit['duration'] ?? 0),
-                'url' => $url,
+                'url' => $local !== null ? Storage::disk('public')->url($local) : $url,
             ];
         }
 
@@ -194,41 +208,33 @@ class JamendoMusicService implements MusicProviderInterface
     }
 
     /**
-     * Files under storage/app/public/audio/{category}. Ids are content-free
-     * hashes and a chosen id is only ever RESOLVED against this listing, so no
-     * user input can name an arbitrary path.
+     * Everything playable for this category WITHOUT the API: tracks already
+     * downloaded into audio/jamendo/{category} first (they keep their Jamendo
+     * ids, so a user's earlier pick still resolves when the catalogue is
+     * unreachable), then the operator's own files in audio/{category}.
      *
      * @return array<int, array{id: string, title: string, duration: int, url: string, path: string}>
      */
     private function localTracks(string $category): array
     {
-        $dir = self::LOCAL_DIR . '/' . (self::LOCAL_ALIASES[$category] ?? $category);
-        $tracks = [];
+        return array_merge(
+            $this->library->cached(self::LIBRARY, $category),
+            $this->library->folderTracks(self::LOCAL_DIR . '/' . (self::LOCAL_ALIASES[$category] ?? $category))
+        );
+    }
 
-        try {
-            foreach (Storage::disk('public')->files($dir) as $file) {
-                if (!preg_match('/\.(mp3|wav|m4a)$/i', $file)) {
-                    continue;
-                }
-                $name = pathinfo($file, PATHINFO_FILENAME);
-                $title = ucwords(trim((string) preg_replace(
-                    '/\s+/',
-                    ' ',
-                    (string) preg_replace('/\(.*?\)|[-_]+|\d{5,}/', ' ', $name)
-                )));
-                $tracks[] = [
-                    'id' => 'l' . substr(md5($file), 0, 12),
-                    'title' => $title !== '' ? $title : $name,
-                    'duration' => 0,
-                    'url' => Storage::disk('public')->url($file),
-                    'path' => $file,
-                ];
-            }
-        } catch (\Throwable $e) {
-            Log::warning('JamendoMusicService: local library listing failed', ['error' => $e->getMessage()]);
-        }
+    /**
+     * Jamendo names its tracks properly, so unlike Pixabay's tag soup there is
+     * a real title to show — with the artist, which the CC licence makes it
+     * good manners to credit.
+     */
+    private function titleFor(array $hit): string
+    {
+        $name = trim((string) ($hit['name'] ?? ''));
+        $artist = trim((string) ($hit['artist_name'] ?? ''));
+        $title = $name !== '' ? $name : 'Untitled track';
 
-        return $tracks;
+        return $artist !== '' ? "{$title} — {$artist}" : $title;
     }
 
     /**
@@ -325,39 +331,32 @@ class JamendoMusicService implements MusicProviderInterface
         return [];
     }
 
-    /** Download a track once into public storage; later picks reuse the file. */
-    private function download(string $category, string $trackId, string $audioUrl): ?string
+    /**
+     * Download a search hit into the local library once, with its title,
+     * artist and licence, and return the relative path — or null when the
+     * bytes could not be stored, which callers treat as "try another track".
+     *
+     * @param array $hit raw Jamendo result row
+     */
+    private function download(string $category, array $hit): ?string
     {
-        $relative = self::DOWNLOAD_DIR . "/{$category}/{$trackId}.mp3";
-
-        if (Storage::disk('public')->exists($relative)) {
-            return $relative;
-        }
-
-        try {
-            $response = Http::timeout(120)->get($audioUrl);
-            if (!$response->successful() || strlen($response->body()) === 0) {
-                Log::warning('JamendoMusicService: track download failed', [
-                    'url' => $audioUrl,
-                    'status' => $response->status(),
-                ]);
-
-                return null;
-            }
-
-            Storage::disk('public')->put($relative, $response->body());
-
-            Log::info('JamendoMusicService: cached track', [
-                'category' => $category,
-                'track_id' => $trackId,
-                'bytes' => strlen($response->body()),
-            ]);
-
-            return $relative;
-        } catch (\Throwable $e) {
-            Log::warning('JamendoMusicService: track download threw', ['error' => $e->getMessage()]);
-
+        $audioUrl = (string) ($hit['audio'] ?? '');
+        if ($audioUrl === '') {
             return null;
         }
+
+        return $this->library->store(
+            self::LIBRARY,
+            $category,
+            (string) ($hit['id'] ?? md5($audioUrl)),
+            $audioUrl,
+            [
+                'title' => (string) ($hit['name'] ?? ''),
+                'artist' => (string) ($hit['artist_name'] ?? ''),
+                'duration' => (int) ($hit['duration'] ?? 0),
+                'license' => empty($hit['license_ccurl']) ? '' : 'Creative Commons',
+                'license_url' => (string) ($hit['license_ccurl'] ?? ''),
+            ]
+        );
     }
 }
