@@ -2,7 +2,7 @@
     "name": "Project",
     "version": "1.0.0",
     "description": "Video project management module for creating and processing video content",
-    "author": "ViralForge Team",
+    "author": "Vreato Team",
     "providers": [
         "Modules\\Project\\ModuleServiceProvider"
     ],
