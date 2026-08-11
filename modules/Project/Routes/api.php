@@ -79,6 +79,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/explainer/projects/{project}/aspect-variants', [ExplainerController::class, 'toggleAspectVariants']);
     Route::post('/explainer/projects/{project}/brand', [ExplainerController::class, 'setBrand']);
     Route::post('/explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}/asset', [ExplainerController::class, 'uploadAsset']);
+    // Draw (or re-draw) an image slot with AI, on demand, with the user's own
+    // art direction. Throttled: each call is a real image-model charge.
+    Route::post('/explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}/generate', [ExplainerController::class, 'generateSlotImage'])
+        ->middleware('throttle:30,1');
     Route::delete('/explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}/asset', [ExplainerController::class, 'deleteAsset']);
     Route::patch('/explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}', [ExplainerController::class, 'updateSlot']);
     Route::patch('/explainer/projects/{project}/scenes/{sceneId}', [ExplainerController::class, 'updateScene']);

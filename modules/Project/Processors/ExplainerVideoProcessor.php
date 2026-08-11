@@ -803,35 +803,18 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
     }
 
     /**
-     * The one flat-vector art direction every AI image in the video obeys —
-     * locked to the theme's own three colours (named in WORDS: the image
-     * model largely ignores raw hex codes but follows "dark plum background
-     * with pink accents" reliably) with the hard no-text rule (§7.1).
+     * The one flat-vector art direction every AI image in the video obeys.
+     *
+     * Lives in {@see \Modules\Project\Support\ExplainerImagePrompt} now,
+     * because the storyboard generates images on demand too and the two must
+     * produce a byte-identical prompt — the file is cached under a hash of it.
      */
     private function flatVectorPrompt(string $topic): string
     {
-        $settings = $this->project->settings ?? [];
-        $theme = ExplainerRegistry::colorScheme($settings['color_scheme'] ?? null);
-        $field = $theme['bg_from'] ?? '#0A0F1E';
-        $ink = $theme['text'] ?? '#EDF0F8';
-        $accent = $theme['accent'] ?? '#FFB020';
-
-        return 'Bold flat 2D vector illustration of ' . $topic . '. '
-            . 'Bold geometric shapes with solid colour fills, thick confident outlines, crisp clean edges, '
-            // "generous negative space, centered composition" was read by the
-            // image model as "one small icon adrift in an empty field" — the
-            // reason so many frames came back as a near-solid background with a
-            // postage-stamp motif. The subject has to OWN the frame instead.
-            . 'The subject is large and fills the frame edge to edge, generously cropped, '
-            . 'occupying most of the canvas — never a small icon floating in empty space. '
-            . 'Modern editorial poster style. '
-            . "Strictly three colours only: a {$this->colorName($field)} background, "
-            . "{$this->colorName($ink)} linework, and {$this->colorName($accent)} accents. "
-            . 'Not a photograph: no photorealism, no bokeh, no blur, no depth of field. '
-            . 'No gradients, no shading, no glow, no drop shadows. '
-            // Image models cannot spell — the hard no-text rule (copilot.md
-            // §7.1) covers every way glyphs sneak in.
-            . 'No text, no words, no letters, no numbers, no labels, no captions, no watermark anywhere in the image';
+        return \Modules\Project\Support\ExplainerImagePrompt::flatVector(
+            $topic,
+            ExplainerRegistry::colorScheme(($this->project->settings ?? [])['color_scheme'] ?? null)
+        );
     }
 
     /** Effective auto-visuals switch: explicit user choice > math-video auto. */
@@ -875,18 +858,21 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
                     }
                     $existing = $assets->get($scene->scene_id . '::' . $slotKey);
 
-                    $subject = trim((string) ($slot['asset_request']['description'] ?? ''));
-                    $label = trim((string) ($slot['label'] ?? ''));
-                    if ($subject === '') {
-                        $subject = $label !== '' ? $label : 'the idea this scene narrates';
-                    }
+                    // Built by the SHARED prompt builder, which also carries
+                    // the user's own art direction (asset_request.instruction)
+                    // from the storyboard. Both facts matter: a prompt that
+                    // differed from the one the storyboard generated with would
+                    // re-bill an image the user already accepted, and one that
+                    // ignored their instruction would put the old picture back.
                     // VLM retry (§12.4): a flagged fill regenerates with a
                     // composition nudge — which also changes the prompt hash.
-                    if (!empty(($this->project->settings['vlm_retry_suffix'] ?? [])[(string) $scene->scene_id])) {
-                        $subject .= ' — different composition, different angle';
-                    }
-                    $prompt = $this->flatVectorPrompt($subject);
-                    $hash = md5($prompt);
+                    $built = \Modules\Project\Support\ExplainerImagePrompt::forSlot(
+                        $slot,
+                        ExplainerRegistry::colorScheme(($this->project->settings ?? [])['color_scheme'] ?? null),
+                        !empty(($this->project->settings['vlm_retry_suffix'] ?? [])[(string) $scene->scene_id])
+                    );
+                    $prompt = $built['prompt'];
+                    $hash = $built['hash'];
 
                     if ($existing && Storage::disk('public')->exists($existing->path)) {
                         $isFill = str_starts_with((string) $existing->original_name, 'slot-fill:');
@@ -1222,65 +1208,12 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
 
     /**
      * A human colour name for a hex — image models follow "dark plum" far
-     * more reliably than "#150F1B". Hue-bucketed HSL with light/dark
-     * adjectives; deliberately coarse (it steers a palette, not a paint mix).
+     * more reliably than "#150F1B". Shared with the storyboard's on-demand
+     * image generation, so both describe the same palette the same way.
      */
     private function colorName(string $hex): string
     {
-        $h = ltrim(trim($hex), '#');
-        if (strlen($h) !== 6) {
-            return 'neutral dark';
-        }
-        $r = hexdec(substr($h, 0, 2)) / 255;
-        $g = hexdec(substr($h, 2, 2)) / 255;
-        $b = hexdec(substr($h, 4, 2)) / 255;
-        $max = max($r, $g, $b);
-        $min = min($r, $g, $b);
-        $l = ($max + $min) / 2;
-        $d = $max - $min;
-        $s = $d === 0.0 ? 0.0 : $d / (1 - abs(2 * $l - 1));
-
-        if ($s < 0.12) {
-            return $l < 0.12 ? 'near-black' : ($l > 0.85 ? 'near-white' : ($l > 0.6 ? 'light warm grey' : 'dark grey'));
-        }
-
-        $hue = 0.0;
-        if ($d > 0) {
-            $hue = match ($max) {
-                $r => fmod((($g - $b) / $d) + 6, 6),
-                $g => (($b - $r) / $d) + 2,
-                default => (($r - $g) / $d) + 4,
-            } * 60;
-        }
-
-        $name = match (true) {
-            $hue < 15 || $hue >= 345 => 'red',
-            $hue < 40 => 'orange',
-            $hue < 65 => 'golden yellow',
-            $hue < 90 => 'lime green',
-            $hue < 150 => 'green',
-            $hue < 185 => 'teal',
-            $hue < 210 => 'cyan',
-            $hue < 250 => 'blue',
-            $hue < 275 => 'indigo',
-            $hue < 300 => 'violet',
-            $hue < 330 => 'magenta',
-            default => 'pink',
-        };
-
-        if ($l < 0.16) {
-            return "very dark {$name}, almost black";
-        }
-        if ($l < 0.35) {
-            return "deep {$name}";
-        }
-        if ($l > 0.85) {
-            return "pale {$name}, almost white";
-        }
-        if ($l > 0.65) {
-            return "light {$name}";
-        }
-        return $name;
+        return \Modules\Project\Support\ExplainerImagePrompt::colorName($hex);
     }
 
     /**

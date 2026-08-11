@@ -415,6 +415,147 @@ class ExplainerController extends Controller
         }
     }
 
+    /**
+     * Draw this slot's picture with AI, now, and hand it back.
+     *
+     * Auto-visuals already illustrate unfilled slots — but only at render, so
+     * the first time anyone sees the picture is in the finished video, and the
+     * only lever is to re-render the whole thing. Here the user asks for it
+     * from the storyboard, sees the result in seconds, and can keep asking
+     * with their own art direction ("show it at night", "from above, no
+     * people") until it is right — or give up and upload their own.
+     *
+     * The instruction is stored ON THE SLOT, not just used once: the render's
+     * fill pass builds its prompt from the same slot through the same builder,
+     * so it recognises this exact image as current and neither re-bills it nor
+     * puts the old one back.
+     */
+    public function generateSlotImage(Request $request, Project $project, string $sceneId, string $slotKey): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+        if ($this->revisionRunning($project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A revision is being applied — wait for it to finish.',
+            ], 409);
+        }
+
+        $validated = $request->validate([
+            'instruction' => 'sometimes|nullable|string|max:400',
+            // The subject itself is editable here too: the storyboard's
+            // description IS the prompt, and "a busy video rental counter" may
+            // simply be the wrong shot.
+            'description' => 'sometimes|nullable|string|max:400',
+        ]);
+
+        $scene = $project->explainerScenes()->where('scene_id', $sceneId)->first();
+        if (!$scene || !isset($scene->slots[$slotKey])) {
+            return response()->json(['success' => false, 'message' => 'Unknown scene or slot'], 404);
+        }
+
+        $slots = $scene->slots;
+        $slot = $slots[$slotKey];
+        if (($slot['content_type'] ?? null) !== 'image') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only image slots can be drawn by AI. Upload a file for a video slot.',
+            ], 422);
+        }
+
+        $request_ = is_array($slot['asset_request'] ?? null) ? $slot['asset_request'] : [];
+        if ($request->has('description')) {
+            $description = trim((string) $validated['description']);
+            if ($description !== '') {
+                $request_['description'] = $description;
+            }
+        }
+        if ($request->has('instruction')) {
+            $instruction = trim((string) ($validated['instruction'] ?? ''));
+            // Empty clears it — that is how the user goes back to the plain
+            // description without deleting the slot.
+            if ($instruction === '') {
+                unset($request_['instruction']);
+            } else {
+                $request_['instruction'] = $instruction;
+            }
+        }
+        $slot['asset_request'] = $request_;
+
+        $built = \Modules\Project\Support\ExplainerImagePrompt::forSlot(
+            $slot,
+            ExplainerRegistry::colorScheme($project->settings['color_scheme'] ?? null)
+        );
+
+        \Modules\Project\Services\CostTracker::setContext($project);
+        $images = (new \Modules\Project\Services\ImageGenerationService())->generateImages(
+            [$built['prompt']],
+            1,
+            '',
+            [
+                'project_id' => $project->id,
+                'template' => 'explainer_slot_fill',
+                'aspect_ratio' => in_array($project->aspect_ratio, ['16:9', '9:16', '1:1'], true)
+                    ? $project->aspect_ratio
+                    : '16:9',
+                'visual_tone' => 'flat 2D vector graphic, solid colour shapes, crisp edges, limited three-colour palette, no gradients, no shading, no photorealism',
+                'detail_boosters' => false,
+                'character_consistency' => false,
+                // A NEW seed every time. The pipeline's seeds are deliberately
+                // deterministic so re-rendering a project does not reshuffle
+                // its pictures — but here the entire request is "give me a
+                // different one", and a stable seed would hand back the image
+                // the user just rejected.
+                'seed' => random_int(1, 2147483646),
+            ]
+        );
+
+        $absolute = is_array($images) ? ($images[0] ?? null) : null;
+        if (!$absolute) {
+            return response()->json([
+                'success' => false,
+                'message' => 'The image service did not return a picture. Try again in a moment, or upload your own.',
+            ], 503);
+        }
+
+        $root = rtrim(str_replace('\\', '/', Storage::disk('public')->path('')), '/');
+        $normalized = str_replace('\\', '/', $absolute);
+        $path = str_starts_with($normalized, $root)
+            ? ltrim(substr($normalized, strlen($root)), '/')
+            : $absolute;
+
+        // The old file goes only after the new one exists, and never when the
+        // storage layer handed back the same path.
+        $previous = ExplainerAsset::where('project_id', $project->id)
+            ->where('scene_id', $sceneId)->where('slot_key', $slotKey)->first();
+        if ($previous && $previous->path !== $path && Storage::disk('public')->exists($previous->path)) {
+            Storage::disk('public')->delete($previous->path);
+        }
+
+        $asset = ExplainerAsset::updateOrCreate(
+            ['project_id' => $project->id, 'scene_id' => $sceneId, 'slot_key' => $slotKey],
+            ['type' => 'image', 'path' => $path, 'original_name' => $built['name']]
+        );
+
+        $slots[$slotKey] = $slot;
+        $scene->update(['slots' => $slots]);
+        $this->markStoryboardEdited($project);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'asset' => [
+                    'url' => $asset->url,
+                    'type' => 'image',
+                    'source' => 'ai',
+                    'name' => $asset->original_name,
+                ],
+                'asset_request' => $request_,
+            ],
+        ]);
+    }
+
     public function deleteAsset(Project $project, string $sceneId, string $slotKey): JsonResponse
     {
         if ($denied = $this->guard($project)) {
@@ -1256,7 +1397,17 @@ class ExplainerController extends Controller
             foreach ($scene->slots ?? [] as $slotKey => $slot) {
                 if (in_array($slot['content_type'] ?? null, ['image', 'video'], true)) {
                     $asset = $assets->get($scene->scene_id . '::' . $slotKey);
-                    $slot['asset'] = $asset ? ['url' => $asset->url, 'type' => $asset->type, 'name' => $asset->original_name] : null;
+                    // `source` is what lets the UI tell the user where the
+                    // picture came from and therefore what to offer: an AI
+                    // fill can be re-drawn with new direction, an upload can
+                    // be replaced, stock can be overridden. Without it every
+                    // image looks like something the user put there.
+                    $slot['asset'] = $asset ? [
+                        'url' => $asset->url,
+                        'type' => $asset->type,
+                        'name' => $asset->original_name,
+                        'source' => $this->assetSource((string) $asset->original_name),
+                    ] : null;
                     // Stock b-roll slots (§8) auto-fill at render time — they
                     // never block readiness.
                     if (!$asset && !$autoVisuals && trim((string) ($slot['stock_query'] ?? '')) === '') {
@@ -1386,6 +1537,22 @@ class ExplainerController extends Controller
                 (array) ($project->settings['output_videos'] ?? [])
             )),
         ];
+    }
+
+    /**
+     * Where a stored asset came from, read off the naming convention the
+     * pipeline already writes (StoryboardDiff reads the same prefixes to
+     * decide who wins a contested slot).
+     */
+    private function assetSource(string $originalName): string
+    {
+        foreach (['slot-fill:' => 'ai', 'stock:' => 'stock', 'sprite:' => 'sprite'] as $prefix => $source) {
+            if (str_starts_with($originalName, $prefix)) {
+                return $source;
+            }
+        }
+
+        return 'upload';
     }
 
     /**

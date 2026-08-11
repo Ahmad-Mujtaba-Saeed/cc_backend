@@ -342,9 +342,19 @@ class PythonAIService
      * Seed for image $index. Shared across a run by default so scenes hold one
      * look; callers whose images are independent (illustrations, props) pass
      * `vary_seed` so they don't all collapse onto the same composition.
+     *
+     * Both of those are DETERMINISTIC on purpose — re-rendering a project must
+     * not reshuffle every picture. That is wrong for exactly one caller: the
+     * storyboard's "draw it again" button, where the whole request is a
+     * DIFFERENT picture of the same subject, and a stable seed would hand back
+     * the identical image. Such a caller passes an explicit `seed`.
      */
     public function imageSeed(string $projectId, int $index, array $options = []): int
     {
+        if (isset($options['seed']) && is_numeric($options['seed'])) {
+            return (int) abs((int) $options['seed']) % 2147483647;
+        }
+
         $basis = !empty($options['vary_seed']) ? $projectId . '|' . $index : $projectId;
 
         return (int) (crc32($basis) % 2147483647);
