@@ -64,7 +64,19 @@ class GenericStoryboardComposerService
         'before_after', 'photo_stack', 'labeled_diagram', 'single_focus',
     ];
 
-    /** One-line content docs, only included when a menu offers the card. */
+    /**
+     * One-line content docs, only included when a menu offers the card.
+     *
+     * PUBLIC as data (see {@see cardDocs()}): the storyboard REVISION pass
+     * re-authors an individual card from a user's note ("make scene 4 a
+     * comparison"), and it must describe the cards with exactly the same words
+     * this composer does — two drifting copies of "what a receipt_card looks
+     * like" is how a slot key goes stale (see carddocs-check.php). Entries
+     * exist for templates NO menu offers (geometry, scenario, the vertical
+     * split): a doc is only emitted for a template that was actually offered,
+     * so extra keys cost this composer nothing and give the revision pass the
+     * full vocabulary.
+     */
     private const CARD_DOCS = [
         'single_focus' => 'slot_main: {content_type:"text_block", heading<=40, bullets:[1-4 <=60]} OR {content_type:"image", asset_request:{description: a concrete photographable subject}, camera_move:"slow_zoom_in"}',
         'stat_spotlight' => 'slot_stat: {content_type:"text_block", heading: THE stat itself ("\$4.2 Billion"), bullets:[1 support line]}',
@@ -83,7 +95,12 @@ class GenericStoryboardComposerService
         'map_card' => 'slot_map: {content_type:"map", pins:[{label,lat,lon} <=2 real approx coords], region?:"world|europe|asia|africa|north_america|south_america|oceania", route?:true}',
         'timeline_card' => 'slot_timeline: {content_type:"timeline_nodes", nodes:[3-6 {date,label}], heading?}. ONLY for real chronology (years, eras, release dates) — every date must be a POINT IN TIME. A list of criteria, factors or features is not a timeline: use icon_grid or checklist_card',
         'before_after' => 'slot_before + slot_after: each {content_type:"image", asset_request:{description}}',
-        'versus_card' => 'slot_left + slot_right: image requests; slot_versus: {content_type:"versus", left:{label,stats:[<=3]}, right:{...}, verdict?}',
+        // Three slots, and the two panels are PICTURES — spelled out because
+        // the terse version ("slot_left + slot_right: image requests") reads
+        // as "put the contenders here", and models answered it by repeating
+        // the comparison into both panels; the validator then dropped them and
+        // back-filled two placeholder image requests.
+        'versus_card' => 'slot_left + slot_right: {content_type:"image", asset_request:{description: a concrete photographable subject for THAT side}} — one picture per contender, NOT their stats; slot_versus: {content_type:"versus", left:{label <=24, stats:[<=3 short lines]}, right:{same}, verdict?: <=80}',
         'checklist_card' => 'slot_checklist: {content_type:"proscons", pros:[...], cons?:[...], heading?}',
         'list_ranking' => 'slot_ranking: {content_type:"ranking", items:[3-6 strings, BEST LAST], heading?}',
         'icon_grid' => 'slot_icons: {content_type:"icons", items:[3-9 {icon: a lucide name, label: 1-2 words}], heading?}',
@@ -113,7 +130,45 @@ class GenericStoryboardComposerService
         'spectrum_card' => 'slot_spectrum: {content_type:"spectrum", axis:{left_label, right_label} the two poles <=18 chars, spectrum_items:[2-5 {label <=20, position: 0..1 from the LEFT pole — commit to real judgements, spread them}], highlight_index?: the item the question is about, heading?, caption?} — for WHERE-does-X-sit beats (pricing, risk, difficulty); never for time or measured series',
         'layer_stack' => 'slot_layers: {content_type:"layers", layers:[3-6 {label <=24, caption?: <=44 what that layer does} listed TOP FIRST in their REAL stacking order — the order is the content, repeated labels are fine], highlight_index?: the one layer this beat is about, heading?, caption?} — ONLY when things genuinely sit ON TOP of each other (atmosphere, network stack, soil, what\'s inside a battery); a list with no vertical structure is checklist_card or icon_grid; a repeating loop is cycle_diagram',
         'hierarchy_card' => 'slot_hierarchy: {content_type:"hierarchy", root: the one thing at the top <=28 ("The UN", "A cell"), children:[2-4 {label: a branch under the root <=22, caption?: <=40 what it is or does, children?:[2-4 {label <=18}] for a SECOND level of sub-parts under that branch}], highlight_index?: the top-level branch this beat is about, heading?, caption?} — for HOW SOMETHING IS STRUCTURED, drawn as an org chart (org structure, parts-of-parts of a system, a taxonomy); at most two levels below the root. A yes/no path the viewer walks is decision_tree; things stacked ON TOP of each other are layer_stack; a flat list that does not branch is icon_grid or checklist_card',
+
+        // ---- offered by no menu; carried for the revision pass ------------
+        'split_top_bottom' => 'slot_top + slot_bottom: each {content_type:"image", asset_request:{description}} OR {content_type:"text_block", heading, bullets:[1-3]} — the vertical twin of split_side_by_side; prefer it in 9:16 and for "the picture on top, the facts underneath"',
+        'progress_meter' => 'slot_meter: {content_type:"meter", value_pct: 0-100, label: what the share IS ("of players finished it"), unit?: "%", heading?} — ONE percentage that IS the whole beat; a share of PEOPLE is pictogram_percent, a measured series is animated_chart',
+        'quote_portrait' => 'slot_portrait: {content_type:"image", asset_request:{description: a head-and-shoulders portrait of the person}}, slot_quote: {content_type:"text_block", heading: the quotation, bullets:["— who said it"]} — ONLY when the SPEAKER matters enough to show their face and a portrait can be supplied; otherwise quote_card',
+        'headline_ticker' => 'slot_headlines: {content_type:"headlines", items:[2-3 {text: the headline as printed <=90, source?: the outlet <=18}], heading?} — for "the press/the internet reacted" beats; never for the narrator\'s own claims',
+        'geometry_diagram' => 'slot_geometry: {content_type:"geometry", shape:"triangle"|"right_triangle"|"square"|"rectangle"|"polygon"|"circle"|"angle", points:[{x:0..1, y:0..1 with y pointing UP, label:"A"} in order around the figure], side_labels?:["c","a","b"] one per edge (edge i joins point i to i+1, "" to skip), angle_marks?:[{at:<vertex index>, label?:"90°", right?:true}], segments?:[{from:"A", to:"C", label?, dashed?}] an internal line, extra_points?:[{on_side:<edge index>, t:0..1, label:"M"}], circumcircle?:true draws the circle through the first 3 points, radius_label?/center_label? (circle only), highlight_side?:<edge index>, heading?} — the figure is DRAWN, never uploaded; carry every letter and given value the narration names',
+        'scenario_diagram' => 'slot_scenario: {content_type:"scenario", layout:"line"|"arc"|"climb"|"fall"|"compare"|"split"|"cycle" (the SHAPE the situation makes — a projectile is "arc", a tank filling is "climb", rivals weighed side by side is "compare", one source fanning out is "split"), entities:[2-4 {label <=16, icon?: a lucide name, value?: the GIVEN quantity <=24 ("v0 = 28 m/s"), sprite?: <=8 words naming ONE drawable real object for this actor, emphasis?:"key" on the single thing the question is about} ORDERED ALONG THE MOTION], connectors?:[one per gap, {label <=18, sub?: <=18, style?:"arrow"|"line"|"both"}], question?: what we must FIND <=24 ("h max = ?"), heading?} — the word-problem setup drawing, drawn before any algebra; maths word problems only',
     ];
+
+    /**
+     * The card vocabulary as data, so other passes describe a card the same
+     * way this composer does.
+     *
+     * @return array<string, string> template => one-line content shape
+     */
+    public static function cardDocs(): array
+    {
+        return self::CARD_DOCS;
+    }
+
+    /**
+     * Render the doc lines for a set of templates, skipping any this composer
+     * has no vocabulary for (the caller has already decided what is legal —
+     * this only decides what is DESCRIBED).
+     *
+     * @param string[] $templates
+     */
+    public static function docsFor(array $templates): string
+    {
+        $out = '';
+        foreach (array_unique($templates) as $tpl) {
+            if (isset(self::CARD_DOCS[$tpl])) {
+                $out .= "  {$tpl}: " . self::CARD_DOCS[$tpl] . "\n";
+            }
+        }
+
+        return $out;
+    }
 
     private ?string $apiKey;
     private string $model;

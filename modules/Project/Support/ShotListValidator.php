@@ -113,6 +113,85 @@ class ShotListValidator
     }
 
     /**
+     * Validate ONE model-authored scene on its own, with no editorial pass.
+     *
+     * The revision flow (a user asking for "make scene 4 a comparison") must
+     * touch nothing but the cards it was asked about: the whole point is that
+     * every other scene keeps its uploads, its cached voiceover and its
+     * timing. Re-running validate() over the whole board would re-merge dead
+     * air, re-fold echoes, re-cap and re-hook scenes that have already been
+     * through all of that once — restructuring work the user never asked for.
+     *
+     * So this exposes the per-scene half only: template legality, card-content
+     * clamps, slot repair, dock, pacing, mood. Everything cross-scene
+     * (variety, caps, transitions, hook/outro) stays the caller's business —
+     * see StoryboardRevision, which enforces the caps against the CHANGED
+     * scenes so an untouched one is never degraded for a neighbour's sake.
+     *
+     * `$order` is only a seed for the scene id when the raw scene carries
+     * none; the caller renumbers afterwards.
+     */
+    public function validateOne(array $rawScene, int $order, array $options = []): array
+    {
+        $this->warnings = [];
+        $this->changed = false;
+        $this->mathMode = ($options['math_mode'] ?? false) === true;
+        $this->aspectRatio = (string) ($options['aspect_ratio'] ?? '16:9');
+
+        try {
+            $scene = $this->validateScene($rawScene, $order);
+        } catch (\Throwable $e) {
+            $sceneId = is_scalar($rawScene['scene_id'] ?? null) ? (string) $rawScene['scene_id'] : "scene_{$order}";
+            $narr = '';
+            if (isset($rawScene['narration'])) {
+                $narr = is_array($rawScene['narration'])
+                    ? (string) ($rawScene['narration']['text'] ?? '')
+                    : (string) $rawScene['narration'];
+            }
+            $this->warn("Scene {$sceneId}: validation threw ({$e->getMessage()}) -> safe text fallback.");
+            $scene = $this->fallbackScene($sceneId, $order, ExplainerRegistry::defaultSceneSeconds(), $narr);
+        }
+
+        unset($scene['_transition_explicit']); // internal flag, never shipped
+
+        return $scene;
+    }
+
+    /** Warnings collected by the most recent validate()/validateOne() call. */
+    public function warnings(): array
+    {
+        return $this->warnings;
+    }
+
+    /**
+     * How long a scene needs for the words and the reading in it.
+     *
+     * Public because the storyboard lets the user rewrite a scene's narration
+     * by hand, and a shortened line must not leave the card sitting on the old
+     * estimate. Callers pass `$seed = 0` for a FRESH estimate: paceDuration
+     * takes the max of the seed and its own reckoning, so passing the current
+     * duration would turn it into a floor the edit could never go below.
+     *
+     * The render re-times every narrated scene from the actual voiceover
+     * anyway — this is the number the storyboard shows until then.
+     */
+    public function paceScene(string $narrationText, array $slots, float $seed = 0.0): float
+    {
+        return round($this->paceDuration($seed, $narrationText, $slots), 2);
+    }
+
+    /**
+     * Public face of the over-cap fallback: recast a card as the safe
+     * equivalent that carries the same content. Used by the revision pass,
+     * which enforces per-video caps itself so that only the scene the user
+     * actually changed can be the one that degrades.
+     */
+    public function degradeCard(array $scene): array
+    {
+        return $this->degradeCappedCard($scene);
+    }
+
+    /**
      * A rule stated on its own slide, one beat before the working that uses
      * it, belongs BESIDE that working — that is what the rule panel is for,
      * and it is what the viewer asked for ("if we applied some formula show it

@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 use Modules\Project\Jobs\AnalyzeExplainerScriptJob;
 use Modules\Project\Jobs\ProcessVideoJob;
+use Modules\Project\Jobs\ReviseExplainerStoryboardJob;
 use Modules\Project\Models\ExplainerAsset;
 use Modules\Project\Models\Project;
 use Modules\Project\Services\CanvasDirectorService;
@@ -22,6 +23,7 @@ use Modules\Project\Services\TemplateSettingsService;
 use Modules\Project\Support\CanvasPlanValidator;
 use Modules\Project\Support\ChapterPlanValidator;
 use Modules\Project\Support\ExplainerRegistry;
+use Modules\Project\Support\ShotListValidator;
 use Modules\Billing\Services\CreditService;
 use Modules\Billing\Exceptions\InsufficientCreditsException;
 use Modules\User\Models\User;
@@ -168,6 +170,13 @@ class ExplainerController extends Controller
             return $denied;
         }
 
+        if ($this->revisionRunning($project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A revision is being applied — wait for it to finish before re-analyzing.',
+            ], 409);
+        }
+
         $validated = $request->validate([
             'script' => 'sometimes|string|min:10',
             'target_seconds' => 'sometimes|integer|min:10|max:600',
@@ -188,6 +197,94 @@ class ExplainerController extends Controller
             'success' => true,
             'message' => 'Re-analyzing script...',
         ]);
+    }
+
+    /**
+     * Targeted AI revision: the user says what is wrong with the storyboard
+     * and only the cards that note is about are rebuilt. Everything else —
+     * including every file already uploaded to it — is left alone.
+     *
+     * Re-analysis is the blunt instrument (rebuild from the script); this is
+     * the scalpel, and it is what makes the storyboard an editable document
+     * rather than a take-it-or-leave-it proposal.
+     */
+    public function revise(Request $request, Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $validated = $request->validate([
+            'request' => 'required|string|min:3|max:2000',
+            // Optional UI affordance: the scenes the user had selected when
+            // they wrote the note. Prepended so "make this shorter" has a
+            // subject, rather than asking the planner to guess.
+            'scene_ids' => 'sometimes|array|max:12',
+            'scene_ids.*' => 'string|max:80',
+        ]);
+
+        if (!in_array($project->status, ['storyboard_ready', 'completed', 'failed'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wait for the current job to finish before revising the storyboard.',
+            ], 409);
+        }
+        if ($project->explainerScenes()->count() === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'There is no storyboard to revise yet.',
+            ], 422);
+        }
+        if ($this->revisionRunning($project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A revision is already being applied — give it a moment.',
+            ], 409);
+        }
+
+        $note = trim($validated['request']);
+        $scoped = array_values(array_filter(
+            array_map('strval', $validated['scene_ids'] ?? []),
+            fn ($id) => $project->explainerScenes()->where('scene_id', $id)->exists()
+        ));
+        if ($scoped !== []) {
+            $note = 'This note is about ' . implode(', ', $scoped) . " only.\n" . $note;
+        }
+
+        $settings = $project->settings ?? [];
+        $settings['revision'] = array_merge(
+            is_array($settings['revision'] ?? null) ? $settings['revision'] : [],
+            ['state' => 'running', 'started_at' => now()->toIso8601String(), 'request' => mb_substr($note, 0, 1000)]
+        );
+        $project->update(['settings' => $settings]);
+
+        ReviseExplainerStoryboardJob::dispatch($project->fresh(), $note);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Applying your changes…',
+        ]);
+    }
+
+    /**
+     * Is a revision job in flight? A crashed worker must not lock the
+     * storyboard forever, so the lock expires — a job that has not reported
+     * back within its own timeout is treated as gone.
+     */
+    private function revisionRunning(Project $project): bool
+    {
+        $revision = $project->settings['revision'] ?? null;
+        if (!is_array($revision) || ($revision['state'] ?? '') !== 'running') {
+            return false;
+        }
+
+        try {
+            $started = \Illuminate\Support\Carbon::parse((string) ($revision['started_at'] ?? ''));
+        } catch (\Throwable) {
+            return false;
+        }
+
+        return $started->greaterThan(now()->subMinutes(ReviseExplainerStoryboardJob::LOCK_MINUTES));
     }
 
     public function storyboard(Project $project): JsonResponse
@@ -343,6 +440,15 @@ class ExplainerController extends Controller
             return $denied;
         }
 
+        // Rendering half an applied revision would ship a video that matches
+        // neither the old storyboard nor the new one.
+        if ($this->revisionRunning($project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A revision is being applied — wait for it to finish before rendering.',
+            ], 409);
+        }
+
         $storyboard = $this->serializeStoryboard($project);
         if (!$storyboard['ready_to_render']) {
             return response()->json([
@@ -414,6 +520,12 @@ class ExplainerController extends Controller
         if ($denied = $this->guard($project)) {
             return $denied;
         }
+        if ($this->revisionRunning($project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A revision is being applied — wait for it to finish before editing scenes.',
+            ], 409);
+        }
 
         $scene = $project->explainerScenes()->where('scene_id', $sceneId)->first();
         if (!$scene || !isset($scene->slots[$slotKey])) {
@@ -422,6 +534,7 @@ class ExplainerController extends Controller
 
         $slots = $scene->slots;
         $slot = $slots[$slotKey];
+        $textChanged = false;
 
         if ($request->filled('camera_move')) {
             $move = $request->input('camera_move');
@@ -437,22 +550,41 @@ class ExplainerController extends Controller
         }
 
         if ($slot['content_type'] === 'text_block') {
+            // Same shape the validator guarantees for a generated card, so a
+            // hand-edited block cannot become one the renderer never expects:
+            // at most five bullets, bounded lengths, nothing blank.
             if ($request->has('heading')) {
-                $slot['heading'] = trim((string) $request->input('heading'));
+                $slot['heading'] = mb_substr(trim((string) $request->input('heading')), 0, 80);
+                $textChanged = true;
             }
             if ($request->has('bullets')) {
                 $bullets = $request->input('bullets');
                 if (is_array($bullets)) {
-                    $slot['bullets'] = array_values(array_filter(array_map(
-                        fn ($b) => trim((string) $b),
+                    $slot['bullets'] = array_slice(array_values(array_filter(array_map(
+                        fn ($b) => mb_substr(trim((string) $b), 0, 160),
                         $bullets
-                    ), fn ($b) => $b !== ''));
+                    ), fn ($b) => $b !== '')), 0, 5);
+                    $textChanged = true;
                 }
+            }
+            // A card with neither a heading nor a line is a blank frame.
+            if ($textChanged
+                && trim((string) ($slot['heading'] ?? '')) === ''
+                && empty($slot['bullets'])
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Give the card a heading or at least one line — an empty card renders as a blank frame.',
+                ], 422);
             }
         }
 
         $slots[$slotKey] = $slot;
         $scene->update(['slots' => $slots]);
+
+        if ($textChanged) {
+            $this->markStoryboardEdited($project);
+        }
 
         return response()->json(['success' => true, 'data' => ['slot' => $slot]]);
     }
@@ -963,12 +1095,27 @@ class ExplainerController extends Controller
     }
 
     /**
-     * Edit scene-level pacing: transition style and/or duration.
+     * Edit one scene by hand: its spoken narration, its transition, its
+     * duration, its mood.
+     *
+     * Narration is the one the storyboard most needs, and it is safe to hand
+     * over precisely because nothing has been spoken yet: the voiceover is
+     * synthesised at RENDER time and cached under a hash of the spoken text,
+     * so an edited line re-synthesises that scene alone and every other
+     * scene's wav (and its word-timing sidecar, and the credits already spent
+     * on it) is untouched. Captions and the SRT are derived from the same
+     * text, so they follow for free.
      */
     public function updateScene(Request $request, Project $project, string $sceneId): JsonResponse
     {
         if ($denied = $this->guard($project)) {
             return $denied;
+        }
+        if ($this->revisionRunning($project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A revision is being applied — wait for it to finish before editing scenes.',
+            ], 409);
         }
 
         $scene = $project->explainerScenes()->where('scene_id', $sceneId)->first();
@@ -977,6 +1124,18 @@ class ExplainerController extends Controller
         }
 
         $update = [];
+        $textChanged = false;
+
+        // `has` not `filled`: clearing the narration is a legitimate edit — it
+        // makes the scene a deliberate silent beat, which is exactly what the
+        // auto-inserted chapter covers already are.
+        if ($request->has('narration')) {
+            $narration = $this->cleanNarration($request->input('narration'));
+            if ($narration !== (string) $scene->narration) {
+                $update['narration'] = $narration;
+                $textChanged = true;
+            }
+        }
 
         if ($request->filled('transition')) {
             $transition = $request->input('transition');
@@ -998,11 +1157,58 @@ class ExplainerController extends Controller
             $update['mood'] = $mood;
         }
 
+        // A rewritten line changes how long the scene needs. Re-estimate from
+        // the new content unless the same call also set a duration by hand —
+        // that is the user overruling the estimate, and it wins.
+        if ($textChanged && !$request->has('duration_seconds')) {
+            $update['duration_seconds'] = (new ShotListValidator())->paceScene(
+                (string) $update['narration'],
+                $scene->slots ?? []
+            );
+        }
+
         if (!empty($update)) {
             $scene->update($update);
         }
 
+        if ($textChanged) {
+            $this->markStoryboardEdited($project);
+        }
+
         return response()->json(['success' => true, 'data' => $update]);
+    }
+
+    /**
+     * Sanitise a hand-written narration line. It is spoken by the TTS engine
+     * and printed in the SRT, so the only real hazards are control characters
+     * (which have corrupted model output before) and unbounded length —
+     * narration drives the scene's runtime, and a wall of text becomes a
+     * minutes-long scene nobody asked for.
+     */
+    private function cleanNarration($raw): string
+    {
+        $text = is_scalar($raw) ? (string) $raw : '';
+        $text = (string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text);
+        $text = (string) preg_replace('/[ \t]+/', ' ', $text);
+        $text = (string) preg_replace('/\R+/', ' ', $text);
+
+        return mb_substr(trim($text), 0, 1500);
+    }
+
+    /**
+     * Record that the storyboard's CONTENT changed by hand.
+     *
+     * `storyboard_rev` feeds ExplainerPreviewService::lookHash, so bumping it
+     * does the two things an edit needs: the cached preview still misses (the
+     * frame really is different) and a finished MP4 correctly reads as stale
+     * (its voiceover no longer matches the script). Without this a hand-edited
+     * line would sit next to a video that still says the old one.
+     */
+    private function markStoryboardEdited(Project $project): void
+    {
+        $settings = $project->settings ?? [];
+        $settings['storyboard_rev'] = (int) ($settings['storyboard_rev'] ?? 0) + 1;
+        $project->update(['settings' => $settings]);
     }
 
     public function status(Project $project): JsonResponse
@@ -1149,6 +1355,9 @@ class ExplainerController extends Controller
             // Quality gates (§12): the storyboard lint report + last VLM pass.
             'lint_report' => $project->settings['lint_report'] ?? null,
             'vlm_review' => $project->settings['vlm_review'] ?? null,
+            // AI revision: whether one is in flight, what the last one did
+            // (so the changed cards can be badged), and the note history.
+            'revision' => $this->revisionState($project),
             // Packaging (§10.3–10.7).
             'chapter_chip' => (bool) ($project->settings['chapter_chip'] ?? false),
             'accent_shift' => (bool) ($project->settings['accent_shift'] ?? false),
@@ -1176,6 +1385,32 @@ class ExplainerController extends Controller
                 ],
                 (array) ($project->settings['output_videos'] ?? [])
             )),
+        ];
+    }
+
+    /**
+     * The revision panel's state. `running` is derived from the same expiring
+     * lock the endpoints use, so a storyboard can never sit showing a spinner
+     * for a worker that died.
+     */
+    private function revisionState(Project $project): array
+    {
+        $revision = $project->settings['revision'] ?? null;
+        $revision = is_array($revision) ? $revision : [];
+        $running = $this->revisionRunning($project);
+
+        return [
+            'running' => $running,
+            'request' => $running ? ($revision['request'] ?? null) : null,
+            // A 'running' state that has outlived its lock is a dead job, and
+            // the last *result* is what the panel should show instead.
+            'last' => is_array($revision['last'] ?? null) ? $revision['last'] : null,
+            'log' => array_values(array_filter(
+                (array) ($revision['log'] ?? []),
+                fn ($e) => is_array($e)
+            )),
+            'count' => (int) ($revision['count'] ?? 0),
+            'max_touched' => \Modules\Project\Support\StoryboardRevision::MAX_TOUCHED,
         ];
     }
 

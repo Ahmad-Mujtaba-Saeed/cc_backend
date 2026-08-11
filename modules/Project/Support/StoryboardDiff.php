@@ -46,8 +46,40 @@ final class StoryboardDiff
      */
     public static function plan(array $newScenes, array $oldScenes, array $oldAssets): array
     {
-        $sceneMap = self::matchScenes($newScenes, $oldScenes);
+        return self::planWithMap(
+            $newScenes,
+            $oldScenes,
+            $oldAssets,
+            self::matchScenes($newScenes, $oldScenes)
+        );
+    }
 
+    /**
+     * The same asset decisions, but against a scene map the caller ALREADY
+     * knows.
+     *
+     * Content fingerprinting exists because a fresh analysis renumbers scenes
+     * and paraphrases narration, so survival has to be guessed. A targeted
+     * revision has no such problem: it edits named scenes in place and knows
+     * exactly which ids survived, so guessing would only introduce a way to be
+     * wrong (a heavily rewritten scene scoring below the match threshold would
+     * silently drop the upload sitting on it). Same rules, certain map.
+     *
+     * @param array<string,string> $sceneMap old scene_id => new scene_id;
+     *                                       an id absent from it did not survive
+     * @param bool $allowRescue  may an orphaned upload jump to a NEW scene?
+     *                           True for a re-analysis (nothing else can save
+     *                           it); false for a targeted revision, where
+     *                           moving a file onto a scene the user never
+     *                           mentioned is a worse surprise than losing it
+     */
+    public static function planWithMap(
+        array $newScenes,
+        array $oldScenes,
+        array $oldAssets,
+        array $sceneMap,
+        bool $allowRescue = true
+    ): array {
         $newById = [];
         foreach ($newScenes as $scene) {
             $id = (string) ($scene['scene_id'] ?? '');
@@ -79,7 +111,7 @@ final class StoryboardDiff
         $stats = ['kept_uploads' => 0, 'kept_cached' => 0, 'dropped' => 0, 'rescued' => 0];
 
         foreach ($assets as $asset) {
-            $decision = self::decide($asset, $sceneMap, $newById, $oldById, $claimed);
+            $decision = self::decide($asset, $sceneMap, $newById, $oldById, $claimed, $allowRescue);
             if ($decision === null) {
                 $actions[] = ['id' => (int) ($asset['id'] ?? 0), 'action' => 'drop'];
                 $stats['dropped']++;
@@ -178,7 +210,8 @@ final class StoryboardDiff
         array $sceneMap,
         array $newById,
         array $oldById,
-        array $claimed
+        array $claimed,
+        bool $allowRescue = true
     ): ?array {
         $oldScene = (string) ($asset['scene_id'] ?? '');
         $slotKey = (string) ($asset['slot_key'] ?? '');
@@ -222,7 +255,7 @@ final class StoryboardDiff
 
         // Orphan rescue: only a user's own upload is precious enough to jump
         // scenes — and only when a new slot asks for the same subject.
-        if (self::rank($asset) === 0) {
+        if ($allowRescue && self::rank($asset) === 0) {
             $rescued = self::rescueTarget($asset, $oldById[$oldScene] ?? [], $newById, $claimed);
             if ($rescued !== null) {
                 return [$rescued[0], $rescued[1], true];
@@ -316,6 +349,18 @@ final class StoryboardDiff
         }
 
         return ($best !== null && $bestScore >= self::ORPHAN_RESCUE_MIN) ? $best : null;
+    }
+
+    /**
+     * Is this row a file the USER put there (rather than one the pipeline
+     * generated or cached)? The distinction decides who wins a contested slot
+     * here, and elsewhere decides what is worth warning someone about.
+     *
+     * @param array{slot_key?: string, original_name?: string} $asset
+     */
+    public static function isUpload(array $asset): bool
+    {
+        return self::rank($asset) === 0;
     }
 
     /** 0 = user upload, 1 = generated media (fill/stock/sprite), 2 = internal cache. */

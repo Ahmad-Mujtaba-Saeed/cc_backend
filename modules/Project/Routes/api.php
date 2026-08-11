@@ -58,6 +58,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/explainer/projects/{project}/storyboard', [ExplainerController::class, 'storyboard']);
     Route::get('/explainer/projects/{project}/status', [ExplainerController::class, 'status']);
     Route::post('/explainer/projects/{project}/reanalyze', [ExplainerController::class, 'reanalyze']);
+    // Targeted AI edit of the storyboard: the user's note, applied to the
+    // cards it is about and nothing else.
+    Route::post('/explainer/projects/{project}/revise', [ExplainerController::class, 'revise'])->middleware('throttle:20,1');
     Route::post('/explainer/projects/{project}/render', [ExplainerController::class, 'render']);
     Route::post('/explainer/projects/{project}/shuffle-theme', [ExplainerController::class, 'shuffleTheme']);
     Route::post('/explainer/projects/{project}/narration', [ExplainerController::class, 'toggleNarration']);

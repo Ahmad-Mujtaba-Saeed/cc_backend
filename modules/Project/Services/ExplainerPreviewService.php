@@ -102,7 +102,7 @@ class ExplainerPreviewService
     {
         $settings = $project->settings ?? [];
 
-        return substr(md5(json_encode([
+        $payload = [
             'v' => 1,
             'aspect' => $project->aspect_ratio,
             'color_scheme' => $settings['color_scheme'] ?? null,
@@ -120,7 +120,21 @@ class ExplainerPreviewService
             'chapter_chip' => $settings['chapter_chip'] ?? null,
             'accent_shift' => $settings['accent_shift'] ?? null,
             'backdrop' => $settings['backdrop_enabled'] ?? null,
-        ], JSON_UNESCAPED_UNICODE)), 0, 20);
+        ];
+
+        // An AI revision rewrites CONTENT, not a style knob — but it changes
+        // frames, so both things this hash drives must react to it: the
+        // preview cache has to miss, and a finished MP4 has to read as stale.
+        //
+        // Added conditionally on purpose. Putting the key in unconditionally
+        // would change the hash of every project that has never been revised,
+        // and every completed video in the system would suddenly claim its
+        // render no longer matches its settings.
+        if (!empty($settings['storyboard_rev'])) {
+            $payload['storyboard_rev'] = (int) $settings['storyboard_rev'];
+        }
+
+        return substr(md5(json_encode($payload, JSON_UNESCAPED_UNICODE)), 0, 20);
     }
 
     /**
