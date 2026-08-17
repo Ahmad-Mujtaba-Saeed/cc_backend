@@ -120,7 +120,7 @@ class ExplainerController extends Controller
             'aspect_ratio' => 'sometimes|string|in:16:9,9:16,1:1',
             'target_seconds' => 'sometimes|integer|min:10|max:600',
             'tts_voice' => ['sometimes', 'string', 'in:' . implode(',', \Modules\Project\Support\TtsVoices::allIds())],
-            'music_category' => ['sometimes', 'string', 'in:' . implode(',', array_merge(['none', 'auto'], MusicProviderInterface::CATEGORIES))],
+            'music_category' => ['sometimes', 'string', 'in:' . implode(',', array_merge(['none', 'auto', \Modules\Project\Services\UserMusicLibrary::CATEGORY], MusicProviderInterface::CATEGORIES))],
             'music_track_id' => ['sometimes', 'nullable', 'regex:/^[a-z0-9]{1,32}$/i'],
             'music_volume' => ['sometimes', 'numeric', 'min:0', 'max:1'],
         ]);
@@ -811,7 +811,11 @@ class ExplainerController extends Controller
 
         if ($request->has('category')) {
             $category = strtolower(trim((string) $request->input('category')));
-            $allowed = array_merge(['auto', 'none'], MusicProviderInterface::CATEGORIES);
+            // 'custom' = one of this user's own uploads (UserMusicLibrary).
+            $allowed = array_merge(
+                ['auto', 'none', \Modules\Project\Services\UserMusicLibrary::CATEGORY],
+                MusicProviderInterface::CATEGORIES
+            );
             if (!in_array($category, $allowed, true)) {
                 return response()->json(['success' => false, 'message' => 'Invalid music category'], 422);
             }
@@ -1458,6 +1462,17 @@ class ExplainerController extends Controller
             'music_volume' => (float) ($project->settings['music_volume'] ?? MusicProviderInterface::DEFAULT_VOLUME),
             'music_track_id' => $project->settings['music_track_id'] ?? null,
             'music_categories' => MusicProviderInterface::CATEGORIES,
+            // The private shelf beside the catalogue: what it is called,
+            // how full it is, and what it accepts — so the panel renders
+            // its tab and its limits without hardcoding any of them.
+            'music_custom' => [
+                'category' => \Modules\Project\Services\UserMusicLibrary::CATEGORY,
+                'label' => 'My music',
+                'count' => \Modules\Project\Services\UserMusicLibrary::countFor((int) $project->user_id),
+                'max' => \Modules\Project\Services\UserMusicLibrary::MAX_PER_USER,
+                'max_kilobytes' => \Modules\Project\Services\UserMusicLibrary::MAX_KILOBYTES,
+                'accept' => '.mp3,.wav,.m4a,.aac,.ogg',
+            ],
             // Without a Pixabay key the picker still works off the local
             // library, so the UI says so instead of offering dead controls.
             'music_configured' => MusicProviderFactory::make()->isConfigured(),

@@ -19,7 +19,7 @@ class PlanSeeder extends Seeder
             [
                 'tier' => 'starter',
                 'name' => 'Starter',
-                'monthly_price' => 5.00,
+                'monthly_price' => 10.00,
                 'daily_credits' => 100,
                 'is_popular' => false,
                 'subdesc' => 'For getting started with daily content.',
@@ -34,7 +34,7 @@ class PlanSeeder extends Seeder
             [
                 'tier' => 'creator',
                 'name' => 'Creator',
-                'monthly_price' => 10.00,
+                'monthly_price' => 15.00,
                 'daily_credits' => 300,
                 'is_popular' => true,
                 'subdesc' => 'For creators publishing every day.',
@@ -50,7 +50,7 @@ class PlanSeeder extends Seeder
             [
                 'tier' => 'studio',
                 'name' => 'Studio',
-                'monthly_price' => 20.00,
+                'monthly_price' => 30.00,
                 'daily_credits' => 1000,
                 'is_popular' => false,
                 'subdesc' => 'For teams and high-volume output.',

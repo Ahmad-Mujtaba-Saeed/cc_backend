@@ -797,12 +797,20 @@ class RemotionRenderService
             ? (string) $settings['music_track_id']
             : null;
 
-        // Whichever music source the admin selected (Pixabay or Jamendo),
-        // then the legacy local library, so installs with no provider key at
-        // all keep their old behaviour.
-        $track = $settings['music_track']
-            ?? MusicProviderFactory::make()->pickTrack($pixabayCategory, (int) $project->id, $chosenTrack)
-            ?? (new BackgroundMusicService())->pickTrackForMood($dominantMood, (int) $project->id, ExplainerRegistry::moods());
+        if (UserMusicLibrary::isCustom($category)) {
+            // The user's own upload. No falling through to a catalogue here:
+            // "play MY file" cannot be approximated by a stock track, so a
+            // track that has gone missing means silence, which is the honest
+            // answer. Everything below still applies (health check, volume).
+            $track = UserMusicLibrary::resolveForProject($project, $category, $chosenTrack);
+        } else {
+            // Whichever music source the admin selected (Pixabay or Jamendo),
+            // then the legacy local library, so installs with no provider key
+            // at all keep their old behaviour.
+            $track = $settings['music_track']
+                ?? MusicProviderFactory::make()->pickTrack($pixabayCategory, (int) $project->id, $chosenTrack)
+                ?? (new BackgroundMusicService())->pickTrackForMood($dominantMood, (int) $project->id, ExplainerRegistry::moods());
+        }
 
         if (!$track) {
             return null;

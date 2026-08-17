@@ -91,8 +91,13 @@ abstract class AbstractVideoProcessor
             $chosenTrack = isset($this->settings['music_track_id']) && $this->settings['music_track_id'] !== ''
                 ? (string) $this->settings['music_track_id']
                 : null;
-            $trackRelative = \Modules\Project\Services\MusicProviderFactory::make()
-                ->pickTrack($category, (int) $this->project->id, $chosenTrack);
+            // "My music": the user's own upload, private to them. Resolved
+            // first and WITHOUT a fallback — a stock track is not a substitute
+            // for the file they chose, so a missing one means no bed.
+            $trackRelative = \Modules\Project\Services\UserMusicLibrary::isCustom($category)
+                ? \Modules\Project\Services\UserMusicLibrary::resolveForProject($this->project, $category, $chosenTrack)
+                : \Modules\Project\Services\MusicProviderFactory::make()
+                    ->pickTrack($category, (int) $this->project->id, $chosenTrack);
             if (!$trackRelative) {
                 Log::info('applyBackgroundMusic: no track available — skipping', [
                     'project_id' => $this->project->id,

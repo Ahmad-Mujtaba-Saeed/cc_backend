@@ -44,6 +44,11 @@ Route::middleware('auth:sanctum')->group(function () {
     // Background-music browsing for the create flows (audition + select)
     Route::get('/music/options', [MusicController::class, 'options']);
     Route::get('/music/tracks', [MusicController::class, 'tracks'])->middleware('throttle:30,1');
+    // The user's OWN uploaded beds — private to them, reusable on every
+    // project and every template from then on.
+    Route::post('/music/library', [MusicController::class, 'upload'])->middleware('throttle:20,1');
+    Route::delete('/music/library/{trackId}', [MusicController::class, 'destroyTrack'])
+        ->whereNumber('trackId');
 
     // Template configuration routes
     Route::get('/templates', [ProjectController::class, 'getTemplates']);

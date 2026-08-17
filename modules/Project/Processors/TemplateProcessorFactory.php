@@ -151,6 +151,9 @@ class TemplateProcessorFactory
         foreach (PixabayMusicService::CATEGORIES as $category) {
             $categoryOptions[$category] = ucfirst($category);
         }
+        // The user's own uploads, private to them. Listed last because it is
+        // empty until they add something.
+        $categoryOptions[\Modules\Project\Services\UserMusicLibrary::CATEGORY] = 'My music (uploaded)';
 
         $schema['music_category'] = array_merge($schema['music_category'] ?? [], [
             'type' => 'select',
@@ -191,7 +194,10 @@ class TemplateProcessorFactory
 
         // Pixabay background-music picker (injected into every template).
         if (isset($settings['music_category'])) {
-            $validCategories = array_merge(['none', 'auto'], PixabayMusicService::CATEGORIES);
+            $validCategories = array_merge(
+                ['none', 'auto', \Modules\Project\Services\UserMusicLibrary::CATEGORY],
+                PixabayMusicService::CATEGORIES
+            );
             if (!in_array(strtolower((string) $settings['music_category']), $validCategories, true)) {
                 $errors[] = 'Invalid background music category selected';
             }

@@ -1098,8 +1098,12 @@ class AIHorrorShortsProcessor extends AbstractVideoProcessor
                 $chosenTrack = isset($this->settings['music_track_id']) && $this->settings['music_track_id'] !== ''
                     ? (string) $this->settings['music_track_id']
                     : null;
-                $pixabayTrack = \Modules\Project\Services\MusicProviderFactory::make()
-                    ->pickTrack($musicCategory, (int) $this->project->id, $chosenTrack);
+                // "My music" (the user's own upload) is resolved first and
+                // never falls through to the catalogue — see UserMusicLibrary.
+                $pixabayTrack = \Modules\Project\Services\UserMusicLibrary::isCustom($musicCategory)
+                    ? \Modules\Project\Services\UserMusicLibrary::resolveForProject($this->project, $musicCategory, $chosenTrack)
+                    : \Modules\Project\Services\MusicProviderFactory::make()
+                        ->pickTrack($musicCategory, (int) $this->project->id, $chosenTrack);
                 if ($pixabayTrack) {
                     $musicPath = Storage::disk('public')->path($pixabayTrack);
                 }
