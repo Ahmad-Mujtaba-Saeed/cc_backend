@@ -39,19 +39,19 @@ class SafepayPlanService
         $currency = strtoupper($data['currency'] ?? $this->safepay->currency());
 
         $payload = [
-            'name' => $data['name'],
+            'name' => self::safeName($data['name']),
             // Safepay expects the lowest denomination (cents / paisa).
             'amount' => (int) round(((float) $data['price']) * 100),
             'currency' => $currency,
             'interval' => self::interval($data['interval']),
             'interval_count' => (int) ($data['interval_count'] ?? 1),
-            'product' => config('safepay.product', 'subscription'),
+            'product' => self::safeProduct(config('safepay.product', 'subscription')),
             'type' => 'RECURRING',
             'active' => true,
         ];
 
         if (!empty($data['subdesc'])) {
-            $payload['description'] = (string) $data['subdesc'];
+            $payload['description'] = self::safeName($data['subdesc'], 255);
         }
 
         if (!empty($data['trial_period_days'])) {
@@ -68,9 +68,9 @@ class SafepayPlanService
     public function syncMetadata(string $planId, array $data): void
     {
         $payload = array_filter([
-            'name' => $data['name'] ?? null,
-            'description' => $data['subdesc'] ?? null,
-            'product' => config('safepay.product', 'subscription'),
+            'name' => isset($data['name']) ? self::safeName($data['name']) : null,
+            'description' => isset($data['subdesc']) ? self::safeName($data['subdesc'], 255) : null,
+            'product' => self::safeProduct(config('safepay.product', 'subscription')),
             'trial_period_days' => isset($data['trial_period_days']) ? (int) $data['trial_period_days'] : null,
         ], fn ($v) => $v !== null);
 
@@ -87,6 +87,44 @@ class SafepayPlanService
     public function archivePlan(string $planId): void
     {
         $this->safepay->archivePlan($planId);
+    }
+
+    /**
+     * Strip a display string down to what Safepay's plan validator accepts.
+     *
+     * Safepay rejects anything else with `name: must be in a valid format` —
+     * our "Starter (Monthly)" failed on the brackets. The format itself is
+     * undocumented, so this allows only what their API reference demonstrates:
+     * letters, digits, spaces and underscores ("new plan name", "pk_102").
+     *
+     * This affects ONLY the name shown on Safepay's checkout page and merchant
+     * dashboard. The local `plans.name` keeps its original punctuation and is
+     * what the app's own UI renders.
+     */
+    public static function safeName(string $value, int $max = 64): string
+    {
+        // Turn separators into spaces first so "Starter (Monthly)" reads as
+        // "Starter Monthly" rather than "Starter Monthly" losing the gap.
+        $clean = preg_replace('/[^A-Za-z0-9 _]+/u', ' ', $value);
+        $clean = trim(preg_replace('/\s+/', ' ', (string) $clean));
+
+        if ($clean === '') {
+            $clean = 'Plan';
+        }
+
+        return mb_substr($clean, 0, $max);
+    }
+
+    /**
+     * The `product` field is a grouping label under the same validator. Their
+     * examples ("bananas", "pk_102") show no spaces, so keep it a slug.
+     */
+    public static function safeProduct(string $value, int $max = 64): string
+    {
+        $clean = preg_replace('/[^A-Za-z0-9_]+/u', '_', $value);
+        $clean = trim((string) preg_replace('/_+/', '_', $clean), '_');
+
+        return mb_substr($clean !== '' ? $clean : 'subscription', 0, $max);
     }
 
     /**

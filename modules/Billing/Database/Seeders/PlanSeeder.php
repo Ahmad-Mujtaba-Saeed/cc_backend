@@ -66,6 +66,7 @@ class PlanSeeder extends Seeder
             ],
         ];
 
+        $unpublished = [];
         $safepayService = app(SafepayPlanService::class);
         $safepayEnabled = $safepayService->enabled();
         $currency = config('safepay.currency', 'USD');
@@ -143,8 +144,24 @@ class PlanSeeder extends Seeder
                     $attributes
                 );
 
-                $this->command->info("Seeded plan: {$plan->name} ({$tier['daily_credits']} credits/day, \${$variant['price']})");
+                if ($plan->safepay_plan_id) {
+                    $this->command->info("Seeded plan: {$plan->name} ({$tier['daily_credits']} credits/day, {$currency} {$variant['price']}) -> {$plan->safepay_plan_id}");
+                } else {
+                    $unpublished[] = $plan->name;
+                    $this->command->warn("Seeded plan WITHOUT a Safepay id: {$plan->name} - nobody can subscribe to it yet.");
+                }
             }
+        }
+
+        if ($unpublished) {
+            $this->command->newLine();
+            $this->command->error(
+                count($unpublished) . ' plan(s) were not published to Safepay: ' . implode(', ', $unpublished)
+            );
+            $this->command->warn(
+                'Checkout will reject these with a 422 until they have a safepay_plan_id. '
+                . 'Fix the cause above and re-run this seeder - it back-fills the ids in place.'
+            );
         }
     }
 }

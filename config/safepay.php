@@ -34,7 +34,7 @@ return [
     'currency' => env('SAFEPAY_CURRENCY', 'USD'),
 
     // The `product` field on a Safepay plan — a free-form grouping label.
-    'product' => env('SAFEPAY_PRODUCT', 'viralforge-subscription'),
+    'product' => env('SAFEPAY_PRODUCT', 'viralforge_subscription'),
 
     // Where hosted Subscriptions Checkout returns the customer.
     // Both default to the billing page of the Next.js frontend.

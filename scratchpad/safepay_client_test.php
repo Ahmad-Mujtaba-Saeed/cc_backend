@@ -113,6 +113,19 @@ check('protobuf timestamp', SafepayClient::timestamp(['seconds' => 1698758572, '
 check('rfc3339 timestamp', SafepayClient::timestamp('2023-09-26T07:14:24Z')->toDateTimeString(), '2023-09-26 07:14:24');
 check('null timestamp', SafepayClient::timestamp(null), null);
 
+echo "
+6b. plan-name sanitising (Safepay rejects brackets etc.)
+";
+check('brackets dropped', SafepayPlanService::safeName('Starter (Monthly)'), 'Starter Monthly');
+check('yearly variant', SafepayPlanService::safeName('Creator (Yearly)'), 'Creator Yearly');
+check('digits + underscore kept', SafepayPlanService::safeName('Tier_2 Plan'), 'Tier_2 Plan');
+check('punctuation collapsed', SafepayPlanService::safeName('Pro -- Plan!!'), 'Pro Plan');
+check('trailing period dropped', SafepayPlanService::safeName('For daily content.'), 'For daily content');
+check('never empty', SafepayPlanService::safeName('!!!'), 'Plan');
+check('length capped', mb_strlen(SafepayPlanService::safeName(str_repeat('a', 200))), 64);
+check('product slugged', SafepayPlanService::safeProduct('viralforge-subscription'), 'viralforge_subscription');
+check('product keeps underscore', SafepayPlanService::safeProduct('pk_102'), 'pk_102');
+
 echo "\n7. unconfigured client refuses to call out\n";
 try {
     (new SafepayClient(['secret_key' => null] + $config))->timeBasedToken();
