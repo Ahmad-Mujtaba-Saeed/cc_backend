@@ -2,12 +2,13 @@
 
 namespace Modules\Billing\Http\Controllers;
 
-use Modules\Billing\Models\Plan;
-use Modules\Billing\Http\Requests\StorePlanRequest;
-use Modules\Billing\Http\Requests\UpdatePlanRequest;
-use Modules\Billing\Services\StripePlanService;
-use Illuminate\Routing\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Log;
+use Modules\Billing\Http\Requests\StorePlanRequest;
+use Modules\Billing\Models\Plan;
+use Modules\Billing\Services\Safepay\SafepayException;
+use Modules\Billing\Services\SafepayPlanService;
 
 class PlanController extends Controller
 {
@@ -15,7 +16,7 @@ class PlanController extends Controller
     {
         return Plan::where('is_active', true)->get();
     }
-    
+
     public function index()
     {
         return Plan::latest()->get();
@@ -24,79 +25,105 @@ class PlanController extends Controller
     public function store(StorePlanRequest $request)
     {
         try {
-            // Create Stripe product and price
-            $stripeService = app(StripePlanService::class);
-            $stripeData = $stripeService->createPlan($request->validated());
+            $data = $request->validated();
 
-            // Create local plan record
+            // Publish the plan to Safepay first — a local row without a
+            // safepay_plan_id cannot be subscribed to.
+            $safepay = app(SafepayPlanService::class);
+            $created = $safepay->createPlan($data);
+
             $plan = Plan::create([
-                ...$request->validated(),
-                'stripe_product_id' => $stripeData['product_id'] ?? null,
-                'stripe_price_id'   => $stripeData['price_id'] ?? null,
-                'is_active' => true, // Explicitly set default value
+                ...$data,
+                'safepay_plan_id' => $created['plan_id'],
+                'is_active' => true,
             ]);
 
             return response()->json($plan, 201);
+        } catch (SafepayException $e) {
+            Log::error('Safepay API Error: ' . $e->getMessage());
 
-        } catch (\Stripe\Exception\ApiErrorException $e) {
-            \Log::error('Stripe API Error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'Failed to create plan in payment processor',
-                'error' => $e->getMessage()
-            ], 500);
+                'error' => $e->getMessage(),
+            ], 502);
         } catch (\Exception $e) {
-            \Log::error('Plan Creation Error: ' . $e->getMessage());
+            Log::error('Plan Creation Error: ' . $e->getMessage());
+
             return response()->json([
                 'message' => 'Failed to create plan',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
 
+    /**
+     * Update a plan.
+     *
+     * Safepay plans are immutable in price and interval — only name,
+     * description, trial length and availability can be changed in place. So a
+     * billing change retires this plan and publishes a replacement, exactly as
+     * the Stripe version created a new price.
+     */
     public function update(Request $request, Plan $plan)
     {
         $data = $request->all();
+        $safepay = app(SafepayPlanService::class);
 
         $billingFieldsChanged =
-            $data['price'] !== $plan->price ||
-            $data['interval'] !== $plan->interval ||
-            $data['interval_count'] !== $plan->interval_count ||
-            $data['currency'] !== $plan->currency;
+            (float) ($data['price'] ?? $plan->price) !== (float) $plan->price ||
+            ($data['interval'] ?? $plan->interval) !== $plan->interval ||
+            (int) ($data['interval_count'] ?? $plan->interval_count) !== (int) $plan->interval_count ||
+            strtoupper($data['currency'] ?? $plan->currency) !== strtoupper($plan->currency);
 
-        // CASE 1: Only metadata change
-        if (! $billingFieldsChanged) {
-            $plan->update($data);
-            return response()->json($plan);
+        try {
+            // CASE 1: metadata only — push it to the existing Safepay plan.
+            if (!$billingFieldsChanged) {
+                $plan->update($data);
+
+                if ($plan->safepay_plan_id) {
+                    $safepay->syncMetadata($plan->safepay_plan_id, $plan->only([
+                        'name', 'subdesc', 'trial_period_days', 'is_active',
+                    ]));
+                }
+
+                return response()->json($plan->fresh());
+            }
+
+            // CASE 2: billing change — new Safepay plan, archive the old one.
+            $created = $safepay->createPlan(array_merge($plan->toArray(), $data));
+
+            $newPlan = Plan::create([
+                ...$plan->only([
+                    'name', 'price', 'daily_credits', 'tier', 'is_popular', 'subdesc',
+                    'currency', 'interval', 'interval_count', 'trial_period_days', 'features',
+                ]),
+                ...$data,
+                'safepay_plan_id' => $created['plan_id'],
+                'is_active' => true,
+            ]);
+
+            // Retire the old version: hidden locally, closed to new subscribers
+            // on Safepay. Existing subscribers keep billing as before.
+            $plan->update(['is_active' => false]);
+
+            if ($plan->safepay_plan_id) {
+                $safepay->archivePlan($plan->safepay_plan_id);
+            }
+
+            return response()->json([
+                'message' => 'Plan updated with new pricing',
+                'old_plan_id' => $plan->id,
+                'new_plan' => $newPlan,
+            ]);
+        } catch (SafepayException $e) {
+            Log::error('Safepay plan update failed: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'Failed to update plan in payment processor',
+                'error' => $e->getMessage(),
+            ], 502);
         }
-
-        // CASE 2: Billing change → create new Stripe price
-        $stripeService = app(StripePlanService::class);
-
-        $newPrice = $stripeService->createPriceForExistingProduct(
-            $plan->stripe_product_id,
-            $data
-        );
-
-        // Deactivate old plan (soft)
-        $plan->update([
-            'is_active' => false,
-        ]);
-
-        // Create new plan version
-        $newPlan = Plan::create([
-            ...$data,
-            'stripe_product_id' => $plan->stripe_product_id,
-            'stripe_price_id' => $newPrice['price_id'],
-            'is_active' => true,
-        ]);
-
-        return response()->json([
-            'message' => 'Plan updated with new pricing',
-            'old_plan_id' => $plan->id,
-            'new_plan' => $newPlan,
-        ]);
     }
-
 
     public function destroy(Plan $plan)
     {
@@ -105,5 +132,15 @@ class PlanController extends Controller
         }
 
         $plan->update(['is_active' => false]);
+
+        if ($plan->safepay_plan_id) {
+            try {
+                app(SafepayPlanService::class)->archivePlan($plan->safepay_plan_id);
+            } catch (SafepayException $e) {
+                // The local row is already hidden; surface the archive failure
+                // without failing the request.
+                Log::warning('Safepay plan archive failed: ' . $e->getMessage());
+            }
+        }
     }
 }

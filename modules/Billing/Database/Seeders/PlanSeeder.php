@@ -4,7 +4,8 @@ namespace Modules\Billing\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Modules\Billing\Models\Plan;
-use Modules\Billing\Services\StripePlanService;
+use Modules\Billing\Services\Safepay\SafepayException;
+use Modules\Billing\Services\SafepayPlanService;
 
 class PlanSeeder extends Seeder
 {
@@ -65,16 +66,17 @@ class PlanSeeder extends Seeder
             ],
         ];
 
-        $stripeEnabled = !empty(config('services.stripe.secret'));
-        $stripeService = $stripeEnabled ? app(StripePlanService::class) : null;
+        $safepayService = app(SafepayPlanService::class);
+        $safepayEnabled = $safepayService->enabled();
+        $currency = config('safepay.currency', 'USD');
 
-        if (!$stripeEnabled) {
-            $this->command->warn('STRIPE secret not configured — seeding plans WITHOUT Stripe price ids.');
+        if (!$safepayEnabled) {
+            $this->command->warn('SAFEPAY_SECRET_KEY not configured — seeding plans WITHOUT Safepay plan ids.');
         }
 
         // Retire any legacy plans that predate the credit tiers so they don't
         // appear alongside the new ladder. (Existing subscribers keep their
-        // Stripe subscription; only the catalog entry is hidden.)
+        // Safepay subscription; only the catalog entry is hidden.)
         $retired = Plan::whereNull('tier')->update(['is_active' => false]);
         if ($retired) {
             $this->command->info("Deactivated {$retired} legacy plan(s) without a credit tier.");
@@ -99,18 +101,19 @@ class PlanSeeder extends Seeder
             foreach ($variants as $variant) {
                 $name = $tier['name'] . ' (' . ($variant['interval'] === 'year' ? 'Yearly' : 'Monthly') . ')';
 
-                $stripeData = ['product_id' => null, 'price_id' => null];
-                if ($stripeEnabled) {
+                $safepayPlanId = null;
+                if ($safepayEnabled) {
                     try {
-                        $stripeData = $stripeService->createPlan([
+                        $safepayPlanId = $safepayService->createPlan([
                             'name' => $name,
                             'price' => $variant['price'],
-                            'currency' => 'USD',
+                            'currency' => $currency,
                             'interval' => $variant['interval'],
                             'interval_count' => $variant['interval_count'],
-                        ]);
-                    } catch (\Exception $e) {
-                        $this->command->error("Stripe price creation failed for {$name}: " . $e->getMessage());
+                            'subdesc' => $tier['subdesc'],
+                        ])['plan_id'];
+                    } catch (SafepayException $e) {
+                        $this->command->error("Safepay plan creation failed for {$name}: " . $e->getMessage());
                     }
                 }
 
@@ -119,18 +122,17 @@ class PlanSeeder extends Seeder
                     'price' => $variant['price'],
                     'daily_credits' => $tier['daily_credits'],
                     'is_popular' => $tier['is_popular'],
-                    'currency' => 'USD',
+                    'currency' => $currency,
                     'interval_count' => $variant['interval_count'],
                     'subdesc' => $tier['subdesc'],
                     'features' => $tier['features'],
                     'is_active' => true,
                 ];
 
-                // Only (over)write Stripe ids when we actually created fresh ones,
-                // so re-running without Stripe keys preserves existing ids.
-                if (!empty($stripeData['price_id'])) {
-                    $attributes['stripe_product_id'] = $stripeData['product_id'] ?? null;
-                    $attributes['stripe_price_id'] = $stripeData['price_id'];
+                // Only (over)write the Safepay id when we actually created a
+                // fresh plan, so re-running without keys preserves existing ids.
+                if ($safepayPlanId) {
+                    $attributes['safepay_plan_id'] = $safepayPlanId;
                 }
 
                 $plan = Plan::updateOrCreate(

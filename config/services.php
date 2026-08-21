@@ -96,10 +96,6 @@ return [
         'asset_base_url' => env('REMOTION_ASSET_BASE_URL'),
     ],
 
-    'stripe' => [
-        'secret' => env('STRIPE_SECRET'),
-    ],
-
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

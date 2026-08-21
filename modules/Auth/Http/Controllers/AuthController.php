@@ -11,8 +11,6 @@ use Modules\User\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
-use Stripe\Stripe;
-use Stripe\Customer;
 use Modules\AccessControl\Models\Role;
 
 
@@ -30,32 +28,14 @@ class AuthController extends Controller
         ]);
 
 
-        Stripe::setApiKey(config('services.stripe.secret'));
-
-        $stripeCustomer = null;
-        
-        try {
-            $stripeCustomer = Customer::create([
-                'email' => $request->email,
-                'name' => $request->name,
-                'phone' => $request->phone,
-                'metadata' => [
-                    'user_type' => 'registered_user'
-                ]
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Stripe customer creation failed during registration', [
-                'email' => $request->email,
-                'error' => $e->getMessage()
-            ]);
-        }
-
+        // Safepay has no customer to create up front: the shopper record is
+        // created inside hosted checkout, and its token lands on the user via
+        // the subscription webhook.
         $user = User::create([
             'name' => $request->name,
             'phone' => $request->phone,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'stripe_customer_id' => $stripeCustomer ? $stripeCustomer->id : null,
         ]);
 
         $userRole = Role::where('slug', 'user')->first();

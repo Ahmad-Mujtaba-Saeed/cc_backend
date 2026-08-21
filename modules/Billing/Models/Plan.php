@@ -19,8 +19,8 @@ class Plan extends Model implements Auditable
         'currency',
         'interval',
         'interval_count',
-        'stripe_product_id',
-        'stripe_price_id',
+        'safepay_plan_id',
+        'trial_period_days',
         'features',
         'is_active',
     ];
@@ -31,6 +31,7 @@ class Plan extends Model implements Auditable
         'is_popular' => 'boolean',
         'is_active' => 'boolean',
         'price' => 'decimal:2',
+        'trial_period_days' => 'integer',
     ];
 
     public function subscriptions()

@@ -19,7 +19,7 @@ class User extends Authenticatable implements Auditable
         'email',
         'password',
         'phone',
-        'stripe_customer_id',
+        'safepay_customer_id',
         'firebase_uid',
         'profile_img',
         'trial_used',
@@ -41,7 +41,7 @@ class User extends Authenticatable implements Auditable
 
     protected $hidden = [
         'password',
-        'stripe_customer_id',
+        'safepay_customer_id',
         'remember_token',
         'trial_used_at',
     ];

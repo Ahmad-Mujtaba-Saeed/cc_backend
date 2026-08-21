@@ -61,7 +61,7 @@ class AdminSubscriberSeeder extends Seeder
                 'name' => $plan->name,
                 'type' => 'membership',
                 'type_id' => $plan->id,
-                'cus_id' => $admin->stripe_customer_id ?? 'seed_admin_customer',
+                'cus_id' => $admin->safepay_customer_id ?? 'seed_admin_customer',
                 'status' => 'active',
                 'starts_at' => now(),
                 'ends_at' => now()->addMonth(),

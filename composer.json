@@ -24,7 +24,6 @@
         "phpoffice/phpword": "^1.4",
         "pusher/pusher-php-server": "^7.2",
         "smalot/pdfparser": "^2.12",
-        "stripe/stripe-php": "^17.6",
         "inovector/mixpost": "dev-main"
     },
     "require-dev": {
