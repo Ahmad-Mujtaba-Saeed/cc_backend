@@ -262,8 +262,8 @@ class AIHorrorShortsProcessor extends AbstractVideoProcessor
     protected function getTemplateConfig(): array
     {
         return [
-            'name' => 'AI Horror Shorts',
-            'description' => 'Generate a vertical horror short with cartoon/horror images, effects and captions.',
+            'name' => 'AI Horror Story Short',
+            'description' => 'Type a premise and get a chilling narrated horror short — AI story, eerie AI visuals in your chosen style, atmosphere effects and captions.',
             'requires_upload' => false,
             'min_duration' => 15,
             'max_duration' => 300,
@@ -334,8 +334,8 @@ class AIHorrorShortsProcessor extends AbstractVideoProcessor
     public static function getStaticTemplateConfig(): array
     {
         return [
-            'name' => 'AI Horror Shorts',
-            'description' => 'Generate a vertical horror short with cartoon/horror images, effects and captions.',
+            'name' => 'AI Horror Story Short',
+            'description' => 'Type a premise and get a chilling narrated horror short — AI story, eerie AI visuals in your chosen style, atmosphere effects and captions.',
             'requires_upload' => false,
             'min_duration' => 15,
             'max_duration' => 300,

@@ -277,8 +277,8 @@ class AIVideoProcessor extends AbstractVideoProcessor
     protected function getTemplateConfig(): array
     {
         return [
-            'name' => 'YT Automation Short',
-            'description' => 'Advanced AI-driven video processing with transcription, script rewriting, TTS, face detection, and automated editing',
+            'name' => 'Repurpose Video to Short',
+            'description' => 'Turn a video you already have into a punchy vertical short — transcribed, rewritten tighter, re-voiced by AI, kept on the speaker, and karaoke-captioned.',
             'min_duration' => 10,
             'max_duration' => 600,
             'max_file_size_mb' => 500,

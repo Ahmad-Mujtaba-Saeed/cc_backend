@@ -42,54 +42,59 @@ class TemplateProcessorFactory
      */
     public static function getAvailableTemplates(): array
     {
+        // Names and descriptions here are what users read on the landing page,
+        // the templates gallery and the create flow. They are deliberately
+        // written as "what you put in -> what you get out", not as a list of
+        // the internal pipeline stages, so someone who has never used the app
+        // can pick the right template on the first read.
         return [
+            'ai_explainer_video' => [
+                'name' => 'AI Explainer Video',
+                'description' => 'Paste a script or a topic and get a finished explainer video. The AI splits it into scenes, picks the right layout for each one (charts, diagrams, bullet slides, even a worked-out maths board), narrates it, syncs the captions and renders it in widescreen.',
+                'icon' => 'presentation',
+                'aspect_ratio' => '16:9',
+                'requires_upload' => false
+            ],
             'yt_automation_short' => [
-                'name' => 'YT Automation Short',
-                'description' => 'Advanced AI-driven video processing with transcription, script rewriting, TTS, face detection, and automated editing',
+                'name' => 'Repurpose Video to Short',
+                'description' => 'Turn a video you already have into a punchy vertical short. The AI transcribes it, rewrites the script tighter in the tone you choose, re-records it in a studio AI voice, keeps the frame on whoever is speaking and burns in karaoke captions.',
                 'icon' => 'brain',
                 'aspect_ratio' => '9:16',
                 'requires_upload' => true
             ],
-            'ai_image_based_shorts' => [
-                'name' => 'AI Image-Based Shorts',
-                'description' => 'Generate vertical shorts using AI scripts, image generation, animated character motion, captions, and cloud upload',
-                'icon' => 'sparkles',
-                'aspect_ratio' => '9:16',
-                'requires_upload' => false
-            ],
-            'ai_horror_shorts' => [
-                'name' => 'AI Horror Shorts',
-                'description' => 'Generate vertical horror-themed shorts using AI scripts, cartoon/horror images, character effects, and captions',
-                'icon' => 'ghost',
-                'aspect_ratio' => '9:16',
-                'requires_upload' => false
-            ],
             'yt_gameplay_short' => [
-                'name' => 'YT + Gameplay Short',
-                'description' => 'Convert YouTube or uploaded videos into vertical shorts with intelligent clip selection and gameplay compositing',
+                'name' => 'Long Video to Shorts',
+                'description' => 'Paste one long YouTube video and get several ready-to-post vertical shorts out of it. The AI finds the strongest moments, cuts the dead air out of each one, adds karaoke captions, and can stack satisfying gameplay footage underneath.',
                 'icon' => 'play-circle',
                 'aspect_ratio' => '9:16',
                 'requires_upload' => true
             ],
             'yt_compilation_short' => [
-                'name' => 'Moments Compilation',
-                'description' => 'Turn 2-3 YouTube videos into one themed compilation (e.g. 30 Disaster Moments) with AI commentary, countdown overlays and captions',
+                'name' => 'Themed Moments Compilation',
+                'description' => 'Give 2-3 YouTube links and a theme like "30 Disaster Moments". The AI ranks the best clips across all of them, removes the original speech so nobody talks over your voiceover, writes fresh commentary and stitches one countdown compilation.',
                 'icon' => 'film',
                 'aspect_ratio' => '16:9',
                 'requires_upload' => false
             ],
             'ranking_moments_short' => [
                 'name' => 'Top Moments Ranking',
-                'description' => 'Turn one video into a countdown ranking short — best moments auto-ranked with star ratings, a colorful rank rail, bold title, and one-word pop captions',
+                'description' => 'One video in, a countdown ranking short out. The AI scores every moment, ranks the winners with star ratings on a colourful rank rail, adds a bold title card, and pops the captions one word at a time.',
                 'icon' => 'trophy',
                 'aspect_ratio' => '9:16',
                 'requires_upload' => false
             ],
-            'ai_explainer_video' => [
-                'name' => 'AI Explainer Video',
-                'description' => 'Turn a script into an auto-edited explainer: AI breaks it into scenes, picks slot-based layouts (image/bullets in any combination), you upload the visuals, and it renders a paced video with camera moves and transitions',
-                'icon' => 'presentation',
-                'aspect_ratio' => '16:9',
+            'ai_image_based_shorts' => [
+                'name' => 'AI Story Short from a Prompt',
+                'description' => 'Type an idea and get a finished short with no footage at all. The AI writes the script, generates an image for every scene in the visual style you pick, animates the characters, narrates it and burns in the captions.',
+                'icon' => 'sparkles',
+                'aspect_ratio' => '9:16',
+                'requires_upload' => false
+            ],
+            'ai_horror_shorts' => [
+                'name' => 'AI Horror Story Short',
+                'description' => 'Type a premise and get a chilling narrated horror short. The AI writes the story beat by beat, generates eerie visuals in your chosen style, layers on atmosphere and effects, and burns in the captions.',
+                'icon' => 'ghost',
+                'aspect_ratio' => '9:16',
                 'requires_upload' => false
             ],
         ];

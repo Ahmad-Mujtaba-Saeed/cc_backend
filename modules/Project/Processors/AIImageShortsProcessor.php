@@ -243,8 +243,8 @@ class AIImageShortsProcessor extends AbstractVideoProcessor
     protected function getTemplateConfig(): array
     {
         return [
-            'name' => 'AI Image-Based Shorts',
-            'description' => 'Generate a vertical social short from AI script, image generation, character animation and captions.',
+            'name' => 'AI Story Short from a Prompt',
+            'description' => 'Type an idea and get a finished vertical short — AI script, an AI image per scene, animated characters, narration and captions. No footage needed.',
             'requires_upload' => false,
             'min_duration' => 10,
             'max_duration' => 300,

@@ -88,7 +88,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
             ]);
 
             $this->logActivity('yt_gameplay_short_processing_started', 'YT + Gameplay Short processing started');
-            $this->pusherService->sendStatus($this->project->id, 'processing', 'Starting YT + Gameplay Short processing');
+            $this->pusherService->sendStatus($this->project->id, 'processing', 'Starting Long Video to Shorts processing');
 
             // STEP 1: Validate
             $validation = $this->runProcessingStep(
@@ -1164,7 +1164,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     public static function getStaticTemplateConfig(): array
     {
         return [
-            'name' => 'YouTube + Gameplay Short',
+            'name' => 'Long Video to Shorts',
             'description' => 'Turn one YouTube video into multiple 9:16 vertical shorts — the best moments are auto-selected, dead air is edited out, and each short gets karaoke captions with optional gameplay footage at the bottom.',
             'requires_upload' => false,
             'min_duration' => 15,
