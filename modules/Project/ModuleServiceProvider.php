@@ -37,6 +37,7 @@ class ModuleServiceProvider extends ServiceProvider
             $this->commands([
                 \Modules\Project\Console\ReapStaleProjectsCommand::class,
                 \Modules\Project\Console\CacheMusicLibraryCommand::class,
+                \Modules\Project\Console\MusicDoctorCommand::class,
             ]);
         }
     }

@@ -94,14 +94,40 @@ abstract class AbstractVideoProcessor
             // "My music": the user's own upload, private to them. Resolved
             // first and WITHOUT a fallback — a stock track is not a substitute
             // for the file they chose, so a missing one means no bed.
-            $trackRelative = \Modules\Project\Services\UserMusicLibrary::isCustom($category)
-                ? \Modules\Project\Services\UserMusicLibrary::resolveForProject($this->project, $category, $chosenTrack)
-                : \Modules\Project\Services\MusicProviderFactory::make()
-                    ->pickTrack($category, (int) $this->project->id, $chosenTrack);
+            if (\Modules\Project\Services\UserMusicLibrary::isCustom($category)) {
+                $trackRelative = \Modules\Project\Services\UserMusicLibrary::resolveForProject(
+                    $this->project,
+                    $category,
+                    $chosenTrack
+                );
+            } else {
+                // Same ladder the explainer uses (see MUSIC_SETUP.md): the
+                // selected provider, the other one when the selection has no
+                // credential at all, then anything playable already on this
+                // box. The last rung is what makes this work on a freshly
+                // deployed server, where the library ships empty (storage/ is
+                // gitignored) and the API keys are database rows that do not
+                // travel with a deploy — before it, a provider that could not
+                // answer meant no bed at all, silently.
+                $trackRelative = \Modules\Project\Services\MusicProviderFactory::pickTrackWithFallback(
+                    $category,
+                    (int) $this->project->id,
+                    $chosenTrack
+                ) ?? (new \Modules\Project\Services\MusicLibraryService())->anyHealthyTrack(
+                    (int) $this->project->id,
+                    [$category],
+                    // Other users' private uploads are never borrowed. Unlike
+                    // the explainer, audio/horror is NOT excluded here: these
+                    // templates include the horror short, whose bed that is.
+                    ['audio/user']
+                );
+            }
+
             if (!$trackRelative) {
                 Log::info('applyBackgroundMusic: no track available — skipping', [
                     'project_id' => $this->project->id,
                     'category' => $category,
+                    'hint' => 'php artisan music:doctor --fix',
                 ]);
                 return;
             }

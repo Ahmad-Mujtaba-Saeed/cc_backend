@@ -24,6 +24,14 @@ use Symfony\Component\Process\Process;
 class RemotionRenderService
 {
     /** Storyboard mood → Pixabay audio search category. */
+    /**
+     * Folders the last-resort library sweep must never borrow from.
+     * `audio/horror` belongs to the horror template (copilot.md §6.4 — an
+     * explainer never pulls it) and `audio/user` holds users' private uploads,
+     * which must not leak between accounts.
+     */
+    private const MUSIC_SWEEP_EXCLUDED_DIRS = ['audio/horror', 'audio/user'];
+
     private const MOOD_MUSIC_CATEGORIES = [
         'neutral' => 'corporate',
         'upbeat' => 'happy',
@@ -763,7 +771,20 @@ class RemotionRenderService
 
     /**
      * Pick a background-music track for the video based on its dominant scene
-     * mood. Returns null when disabled or when the library is empty.
+     * mood. Returns null only when music is switched off, when the user asked
+     * for a specific upload we no longer have, or when this box holds no
+     * playable track at all.
+     *
+     * WHY THIS IS A CHAIN AND NOT A SINGLE LOOKUP — the bug it was written to
+     * kill: every source below can come back empty on a freshly deployed VPS
+     * while working perfectly on a developer machine, because `storage/` is
+     * gitignored (so the library ships empty) and the provider credentials live
+     * in the database (so a new box has none until an admin adds them). The old
+     * code took ONE candidate, health-checked it, and returned null on failure
+     * instead of trying the next source — so a single miss rendered the whole
+     * video silent, with one log line and nothing else. Now every source is
+     * tried in turn and the first HEALTHY file wins; only a genuinely empty box
+     * yields silence, and that is reported loudly.
      */
     private function resolveMusic(Project $project, array $scenes): ?array
     {
@@ -786,10 +807,7 @@ class RemotionRenderService
         arsort($counts);
         $dominantMood = array_key_first($counts) ?: 'neutral';
 
-        // Pixabay first ('auto' maps the storyboard's dominant mood onto a
-        // search category), then the legacy local library, so installs
-        // without a Pixabay key keep their old behaviour.
-        $pixabayCategory = ($category === '' || $category === 'auto')
+        $providerCategory = ($category === '' || $category === 'auto')
             ? (self::MOOD_MUSIC_CATEGORIES[$dominantMood] ?? 'corporate')
             : $category;
 
@@ -797,45 +815,151 @@ class RemotionRenderService
             ? (string) $settings['music_track_id']
             : null;
 
+        $library = new MusicLibraryService();
+        $seed = (int) $project->id;
+
         if (UserMusicLibrary::isCustom($category)) {
             // The user's own upload. No falling through to a catalogue here:
             // "play MY file" cannot be approximated by a stock track, so a
             // track that has gone missing means silence, which is the honest
-            // answer. Everything below still applies (health check, volume).
+            // answer.
             $track = UserMusicLibrary::resolveForProject($project, $category, $chosenTrack);
-        } else {
-            // Whichever music source the admin selected (Pixabay or Jamendo),
-            // then the legacy local library, so installs with no provider key
-            // at all keep their old behaviour.
-            $track = $settings['music_track']
-                ?? MusicProviderFactory::make()->pickTrack($pixabayCategory, (int) $project->id, $chosenTrack)
-                ?? (new BackgroundMusicService())->pickTrackForMood($dominantMood, (int) $project->id, ExplainerRegistry::moods());
+
+            if ($track === null || !$library->isHealthy($track)) {
+                $this->logMusicMiss($project, 'custom_upload_missing', [
+                    'category' => $category,
+                    'track' => $track,
+                ]);
+
+                return null;
+            }
+
+            return $this->musicPayload($track, $settings, $dominantMood);
         }
 
-        if (!$track) {
-            return null;
+        // Candidate sources, best first. Each is a closure so a source that
+        // costs an HTTP round trip is only paid for when the cheaper ones
+        // above it came back empty.
+        $sources = [];
+
+        // 1. A path pinned on the project by an earlier pick — cheap to check,
+        //    and it keeps re-renders on the same track.
+        if (!empty($settings['music_track'])) {
+            $sources['pinned'] = fn () => (string) $settings['music_track'];
         }
 
-        // Last line of defence: Remotion fails the ENTIRE render when an audio
-        // src 404s ("Could not play audio … MediaError"), so a bed whose file
-        // is not on disk must become silence here, never a URL. The providers
-        // already verify their downloads; this catches a file deleted between
-        // the pick and the render, and any future caller that forgets.
-        if (!(new MusicLibraryService())->isHealthy($track)) {
-            Log::warning('RemotionRenderService: music track missing on disk — rendering without a bed', [
-                'project_id' => $project->id,
-                'track' => $track,
-            ]);
+        // 2. Whichever remote catalogue can actually answer: the admin's
+        //    selected provider, or the other one when the selection has no
+        //    credential at all. That policy lives in MusicProviderFactory so
+        //    the shorts processors cannot drift away from it, and it swallows
+        //    its own failures — a database or network problem here degrades to
+        //    the local rungs below instead of breaking the render.
+        $sources['provider'] = fn () => MusicProviderFactory::pickTrackWithFallback(
+            $providerCategory,
+            $seed,
+            $chosenTrack
+        );
 
-            return null;
+        // 4. The legacy mood folders (storage/app/public/audio/<mood>), scoped
+        //    to explainer moods so audio/horror never leaks in here.
+        $sources['mood_folder'] = fn () => (new BackgroundMusicService())
+            ->pickTrackForMood($dominantMood, $seed, ExplainerRegistry::moods());
+
+        // 5. Anything playable anywhere in the library. The point of this rung
+        //    is that once a single track exists on the box, no explainer is
+        //    silent merely because one category happened to be empty.
+        $sources['library_sweep'] = fn () => $library->anyHealthyTrack(
+            $seed,
+            [$providerCategory, self::MOOD_MUSIC_CATEGORIES[$dominantMood] ?? 'corporate', 'corporate'],
+            self::MUSIC_SWEEP_EXCLUDED_DIRS
+        );
+
+        $attempts = [];
+        foreach ($sources as $label => $resolve) {
+            try {
+                $track = $resolve();
+            } catch (\Throwable $e) {
+                $attempts[$label] = 'threw: ' . $e->getMessage();
+                continue;
+            }
+
+            if (!$track) {
+                $attempts[$label] = 'no track';
+                continue;
+            }
+
+            // Remotion fails the ENTIRE render when an audio src 404s
+            // ("Could not play audio … MediaError"), so a bed whose bytes are
+            // not on disk must never become a URL. Unlike before, an unhealthy
+            // candidate now falls through to the next source instead of
+            // silencing the video.
+            if (!$library->isHealthy($track)) {
+                $attempts[$label] = 'unhealthy: ' . $track;
+                continue;
+            }
+
+            if ($label !== 'pinned' && $label !== 'provider') {
+                Log::info('RemotionRenderService: music resolved from a fallback source', [
+                    'project_id' => $project->id,
+                    'source' => $label,
+                    'track' => $track,
+                    'tried' => $attempts,
+                ]);
+            }
+
+            return $this->musicPayload($track, $settings, $dominantMood);
         }
 
+        $this->logMusicMiss($project, 'no_track_anywhere', [
+            'category' => $category,
+            'provider_category' => $providerCategory,
+            'mood' => $dominantMood,
+            'tried' => $attempts,
+        ]);
+
+        return null;
+    }
+
+    /** The renderer's music block, for a track already proven healthy. */
+    private function musicPayload(string $track, array $settings, string $mood): array
+    {
         return [
             'url' => $this->publicUrl($track),
             // Quiet bed: the Remotion side also ducks this under narration.
             'volume' => (float) ($settings['music_volume'] ?? \Modules\Project\Contracts\MusicProviderInterface::DEFAULT_VOLUME),
-            'mood' => $dominantMood,
+            'mood' => $mood,
         ];
+    }
+
+    /**
+     * A video about to render silent, said once and loudly.
+     *
+     * This used to be a bare Log::warning that nothing surfaced, which is why
+     * "no music on the VPS" could only be discovered by listening to the
+     * finished file. The reason is also stamped on the project so the
+     * storyboard and `php artisan music:doctor` can explain it without
+     * re-deriving it.
+     */
+    private function logMusicMiss(Project $project, string $reason, array $context = []): void
+    {
+        Log::warning('RemotionRenderService: rendering WITHOUT a music bed', array_merge([
+            'project_id' => $project->id,
+            'reason' => $reason,
+            'hint' => 'Run `php artisan music:doctor ' . $project->id . '` on this host. On a fresh '
+                . 'VPS the library starts empty (storage/ is gitignored) and the provider '
+                . 'credentials live in the database — `php artisan music:cache` fills it.',
+        ], $context));
+
+        try {
+            $settings = $project->settings ?? [];
+            $settings['music_last_miss'] = [
+                'reason' => $reason,
+                'at' => now()->toIso8601String(),
+            ];
+            $project->forceFill(['settings' => $settings])->saveQuietly();
+        } catch (\Throwable $e) {
+            // Diagnostics must never break a render.
+        }
     }
 
     /**
@@ -999,7 +1123,16 @@ class RemotionRenderService
         $base = config('services.remotion.asset_base_url') ?: config('app.url');
         $base = rtrim((string) $base, '/');
 
-        return $base . '/storage/' . ltrim($relativePath, '/');
+        // Percent-encode each SEGMENT, keeping the slashes. Operator-dropped
+        // library files are named things like
+        // "Tetuano - Abyss (freetouse.com).mp3", and a raw space or bracket in
+        // an <Audio src> is not a valid URL — Remotion fails the ENTIRE render
+        // on a media source it cannot fetch, so this is a render-killer, not a
+        // cosmetic issue. rawurlencode() leaves [A-Za-z0-9-_.~] alone, so
+        // already-safe paths (the provider cache's "{id}.mp3") are unchanged.
+        $encoded = implode('/', array_map('rawurlencode', explode('/', ltrim($relativePath, '/'))));
+
+        return $base . '/storage/' . $encoded;
     }
 
     private function dimensionsFor(string $aspectRatio): array

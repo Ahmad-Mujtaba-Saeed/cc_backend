@@ -227,6 +227,95 @@ class MusicLibraryService
         return $tracks;
     }
 
+    /**
+     * LAST RESORT: any healthy track already on this box, from anywhere in the
+     * library, picked deterministically.
+     *
+     * The failure this exists for: on a fresh VPS `storage/` is not deployed
+     * (it is gitignored), so the library starts empty, and if the provider API
+     * is also unreachable — no credential in api_credentials, no outbound
+     * HTTPS, audio-API access not granted — every category-scoped lookup
+     * returns null and the video renders SILENT with no error. Locally the
+     * same code works because the library has been filling up for months.
+     *
+     * Once ANY track exists on the box, a video should never be silent just
+     * because the requested category is empty. Categories are preferred in the
+     * order given, then everything else is fair game.
+     *
+     * @param  string[]  $preferCategories  tried first, in order
+     * @param  string[]  $excludeDirs       relative dirs never scanned (e.g.
+     *         'audio/horror' must not leak into an explainer, and 'audio/user'
+     *         holds other people's private uploads)
+     */
+    public function anyHealthyTrack(
+        int $seed = 0,
+        array $preferCategories = [],
+        array $excludeDirs = []
+    ): ?string {
+        // Walk the tree ONCE and filter in memory. This runs on the render path
+        // (after every cheaper source has missed), and each pass stats every
+        // file for the health check — doing that once per preferred category
+        // would re-scan the whole library three or four times over.
+        $all = $this->healthyTracksIn(self::ROOT, $excludeDirs);
+        if ($all === []) {
+            return null;
+        }
+
+        foreach ($preferCategories as $category) {
+            $wanted = self::slug($category);
+            $pool = array_values(array_filter(
+                $all,
+                fn ($file) => basename(trim(dirname($file), '/')) === $wanted
+            ));
+            if ($pool !== []) {
+                return $pool[abs($seed) % count($pool)];
+            }
+        }
+
+        return $all[abs($seed) % count($all)];
+    }
+
+    /**
+     * Every playable track under a directory tree, sorted so the pick is stable
+     * across runs.
+     *
+     * @return string[] relative public-disk paths
+     */
+    private function healthyTracksIn(string $root, array $excludeDirs = []): array
+    {
+        $disk = Storage::disk('public');
+        $excluded = array_map(fn ($d) => trim($d, '/'), $excludeDirs);
+        $found = [];
+
+        try {
+            foreach ($disk->allFiles($root) as $file) {
+                if (!$this->isAudio($file)) {
+                    continue;
+                }
+
+                $dir = trim(dirname($file), '/');
+                foreach ($excluded as $bad) {
+                    if ($dir === $bad || str_starts_with($dir . '/', $bad . '/')) {
+                        continue 2;
+                    }
+                }
+
+                if ($this->isHealthy($file)) {
+                    $found[] = $file;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('MusicLibrary: library sweep failed', [
+                'root' => $root,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        sort($found);
+
+        return $found;
+    }
+
     /** Is this a file the renderer can actually play? */
     public function isHealthy(string $relative): bool
     {
