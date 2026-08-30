@@ -55,7 +55,12 @@ class YTVideoDownloadService extends AbstractYoutubeDownloader
             'url' => $ytUrl,
             'audio_quality' => '128',
             'no_merge' => 'false',
-            'allow_extended_duration' => 0,
+            // MUST be 1. With 0 the provider silently truncates anything over
+            // roughly half an hour: a 73-minute source came back as a 28-minute
+            // file with no error and no Content-Length to check it against,
+            // which then failed deep in the cut step. This template exists to
+            // process long videos, so extended duration is not optional.
+            'allow_extended_duration' => 1,
         ]);
 
         if (!$response->successful()) {

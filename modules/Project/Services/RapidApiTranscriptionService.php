@@ -114,34 +114,58 @@ class RapidApiTranscriptionService
     /**
      * Perform the transcript request with one specific API key.
      * Throws on any non-2xx response so the caller can fail over.
+     *
+     * A 5xx from this upstream is usually transient (502s show up on healthy
+     * keys under load) and failing over on one would burn a good key's quota
+     * and, with a single key configured, drop a two-hour video onto local
+     * Whisper. So retry the SAME key on a server-side error before giving up
+     * on it; a 4xx (bad key, quota, captions disabled) is not retried.
      */
     private function requestTranscript(string $apiKey, string $videoId)
     {
-        Log::info('RapidApiTranscriptionService: requesting transcript', [
-            'video_id' => $videoId,
-            'host' => $this->host,
-        ]);
+        $attempts = 3;
+        $lastStatus = null;
 
-        $response = Http::withHeaders([
-            'x-rapidapi-host' => $this->host,
-            'x-rapidapi-key' => $apiKey,
-            'Content-Type' => 'application/json',
-        ])->timeout(60)->get("https://{$this->host}/transcript", [
-            'video_url' => $videoId,
-            'format' => 'json',
-            'include_timestamp' => 'true',
-            'send_metadata' => 'false',
-        ]);
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            Log::info('RapidApiTranscriptionService: requesting transcript', [
+                'video_id' => $videoId,
+                'host' => $this->host,
+                'attempt' => $attempt,
+            ]);
 
-        if (!$response->successful()) {
+            $response = Http::withHeaders([
+                'x-rapidapi-host' => $this->host,
+                'x-rapidapi-key' => $apiKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(60)->get("https://{$this->host}/transcript", [
+                'video_url' => $videoId,
+                'format' => 'json',
+                'include_timestamp' => 'true',
+                'send_metadata' => 'false',
+            ]);
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            $lastStatus = $response->status();
+            $retryable = $lastStatus >= 500 || $lastStatus === 429;
+
             Log::error('RapidApiTranscriptionService: request failed', [
-                'status' => $response->status(),
+                'status' => $lastStatus,
+                'attempt' => $attempt,
+                'will_retry' => $retryable && $attempt < $attempts,
                 'body' => substr($response->body(), 0, 500),
             ]);
-            throw new \Exception('RapidAPI transcription failed: HTTP ' . $response->status());
+
+            if (!$retryable || $attempt === $attempts) {
+                break;
+            }
+
+            sleep($attempt * 2);
         }
 
-        return $response->json();
+        throw new \Exception('RapidAPI transcription failed: HTTP ' . $lastStatus);
     }
 
     /**

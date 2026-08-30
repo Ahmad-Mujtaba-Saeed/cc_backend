@@ -129,11 +129,10 @@ class ClipSelectionService
             }
         }
 
-        // Greedily accept candidates by score. Each candidate is snapped to
-        // sentence boundaries FIRST, then checked against already-accepted
-        // clips — snapping moves boundaries, so overlap must be tested on the
-        // final boundaries, not the raw AI ones.
-        $selected = [];
+        // Snap + validate every candidate ONCE, in score order. Snapping moves
+        // boundaries, so overlap and spacing must be tested on the final
+        // boundaries, not the raw AI ones.
+        $ready = [];
         foreach ($topCandidates as $candidate) {
             $start = floatval($candidate['start_seconds'] ?? 0);
             $end = floatval($candidate['end_seconds'] ?? 0);
@@ -169,15 +168,29 @@ class ClipSelectionService
                 continue;
             }
 
-            if ($this->overlapsAccepted($clip, $selected)) {
-                continue;
-            }
+            $ready[] = $clip;
+        }
 
-            $selected[] = $clip;
+        // Pass 1: greedy by score, but keep the winners SPREAD across the
+        // video. Model scores bunch in the high 80s and PHP's sort is stable,
+        // so a pure score sort resolves every tie chronologically and hands
+        // back four clips from the opening minutes of a two-hour stream.
+        $selected = $this->pickSpread($ready, $count, $this->minSeparation($totalDurationSeconds, $count));
 
-            if (count($selected) >= $count) {
-                break;
+        // Pass 2: a strict spread can starve the result on a video whose good
+        // material really is clustered. Backfill by score with the overlap
+        // rule alone rather than return fewer shorts than were asked for.
+        if (count($selected) < $count) {
+            foreach ($ready as $clip) {
+                if (count($selected) >= $count) {
+                    break;
+                }
+                if ($this->overlapsAccepted($clip, $selected) || $this->alreadySelected($clip, $selected)) {
+                    continue;
+                }
+                $selected[] = $clip;
             }
+            usort($selected, fn ($a, $b) => $b['final_score'] <=> $a['final_score']);
         }
 
         Log::info('ClipSelectionService: Clip selection complete', [
@@ -191,6 +204,67 @@ class ClipSelectionService
         ]);
 
         return $selected;
+    }
+
+    /**
+     * How far apart two chosen clips should ideally start, so a set of shorts
+     * samples the whole video instead of one hot patch. Scales with the source
+     * length and is capped so it never dominates a short video.
+     */
+    private function minSeparation(float $totalDuration, int $count): float
+    {
+        if ($totalDuration <= 0 || $count <= 1) {
+            return 0.0;
+        }
+
+        return min(420.0, $totalDuration / ($count * 2));
+    }
+
+    /**
+     * Greedy pick by score that also requires each winner to start at least
+     * $minSeparation away from every clip already taken. Returns as many as it
+     * can find - the caller backfills if that is fewer than requested.
+     */
+    private function pickSpread(array $ready, int $count, float $minSeparation): array
+    {
+        $selected = [];
+
+        foreach ($ready as $clip) {
+            if (count($selected) >= $count) {
+                break;
+            }
+            if ($this->overlapsAccepted($clip, $selected)) {
+                continue;
+            }
+
+            $tooClose = false;
+            foreach ($selected as $chosen) {
+                if (abs($clip['final_start_seconds'] - $chosen['final_start_seconds']) < $minSeparation) {
+                    $tooClose = true;
+                    break;
+                }
+            }
+            if ($tooClose) {
+                continue;
+            }
+
+            $selected[] = $clip;
+        }
+
+        return $selected;
+    }
+
+    /** Identity check for the backfill pass (same snapped boundaries). */
+    private function alreadySelected(array $clip, array $selected): bool
+    {
+        foreach ($selected as $chosen) {
+            if (abs($clip['final_start_seconds'] - $chosen['final_start_seconds']) < 0.01
+                && abs($clip['final_end_seconds'] - $chosen['final_end_seconds']) < 0.01) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -552,7 +626,8 @@ class ClipSelectionService
                 if (!is_array($row)) {
                     continue;
                 }
-                $candidates[] = [
+
+                $candidate = [
                     'window_index' => $window['window_index'],
                     'start_seconds' => floatval($row['start_seconds'] ?? 0),
                     'end_seconds' => floatval($row['end_seconds'] ?? 0),
@@ -562,6 +637,12 @@ class ClipSelectionService
                     'score_breakdown' => $row['score_breakdown'] ?? [],
                     'reason' => $row['reason'] ?? ''
                 ];
+
+                if (!$this->candidateIsInWindow($candidate, $window, $mode)) {
+                    continue;
+                }
+
+                $candidates[] = $candidate;
             }
 
             return $candidates;
@@ -570,6 +651,58 @@ class ClipSelectionService
             Log::error('GPT Phase 1 call failed', ['error' => $e->getMessage()]);
             return [];
         }
+    }
+
+    /**
+     * Reject a Phase-1 candidate whose timestamps cannot have come from this
+     * window's transcript.
+     *
+     * The model is shown one slice of the video and must answer in SOURCE
+     * seconds. When it answers with a number from somewhere else — a relative
+     * offset, a mis-parsed timestamp, a zero-length range — the candidate is
+     * worthless but still carries a high score, so it wins the ranking and
+     * then gets sentence-snapped into a random stretch of footage. Dropping it
+     * here costs one candidate; keeping it costs a whole short.
+     */
+    private function candidateIsInWindow(array $candidate, array $window, string $mode): bool
+    {
+        $start = $candidate['start_seconds'];
+        $end = $candidate['end_seconds'];
+        $length = $end - $start;
+
+        // Only kill answers that cannot be repaired. An under-sized story
+        // pick usually means the model found the right moment and stopped
+        // one sentence early - sentence snapping grows that back to 15s+, so
+        // throwing it away would lose real material. A near-zero range is a
+        // parse failure and there is nothing to grow.
+        $minLength = $mode === 'moments' ? 4.0 : 3.0;
+
+        // A little slack: the model may land a boundary just outside the slice
+        // it was shown (the overlap region of the neighbouring window).
+        $slack = 30.0;
+        $lo = $window['start_time'] - $slack;
+        $hi = $window['end_time'] + $slack;
+
+        $reason = null;
+        if ($length < $minLength) {
+            $reason = 'degenerate length';
+        } elseif ($start < $lo || $end > $hi) {
+            $reason = 'outside window range';
+        }
+
+        if ($reason === null) {
+            return true;
+        }
+
+        Log::warning('ClipSelectionService: discarding implausible Phase 1 candidate', [
+            'reason' => $reason,
+            'window' => $window['window_index'],
+            'window_range' => [$window['start_time'], $window['end_time']],
+            'candidate' => [round($start, 1), round($end, 1)],
+            'score' => $candidate['score'],
+        ]);
+
+        return false;
     }
 
     private function buildPhase1SystemPrompt(string $mode = 'story'): string
@@ -652,10 +785,24 @@ Return ONLY valid JSON. No markdown. No explanation outside the JSON.
 PROMPT;
     }
 
+    /**
+     * A timestamp the model can read back verbatim: one decimal, NO thousands
+     * separator. See the note in buildPhase1Prompt() for why this matters.
+     */
+    private static function formatSeconds(float $seconds): string
+    {
+        return number_format($seconds, 1, '.', '');
+    }
+
     private function buildPhase1Prompt(array $segments, float $windowStart, float $windowEnd, float $totalDuration, int $maxCandidates = 1, string $mode = 'story'): string
     {
+        // NOTE: never number_format() a timestamp here. Its default thousands
+        // separator renders 1543.3s as "1,543.3s", and the model reads that
+        // comma as a decimal group and answers with 1.5 — so on any video
+        // longer than 16m40s every window past the first returned timestamps
+        // collapsed into the opening minutes. Plain '.'-only formatting.
         $formattedSegments = array_map(function ($seg) {
-            $time = number_format($seg['start'] ?? 0, 1);
+            $time = self::formatSeconds((float) ($seg['start'] ?? 0));
             $text = $seg['text'] ?? '';
             return "[{$time}s]: {$text}";
         }, $segments);
@@ -668,7 +815,8 @@ PROMPT;
                   "Return fewer only if the section genuinely does not contain that many usable moments."
                 : "Find the single most exciting moment in this section.";
             $lengthLine = "Each pick must contain exactly ONE event. Pick the length (6-20s) that captures the\n" .
-                "build-up and the peak of that single event — never stretch a pick to cover a second event.";
+                "build-up and the peak of that single event — never stretch a pick to cover a second event.\n" .
+                "Both numbers are ABSOLUTE seconds copied from the [..s] labels above, not offsets into this section.";
             $emptyRule = 'Score must be 0-100. Always return the best available moments; only return {"clips": []} if this section is truly unusable.';
         } else {
             $clipInstruction = $maxCandidates > 1
@@ -677,7 +825,10 @@ PROMPT;
                   "Return fewer clips (or an empty list) rather than padding with weak ones."
                 : "Find the single best self-contained clip (complete hook -> payoff).";
             $lengthLine = "Make start_seconds land on the first word of the opening sentence and end_seconds on the last\n" .
-                "word of the closing sentence. Pick the length (15-60s) that tells the whole story with no filler.";
+                "word of the closing sentence. Pick the length (15-60s) that tells the whole story with no filler.\n" .
+                "HARD RULE: end_seconds MUST be at least 15 and at most 60 greater than start_seconds. A range\n" .
+                "shorter than 15s is not a clip - extend it to the sentence that completes the thought.\n" .
+                "Both numbers are ABSOLUTE seconds copied from the [..s] labels above, not offsets into this section.";
             $emptyRule = 'Score must be 0-100. If no clip in this section forms a complete story, return {"clips": []}.';
         }
 
@@ -822,8 +973,8 @@ PROMPT;
     {
         $candidatesText = '';
         foreach ($topCandidates as $i => $candidate) {
-            $start = number_format($candidate['start_seconds'], 1);
-            $end = number_format($candidate['end_seconds'], 1);
+            $start = self::formatSeconds((float) $candidate['start_seconds']);
+            $end = self::formatSeconds((float) $candidate['end_seconds']);
             $score = $candidate['score'];
             $reason = $candidate['reason'];
 

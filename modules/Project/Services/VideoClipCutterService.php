@@ -27,7 +27,9 @@ class VideoClipCutterService
      * Uses FFmpeg fast seeking (-ss before -i) and stream copy (-c copy).
      * This is 10-100x faster than re-encoding and preserves quality.
      * 
-     * Returns: output path
+     * Returns: ['path' => string, 'duration' => float] with the duration
+     * MEASURED from the written file — the stream-copy fast path snaps to
+     * keyframes and routinely overshoots the requested range.
      * Throws: on failure
      */
     public function cut(
@@ -36,7 +38,7 @@ class VideoClipCutterService
         float $endSeconds,
         string $outputPath,
         int $projectId
-    ): string
+    ): array
     {
         $duration = $endSeconds - $startSeconds;
 
@@ -69,13 +71,16 @@ class VideoClipCutterService
                 throw new \Exception('Output clip file is empty');
             }
 
+            $measured = (float) ($response['duration'] ?? $duration);
+
             Log::info('VideoClipCutterService: Cut complete', [
                 'output_path' => $outputPath,
                 'file_size' => $fileSize,
-                'duration' => $response['duration'] ?? $duration
+                'requested_duration' => round($duration, 3),
+                'duration' => $measured
             ]);
 
-            return $outputPath;
+            return ['path' => $outputPath, 'duration' => $measured];
 
         } catch (\Exception $e) {
             Log::error('VideoClipCutterService: Cut failed', [
@@ -94,6 +99,8 @@ class VideoClipCutterService
      * A single range degrades to the fast contiguous cut() path; multiple
      * ranges call the Python /cut-video-segments endpoint (re-encode).
      *
+     * Returns ['path' => string, 'duration' => float] with a measured duration.
+     *
      * @param array<int, array{start: float, end: float}> $ranges source-time keep ranges, ordered
      */
     public function cutSegments(
@@ -101,7 +108,7 @@ class VideoClipCutterService
         array $ranges,
         string $outputPath,
         int $projectId
-    ): string
+    ): array
     {
         $ranges = array_values($ranges);
 
@@ -144,13 +151,16 @@ class VideoClipCutterService
                 throw new \Exception('Output clip file is empty');
             }
 
+            $measured = (float) ($response['duration'] ?? $keptDuration);
+
             Log::info('VideoClipCutterService: Segment cut complete', [
                 'output_path' => $outputPath,
                 'file_size' => $fileSize,
-                'duration' => $response['duration'] ?? $keptDuration
+                'planned_duration' => round($keptDuration, 3),
+                'duration' => $measured
             ]);
 
-            return $outputPath;
+            return ['path' => $outputPath, 'duration' => $measured];
 
         } catch (\Exception $e) {
             Log::error('VideoClipCutterService: Segment cut failed', [

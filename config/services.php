@@ -84,7 +84,7 @@ return [
         'vlm_model' => env('OPENAI_VLM_MODEL', 'gpt-4o-mini'),
         // Non-explainer templates: gameplay clip selection and script
         // generation. Previously hardcoded to gpt-4o-mini.
-        'general_model' => env('OPENAI_GENERAL_MODEL', 'gpt-4o-mini'),
+        'general_model' => env('OPENAI_GENERAL_MODEL', 'gpt-4.1-mini'),
     ],
 
     // Node/Remotion render service for the AI explainer template.

@@ -11,9 +11,18 @@ use Illuminate\Support\Facades\Log;
  * ranges (source-time) that skip the empty parts — silence, music-only holes,
  * dead air between sentences — so the rendered short is continuous speech.
  *
- * The plan is derived from the transcript: consecutive speech segments whose
- * gap is small (a natural breath) stay in one block; larger gaps are cut out.
- * Each block is padded slightly so cuts never clip a word.
+ * The plan has two sources, and they cover for each other:
+ *
+ *  - TRANSCRIPT GAPS. Consecutive speech segments whose gap is small (a
+ *    natural breath) stay in one block; larger gaps are cut out.
+ *  - MEASURED SILENCE, passed in by the caller from ffmpeg silencedetect.
+ *    YouTube's auto-captions are timed back-to-back — one segment's end IS
+ *    the next one's start, even across ten seconds of nothing — so on the
+ *    YouTube path the transcript shows no gaps at all and gap-based editing
+ *    silently does nothing. Listening to the audio is the only way to find
+ *    dead air in that transcript.
+ *
+ * Each kept block is padded slightly so cuts never clip a word.
  *
  * The service also maps source timestamps onto the edited timeline
  * (toEditedTime) so captions stay in sync after the silent parts are removed.
@@ -36,12 +45,21 @@ class ClipEditPlanService
     /** Hard cap on cut points — beyond this the clip feels choppy anyway. */
     private const MAX_RANGES = 24;
 
+    /** A measured silence shorter than this isn't worth a visible cut. */
+    private const MIN_SILENCE_TO_CUT = 0.45;
+
+    /** Keep pieces below this are slivers; drop them with the silence. */
+    private const MIN_KEEP_PIECE = 0.6;
+
     /**
      * Build the edit plan for a clip window.
      *
      * @param array $segments Full transcript segments [{start, end, text}, ...] (seconds)
      * @param float $clipStart Selected clip start (source seconds)
      * @param float $clipEnd   Selected clip end (source seconds)
+     * @param array<int, array{start: float, end: float}> $measuredSilences
+     *        Silence intervals measured from the audio, in source seconds.
+     *        Optional — omit to get the transcript-only plan.
      *
      * @return array{
      *   ranges: array<int, array{start: float, end: float}>,
@@ -50,7 +68,7 @@ class ClipEditPlanService
      *   is_edited: bool
      * }
      */
-    public function plan(array $segments, float $clipStart, float $clipEnd): array
+    public function plan(array $segments, float $clipStart, float $clipEnd, array $measuredSilences = []): array
     {
         $window = max(0.0, $clipEnd - $clipStart);
         $contiguous = [
@@ -79,7 +97,12 @@ class ClipEditPlanService
         }
 
         if (empty($spans)) {
-            return $contiguous;
+            // No transcript inside the window (music, action, missing
+            // captions). Measured silence is then the only editor available.
+            return $this->applyMeasuredSilence(
+                [['start' => $clipStart, 'end' => $clipEnd]],
+                $measuredSilences, $clipStart, $clipEnd, $window, $contiguous
+            );
         }
 
         usort($spans, fn ($a, $b) => $a['start'] <=> $b['start']);
@@ -117,6 +140,30 @@ class ClipEditPlanService
             return $contiguous;
         }
 
+        return $this->applyMeasuredSilence($ranges, $measuredSilences, $clipStart, $clipEnd, $window, $contiguous);
+    }
+
+    /**
+     * Subtract measured silence from the transcript-derived keep ranges and
+     * finish the plan (cut-count cap, savings guards, logging).
+     *
+     * @param array<int, array{start: float, end: float}> $ranges
+     * @param array<int, array{start: float, end: float}> $measuredSilences
+     */
+    private function applyMeasuredSilence(
+        array $ranges,
+        array $measuredSilences,
+        float $clipStart,
+        float $clipEnd,
+        float $window,
+        array $contiguous
+    ): array {
+        $ranges = $this->subtractSilences($ranges, $measuredSilences);
+
+        if (empty($ranges)) {
+            return $contiguous;
+        }
+
         // Too many cuts → repeatedly merge across the smallest silence gap
         // (keeps the least-noticeable silences, drops the fewest).
         while (count($ranges) > self::MAX_RANGES) {
@@ -149,6 +196,7 @@ class ClipEditPlanService
             'ranges' => count($ranges),
             'edited_duration' => round($edited, 2),
             'removed_seconds' => round($removed, 2),
+            'measured_silences' => count($measuredSilences),
         ]);
 
         return [
@@ -160,6 +208,68 @@ class ClipEditPlanService
             'removed_seconds' => round($removed, 3),
             'is_edited' => true,
         ];
+    }
+
+    /**
+     * Remove the measured silent intervals from a set of keep ranges.
+     *
+     * Each silence is shrunk by the same padding used around speech blocks,
+     * so a cut still lands in the quiet rather than on the first syllable
+     * after it, and slivers left behind are dropped rather than turned into
+     * a extra hard cut nobody can see the point of.
+     *
+     * @param array<int, array{start: float, end: float}> $ranges
+     * @param array<int, array{start: float, end: float}> $silences
+     * @return array<int, array{start: float, end: float}>
+     */
+    private function subtractSilences(array $ranges, array $silences): array
+    {
+        if (empty($silences)) {
+            return $ranges;
+        }
+
+        $cuts = [];
+        foreach ($silences as $silence) {
+            $start = (float) ($silence['start'] ?? 0) + self::PAD_AFTER;
+            $end = (float) ($silence['end'] ?? 0) - self::PAD_BEFORE;
+            if ($end - $start >= self::MIN_SILENCE_TO_CUT) {
+                $cuts[] = ['start' => $start, 'end' => $end];
+            }
+        }
+
+        if (empty($cuts)) {
+            return $ranges;
+        }
+
+        usort($cuts, fn ($a, $b) => $a['start'] <=> $b['start']);
+
+        $result = [];
+        foreach ($ranges as $range) {
+            $pieces = [$range];
+            foreach ($cuts as $cut) {
+                $next = [];
+                foreach ($pieces as $piece) {
+                    if ($cut['end'] <= $piece['start'] || $cut['start'] >= $piece['end']) {
+                        $next[] = $piece;
+                        continue;
+                    }
+                    if ($cut['start'] > $piece['start']) {
+                        $next[] = ['start' => $piece['start'], 'end' => $cut['start']];
+                    }
+                    if ($cut['end'] < $piece['end']) {
+                        $next[] = ['start' => $cut['end'], 'end' => $piece['end']];
+                    }
+                }
+                $pieces = $next;
+            }
+            foreach ($pieces as $piece) {
+                if ($piece['end'] - $piece['start'] >= self::MIN_KEEP_PIECE) {
+                    $result[] = $piece;
+                }
+            }
+        }
+
+        return $result;
     }
 
     /**

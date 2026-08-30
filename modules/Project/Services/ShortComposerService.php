@@ -31,7 +31,11 @@ class ShortComposerService
      * Pass null for $gameplayClipPath to render the main clip full-frame
      * (1080x1920) with no gameplay panel.
      *
-     * Returns: path to output video
+     * $settings['focus_x'] (0..1) is the subject's horizontal centre in the
+     * main clip; 0.5 is a plain centre crop.
+     *
+     * Returns: ['path' => string, 'duration' => float|null] — the duration is
+     * MEASURED from the rendered file, not predicted.
      * Throws: on failure
      */
     public function compose(
@@ -41,14 +45,16 @@ class ShortComposerService
         string $outputPath,
         int $projectId,
         array $settings = []
-    ): string
+    ): array
     {
         $aspectRatio = $settings['aspect_ratio'] ?? '9:16';
         $captionPosition = $settings['caption_position'] ?? 'top_section';
+        $focusX = min(1.0, max(0.0, (float) ($settings['focus_x'] ?? 0.5)));
         $withGameplay = !empty($gameplayClipPath);
 
         Log::info('ShortComposerService: Starting compose', [
             'main_clip' => basename($mainClipPath),
+            'focus_x' => $focusX,
             'gameplay_clip' => $withGameplay ? basename($gameplayClipPath) : null,
             'mode' => $withGameplay ? 'split (main + gameplay)' : 'fullscreen (no gameplay)',
             'captions_ass' => basename($captionsAssPath),
@@ -66,6 +72,7 @@ class ShortComposerService
                 'project_id' => $projectId,
                 'aspect_ratio' => $aspectRatio,
                 'caption_position' => $captionPosition,
+                'focus_x' => $focusX,
             ];
 
             if ($withGameplay) {
@@ -83,16 +90,20 @@ class ShortComposerService
                 throw new \Exception('Output video file is empty');
             }
 
+            $duration = isset($response['duration']) ? (float) $response['duration'] : null;
+
             Log::info('ShortComposerService: Compose complete', [
                 'output_path' => $outputPath,
                 'file_size' => $fileSize,
+                'duration' => $duration,
+                'focus_x' => $focusX,
                 'final_dimensions' => '1080x1920',
                 'panels' => $withGameplay
                     ? ['top' => '1080x1152 (main clip)', 'bottom' => '1080x768 (gameplay)']
                     : ['full' => '1080x1920 (main clip)']
             ]);
 
-            return $outputPath;
+            return ['path' => $outputPath, 'duration' => $duration];
 
         } catch (\Exception $e) {
             Log::error('ShortComposerService: Compose failed', [

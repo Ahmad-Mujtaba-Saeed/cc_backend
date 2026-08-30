@@ -60,6 +60,12 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     private R2UploadService $r2UploadService;
     private PythonAIService $pythonService;
 
+    /**
+     * The YouTube transcript for this run, fetched once. [] means "tried and
+     * unavailable"; null means "not fetched yet".
+     */
+    private ?array $youtubeTranscript = null;
+
     public function __construct(\Modules\Project\Models\Project $project)
     {
         parent::__construct($project);
@@ -317,41 +323,150 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         $sourceVideoPath = Storage::disk('public')->path("projects/{$this->project->id}/source_video.mp4");
 
         if ($inputMode === 'youtube_url') {
-            $mainUrl = $this->settings['main_url'];
-
-            // Init download
-            $initResult = $this->downloadService->initDownload($mainUrl);
-            $progressUrl = $initResult['progress_url'];
-            $videoTitle = $initResult['title'];
-
-            // Poll until ready
-            $downloadUrl = $this->downloadService->pollUntilReady($progressUrl);
-
-            // Stream download to storage
-            $this->downloadService->streamToStorage($downloadUrl, $sourceVideoPath);
-
-            // Store in processing_state
-            $state = $this->project->processing_state ?? [];
-            $state['source_video_path'] = $sourceVideoPath;
-            $state['video_title'] = $videoTitle;
-            $this->project->update(['processing_state' => $state]);
-
+            $sourceDuration = $this->downloadYoutubeSource($sourceVideoPath);
         } else {
             // Upload mode — file already saved by controller
             $sourceVideoPath = Storage::disk('public')->path($this->project->video_path);
+
+            if (!file_exists($sourceVideoPath) || filesize($sourceVideoPath) === 0) {
+                throw new \Exception('Source video is missing or empty');
+            }
+
+            $sourceDuration = $this->probeDuration($sourceVideoPath);
+            if ($sourceDuration === null) {
+                throw new \Exception('Uploaded video is unreadable or not a valid video file');
+            }
         }
 
-        if (!file_exists($sourceVideoPath) || filesize($sourceVideoPath) === 0) {
-            throw new \Exception('Source video is missing or empty');
-        }
+        $state = $this->project->processing_state ?? [];
+        $state['source_duration'] = round($sourceDuration, 2);
+        $this->project->update(['processing_state' => $state]);
 
         Log::info('Source video ready', [
             'project_id' => $this->project->id,
             'path' => basename($sourceVideoPath),
-            'size' => filesize($sourceVideoPath)
+            'size' => filesize($sourceVideoPath),
+            'duration' => round($sourceDuration, 2),
         ]);
 
         return $sourceVideoPath;
+    }
+
+    /**
+     * Download the YouTube source, retrying until the file on disk is a
+     * complete, readable video.
+     *
+     * The provider transcodes on the fly and answers with a chunked stream:
+     * no Content-Length to verify against, and a dropped connection yields a
+     * headerless MP4 that ffprobe cannot open at all. A non-empty file is
+     * therefore no evidence of a successful download — that check used to pass
+     * and the job died four minutes later inside the cut step with
+     * "Failed to cut any clips from the source video".
+     *
+     * So every attempt is verified against the transcript's length (the
+     * transcript covers the whole video and is fetched cheaply by video id),
+     * and a short or unreadable file earns a fresh download URL rather than a
+     * confusing failure downstream.
+     *
+     * @return float the verified duration of the downloaded file
+     */
+    protected function downloadYoutubeSource(string $sourceVideoPath): float
+    {
+        $mainUrl = $this->settings['main_url'];
+        $expected = $this->expectedSourceDuration();
+        $attempts = 3;
+        $shortest = null;
+
+        for ($attempt = 1; $attempt <= $attempts; $attempt++) {
+            $initResult = $this->downloadService->initDownload($mainUrl);
+            $downloadUrl = $this->downloadService->pollUntilReady($initResult['progress_url']);
+            $this->downloadService->streamToStorage($downloadUrl, $sourceVideoPath);
+
+            $state = $this->project->processing_state ?? [];
+            $state['source_video_path'] = $sourceVideoPath;
+            $state['video_title'] = $initResult['title'];
+            $this->project->update(['processing_state' => $state]);
+
+            $duration = $this->probeDuration($sourceVideoPath);
+
+            if ($duration !== null && ($expected === null || $duration >= $expected * 0.9)) {
+                return $duration;
+            }
+
+            $shortest = $duration;
+
+            Log::warning('[YT_GAMEPLAY] Incomplete source download, retrying', [
+                'project_id' => $this->project->id,
+                'attempt' => $attempt,
+                'of' => $attempts,
+                'got_duration' => $duration,
+                'expected_duration' => $expected,
+                'size' => file_exists($sourceVideoPath) ? filesize($sourceVideoPath) : 0,
+            ]);
+
+            @unlink($sourceVideoPath);
+
+            if ($attempt < $attempts) {
+                sleep($attempt * 5);
+            }
+        }
+
+        if ($shortest === null) {
+            throw new \Exception(
+                'Source video download failed — the file arrived corrupt every time. Please try again.'
+            );
+        }
+
+        throw new \Exception(sprintf(
+            'Source video download kept arriving incomplete (%.0f min of %.0f min). Please try again.',
+            $shortest / 60,
+            ($expected ?? 0) / 60
+        ));
+    }
+
+    /**
+     * How long the source SHOULD be, from the YouTube transcript (which is
+     * keyed on the video id and needs no downloaded file). The transcript is
+     * cached on the instance so the later transcription step reuses this call
+     * instead of paying for a second one. Null when unavailable — the download
+     * is then only checked for readability.
+     */
+    protected function expectedSourceDuration(): ?float
+    {
+        $transcript = $this->youtubeTranscript();
+        $duration = (float) ($transcript['totalDuration'] ?? 0);
+
+        return $duration > 0 ? $duration : null;
+    }
+
+    /**
+     * The RapidAPI transcript for this project's YouTube video, fetched once.
+     * Null for upload mode or when the API is unavailable.
+     */
+    protected function youtubeTranscript(): ?array
+    {
+        if ($this->youtubeTranscript !== null) {
+            return $this->youtubeTranscript ?: null;
+        }
+
+        $videoId = $this->youtubeVideoId();
+        if ($videoId === null) {
+            $this->youtubeTranscript = [];
+            return null;
+        }
+
+        try {
+            $result = $this->rapidTranscriptionService->transcribeByVideoId($videoId);
+            $this->youtubeTranscript = (is_array($result) && !empty($result['segments'])) ? $result : [];
+        } catch (\Exception $e) {
+            Log::warning('[YT_GAMEPLAY] RapidAPI transcript unavailable', [
+                'project_id' => $this->project->id,
+                'error' => $e->getMessage(),
+            ]);
+            $this->youtubeTranscript = [];
+        }
+
+        return $this->youtubeTranscript ?: null;
     }
 
     /**
@@ -387,23 +502,9 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     protected function transcribeVideo(string $sourceVideoPath): ?array
     {
         try {
-            $result = null;
-            $videoId = $this->youtubeVideoId();
-
-            if ($videoId !== null) {
-                try {
-                    Log::info('[YT_GAMEPLAY] Transcribing via RapidAPI', [
-                        'project_id' => $this->project->id,
-                        'video_id' => $videoId,
-                    ]);
-                    $result = $this->rapidTranscriptionService->transcribeByVideoId($videoId);
-                } catch (\Exception $e) {
-                    Log::warning('[YT_GAMEPLAY] RapidAPI transcription failed, falling back to local', [
-                        'project_id' => $this->project->id,
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            }
+            // Already fetched while verifying the download's length — reuse it
+            // rather than paying the API a second time for the same answer.
+            $result = $this->youtubeTranscript();
 
             // Fallback: local Faster-Whisper on the downloaded/uploaded file.
             if (!$result || empty($result['segments'])) {
@@ -431,10 +532,26 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
             $state['total_duration'] = $result['totalDuration'] ?? 0;
             $this->project->update(['processing_state' => $state]);
 
+            // The transcript covers the WHOLE video; the downloaded file may
+            // not. If the file is materially shorter, every clip the selector
+            // picks past that point cuts to nothing - fail here with a reason
+            // instead of producing zero or garbage shorts.
+            $sourceDuration = (float) ($state['source_duration'] ?? 0);
+            $transcriptDuration = (float) ($result['totalDuration'] ?? 0);
+            if ($sourceDuration > 0 && $transcriptDuration > 0
+                && $sourceDuration < $transcriptDuration * 0.9) {
+                throw new \Exception(sprintf(
+                    'Downloaded video is only %.0f min of the %.0f min source — the download was incomplete, try again',
+                    $sourceDuration / 60,
+                    $transcriptDuration / 60
+                ));
+            }
+
             Log::info('Transcription complete', [
                 'project_id' => $this->project->id,
                 'segment_count' => count($result['segments'] ?? []),
-                'duration' => $result['totalDuration'] ?? 0,
+                'duration' => $transcriptDuration,
+                'source_duration' => $sourceDuration,
                 'has_text' => !empty($result['text'])
             ]);
 
@@ -580,7 +697,12 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                 $plan = $this->editPlanService->plan(
                     $segments,
                     (float) $clip['final_start_seconds'],
-                    (float) $clip['final_end_seconds']
+                    (float) $clip['final_end_seconds'],
+                    $this->measureSilence(
+                        $sourceVideoPath,
+                        (float) $clip['final_start_seconds'],
+                        (float) $clip['final_end_seconds']
+                    )
                 );
 
                 Log::info('[YT_GAMEPLAY] Cutting clip', [
@@ -593,9 +715,18 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                 ]);
 
                 $clipPath = $tmpDir . "/main_clip_{$n}.mp4";
-                $this->clipCutterService->cutSegments($sourceVideoPath, $plan['ranges'], $clipPath, $this->project->id);
+                $cutResult = $this->clipCutterService->cutSegments($sourceVideoPath, $plan['ranges'], $clipPath, $this->project->id);
 
-                $cuts[] = ['index' => $n, 'clip' => $clip, 'plan' => $plan, 'path' => $clipPath];
+                $cuts[] = [
+                    'index' => $n,
+                    'clip' => $clip,
+                    'plan' => $plan,
+                    'path' => $clipPath,
+                    // Measured, not planned: the gameplay loop is sized off
+                    // this, and a loop shorter than its clip would truncate
+                    // the short now that vstack terminates on the shortest.
+                    'duration' => (float) $cutResult['duration'],
+                ];
             } catch (\Exception $e) {
                 Log::error('[YT_GAMEPLAY] Clip cut failed — skipping this clip', [
                     'project_id' => $this->project->id,
@@ -617,8 +748,11 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         // vstack stops at the shorter input, so one loop serves every clip. ──
         $gameplayLoopPath = null;
         if ($gameplayEnabled) {
-            $maxDuration = max(array_map(fn($c) => (float) $c['plan']['edited_duration'], $cuts));
-            $gameplayLoopPath = $this->loopGameplay($maxDuration + 0.5);
+            $maxDuration = max(array_map(fn($c) => (float) $c['duration'], $cuts));
+            // Comfortably longer than the longest clip: the stack now ends on
+            // the shortest input, so a loop that came up even a frame short
+            // would clip the end off a short.
+            $gameplayLoopPath = $this->loopGameplay($maxDuration + 2.0);
             $tick('Gameplay loop ready');
         }
 
@@ -627,12 +761,12 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         foreach ($cuts as $cut) {
             $n = $cut['index'];
             try {
-                $captionsAss = $this->buildClipCaptions($segments, $cut['clip'], $cut['plan'], $n, $cut['path']);
+                $captionsAss = $this->buildClipCaptions($segments, $cut['clip'], $cut['plan'], $n, $cut['path'], $cut['duration']);
 
                 $outputRelative = "projects/{$this->project->id}/output_{$n}.mp4";
                 $outputAbsolute = Storage::disk('public')->path($outputRelative);
 
-                $this->composerService->compose(
+                $composed = $this->composerService->compose(
                     $cut['path'],
                     $gameplayLoopPath,
                     $captionsAss,
@@ -641,15 +775,21 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                     [
                         'aspect_ratio' => $this->project->aspect_ratio ?? '9:16',
                         'caption_position' => $this->settings['caption_position'] ?? 'top_section',
+                        'focus_x' => $this->detectFocusX($cut['path'], $n),
                     ]
                 );
 
                 $thumbnailRelative = $this->generateClipThumbnail($outputAbsolute, $n);
 
+                // The plan's edited_duration is a prediction; the composer
+                // measures the file it just wrote. Prefer the measurement, so
+                // the dashboard and the manifest agree with the MP4.
+                $duration = $composed['duration'] ?? (float) $cut['plan']['edited_duration'];
+
                 $outputs[] = [
                     'path' => $outputRelative,
                     'thumbnail' => $thumbnailRelative,
-                    'duration' => round((float) $cut['plan']['edited_duration'], 2),
+                    'duration' => round((float) $duration, 2),
                     'score' => (int) ($cut['clip']['final_score'] ?? 0),
                     'subtitle' => mb_substr(trim((string) ($cut['clip']['subtitle'] ?? '')), 0, 200),
                     'source_start' => round((float) $cut['clip']['final_start_seconds'], 2),
@@ -698,6 +838,129 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         ]);
 
         return $outputs;
+    }
+
+    /**
+     * Container duration of a media file, or null when it cannot be read
+     * (which is itself the useful answer: the file is not usable video).
+     */
+    protected function probeDuration(string $path): ?float
+    {
+        try {
+            $response = $this->pythonService->makeRequest('POST', '/probe-duration', [
+                'path' => $path,
+                'project_id' => $this->project->id,
+            ]);
+
+            if (empty($response['success']) || empty($response['duration'])) {
+                return null;
+            }
+
+            return (float) $response['duration'];
+
+        } catch (\Exception $e) {
+            Log::warning('[YT_GAMEPLAY] Duration probe failed', [
+                'project_id' => $this->project->id,
+                'path' => basename($path),
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Dead air inside one clip window, measured from the audio.
+     *
+     * The transcript-gap plan alone finds nothing on the YouTube path (auto
+     * captions are timed back-to-back, so a ten-second pause shows up as a
+     * zero-length gap), which is why every rendered short reported
+     * removed_silence_seconds = 0. Non-fatal: on any failure we return no
+     * silences and the plan falls back to transcript gaps only.
+     *
+     * @return array<int, array{start: float, end: float}> source-time silences
+     */
+    protected function measureSilence(string $sourceVideoPath, float $clipStart, float $clipEnd): array
+    {
+        if (!file_exists($sourceVideoPath) || $clipEnd <= $clipStart) {
+            return [];
+        }
+
+        try {
+            $response = $this->pythonService->makeRequest('POST', '/detect-silence', [
+                'source_path' => $sourceVideoPath,
+                'start_seconds' => $clipStart,
+                'end_seconds' => $clipEnd,
+                'project_id' => $this->project->id,
+            ]);
+
+            if (empty($response['success']) || empty($response['silences'])) {
+                return [];
+            }
+
+            $silences = [];
+            foreach ($response['silences'] as $row) {
+                $start = (float) ($row['start_seconds'] ?? 0);
+                $end = (float) ($row['end_seconds'] ?? 0);
+                if ($end > $start) {
+                    $silences[] = ['start' => $start, 'end' => $end];
+                }
+            }
+
+            Log::info('[YT_GAMEPLAY] Measured silence in clip window', [
+                'project_id' => $this->project->id,
+                'window' => [round($clipStart, 2), round($clipEnd, 2)],
+                'silences' => count($silences),
+                'silent_seconds' => $response['silent_seconds'] ?? 0,
+            ]);
+
+            return $silences;
+
+        } catch (\Exception $e) {
+            Log::warning('[YT_GAMEPLAY] Silence detection failed (non-fatal)', [
+                'project_id' => $this->project->id,
+                'error' => $e->getMessage(),
+            ]);
+            return [];
+        }
+    }
+
+    /**
+     * Where the speaker sits horizontally in this clip, so the 9:16 crop
+     * follows them instead of blindly taking the middle of a 16:9 frame.
+     * Non-fatal: 0.5 reproduces the old centre crop.
+     */
+    protected function detectFocusX(string $clipPath, int $clipIndex): float
+    {
+        try {
+            $response = $this->pythonService->makeRequest('POST', '/video-focus', [
+                'video_path' => $clipPath,
+                'project_id' => $this->project->id,
+            ]);
+
+            if (empty($response['success'])) {
+                return 0.5;
+            }
+
+            $focus = (float) ($response['focus_x'] ?? 0.5);
+
+            Log::info('[YT_GAMEPLAY] Framing focus detected', [
+                'project_id' => $this->project->id,
+                'clip' => $clipIndex,
+                'focus_x' => $focus,
+                'frames_with_faces' => $response['frames_with_faces'] ?? 0,
+                'frames_sampled' => $response['frames_sampled'] ?? 0,
+            ]);
+
+            return min(1.0, max(0.0, $focus));
+
+        } catch (\Exception $e) {
+            Log::warning('[YT_GAMEPLAY] Focus detection failed (non-fatal)', [
+                'project_id' => $this->project->id,
+                'clip' => $clipIndex,
+                'error' => $e->getMessage(),
+            ]);
+            return 0.5;
+        }
     }
 
     /**
@@ -782,10 +1045,15 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
      * timings from the source transcript and remap them through the edit plan,
      * as before. Returns the absolute path of the generated .ass file.
      */
-    protected function buildClipCaptions(array $segments, array $selectedClip, array $plan, int $clipIndex, string $clipPath): string
+    protected function buildClipCaptions(array $segments, array $selectedClip, array $plan, int $clipIndex, string $clipPath, ?float $clipDuration = null): string
     {
+        // Captions are clamped to the clip's length, so use the MEASURED one:
+        // clamping to the shorter planned duration would freeze the last few
+        // words on screen at the wrong time.
+        $duration = $clipDuration ?: (float) $plan['edited_duration'];
+
         try {
-            return $this->buildClipCaptionsFromClipAudio($clipPath, $clipIndex, (float) $plan['edited_duration']);
+            return $this->buildClipCaptionsFromClipAudio($clipPath, $clipIndex, $duration);
         } catch (\Exception $e) {
             Log::warning('[YT_GAMEPLAY] Per-clip audio captions failed — falling back to source-transcript remap', [
                 'project_id' => $this->project->id,
@@ -793,7 +1061,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                 'error' => $e->getMessage(),
             ]);
 
-            return $this->buildClipCaptionsFromSourceTranscript($segments, $selectedClip, $plan, $clipIndex);
+            return $this->buildClipCaptionsFromSourceTranscript($segments, $selectedClip, $plan, $clipIndex, $duration);
         }
     }
 
@@ -886,12 +1154,12 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
      * inside the clip window, mapped through the edit plan's keep-ranges onto
      * the edited timeline.
      */
-    protected function buildClipCaptionsFromSourceTranscript(array $segments, array $selectedClip, array $plan, int $clipIndex): string
+    protected function buildClipCaptionsFromSourceTranscript(array $segments, array $selectedClip, array $plan, int $clipIndex, ?float $clipDuration = null): string
     {
         $clipStart = (float) $selectedClip['final_start_seconds'];
         $clipEnd = (float) $selectedClip['final_end_seconds'];
         $ranges = $plan['ranges'];
-        $editedDuration = (float) $plan['edited_duration'];
+        $editedDuration = $clipDuration ?: (float) $plan['edited_duration'];
 
         // Segments that overlap the clip window
         $clipSegments = array_filter($segments, function ($seg) use ($clipStart, $clipEnd) {

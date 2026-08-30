@@ -926,13 +926,69 @@ class ComposeShortRequest(BaseModel):
     project_id: int
     aspect_ratio: str = "9:16"
     caption_position: str = "top_section"
+    # Horizontal centre of interest for the main panel's crop (0..1).
+    # 0.5 keeps the historical plain centre crop.
+    focus_x: float = 0.5
 
 class ComposeShortResponse(BaseModel):
     success: bool
     output_path: Optional[str] = None
     file_size: Optional[int] = None
+    # Measured duration of the rendered short, so the caller records what the
+    # file actually is instead of what it predicted.
+    duration: Optional[float] = None
     error: Optional[str] = None
     detail: Optional[str] = None
+
+class ProbeDurationRequest(BaseModel):
+    path: str
+    project_id: Optional[int] = None
+
+
+class ProbeDurationResponse(BaseModel):
+    success: bool
+    duration: Optional[float] = None
+    error: Optional[str] = None
+
+
+class DetectSilenceRequest(BaseModel):
+    source_path: str
+    start_seconds: float = 0.0
+    end_seconds: float = 0.0
+    # Below this dBFS for at least min_silence_seconds counts as dead air.
+    noise_db: float = -34.0
+    min_silence_seconds: float = 0.6
+    project_id: Optional[int] = None
+
+
+class SilenceInterval(BaseModel):
+    start_seconds: float
+    end_seconds: float
+
+
+class DetectSilenceResponse(BaseModel):
+    success: bool
+    # Silences in SOURCE time, so the caller can subtract them from its plan.
+    silences: List[SilenceInterval] = []
+    silent_seconds: float = 0.0
+    error: Optional[str] = None
+
+
+class VideoFocusRequest(BaseModel):
+    video_path: str
+    project_id: Optional[int] = None
+    samples: int = 9
+
+
+class VideoFocusResponse(BaseModel):
+    success: bool
+    # Subject's horizontal centre as a fraction of frame width (0..1).
+    # 0.5 means "no better idea than the centre".
+    focus_x: float = 0.5
+    frames_with_faces: int = 0
+    frames_sampled: int = 0
+    error: Optional[str] = None
+
 
 class GenerateThumbnailRequest(BaseModel):
     video_path: str
@@ -967,6 +1023,22 @@ def _ffmpeg_error_tail(stderr: str, max_len: int = 600) -> str:
     ]
     tail = "\n".join(lines[-8:]) if lines else stderr
     return tail[-max_len:]
+
+
+async def _probe_duration(path: str) -> Optional[float]:
+    """Container duration in seconds via ffprobe, or None if it can't be read."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            'ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+            '-of', 'default=nw=1:nk=1', path,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=30)
+        value = float(stdout.decode(errors='replace').strip())
+        return value if value > 0 else None
+    except Exception as e:
+        logger.warning(f"_probe_duration failed for {path}: {e}")
+        return None
 
 
 def _to_local_path(path: str) -> str:
@@ -1059,10 +1131,13 @@ async def cut_video_clip(request: CutVideoClipRequest):
             raise HTTPException(status_code=500, detail="Output file is empty")
         
         logger.info(f"cut-video-clip: clip created, size={file_size}, duration={duration}s")
+        # Report what the file IS, not what was asked for: the stream-copy
+        # fast path snaps to keyframes and routinely overshoots by a second or
+        # two, and the caller sizes the shared gameplay loop off this number.
         return CutVideoClipResponse(
             success=True,
             output_path=request.output_path,
-            duration=duration,
+            duration=await _probe_duration(request.output_path) or duration,
             file_size=file_size
         )
         
@@ -1148,7 +1223,7 @@ async def cut_video_segments(request: CutVideoSegmentsRequest):
         return CutVideoClipResponse(
             success=True,
             output_path=request.output_path,
-            duration=total_duration,
+            duration=await _probe_duration(request.output_path) or total_duration,
             file_size=file_size
         )
 
@@ -1266,26 +1341,49 @@ async def compose_short(request: ComposeShortRequest):
 
         os.makedirs(os.path.dirname(request.output_path), exist_ok=True)
 
+        # The short lasts exactly as long as the MAIN clip. One gameplay loop
+        # is shared by every clip in the batch, so it is sized to the longest
+        # of them; without this, vstack's framesync (shortest=0 by default)
+        # repeats the main clip's last frame until the loop runs out and every
+        # short in the batch came out padded to the longest one's length -
+        # a frozen top panel over silence. Belt and braces: shortest=1 on the
+        # stack AND an explicit -t on the output.
+        main_duration = await _probe_duration(request.main_clip_path)
+
         # Escape ASS path for FFmpeg filter
         ass_escaped = request.captions_ass_path.replace('\\', '/').replace(':', '\\:')
 
+        # Crop window on the main clip. focus_x is the subject's horizontal
+        # centre as a fraction of the SOURCE frame width (0.5 = plain centre
+        # crop, which is what the historical filter did). The window is
+        # centred on that point and clipped to stay inside the frame, so a
+        # speaker sitting off to one side is not cropped out of their own
+        # short. Commas inside the expression must be escaped for the graph.
+        focus_x = min(max(request.focus_x, 0.0), 1.0)
+        main_h = 1152 if with_gameplay else 1920
+        crop_x = rf"clip(iw*{focus_x:.4f}-out_w/2\,0\,iw-out_w)"
+
         if with_gameplay:
             filter_complex = (
-                "[0:v]scale=1080:1152:force_original_aspect_ratio=increase,"
-                "crop=1080:1152,setsar=1,fps=30[top];"
+                f"[0:v]scale=1080:{main_h}:force_original_aspect_ratio=increase,"
+                f"crop=1080:{main_h}:{crop_x}:(ih-out_h)/2,setsar=1,fps=30[top];"
                 "[1:v]scale=1080:768:force_original_aspect_ratio=increase,"
                 "crop=1080:768,setsar=1,fps=30[bottom];"
-                "[top][bottom]vstack=inputs=2[stacked];"
+                "[top][bottom]vstack=inputs=2:shortest=1[stacked];"
                 f"[stacked]ass={ass_escaped}[out]"
             )
             input_args = ['-i', request.main_clip_path, '-i', request.gameplay_clip_path]
         else:
             filter_complex = (
-                "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
-                "crop=1080:1920,setsar=1,fps=30[full];"
+                f"[0:v]scale=1080:{main_h}:force_original_aspect_ratio=increase,"
+                f"crop=1080:{main_h}:{crop_x}:(ih-out_h)/2,setsar=1,fps=30[full];"
                 f"[full]ass={ass_escaped}[out]"
             )
             input_args = ['-i', request.main_clip_path]
+
+        # Shorts are consumed at phone volume in a feed - a quiet source is a
+        # scrolled-past source. EBU R128 to the -14 LUFS streaming target.
+        audio_filter = 'loudnorm=I=-14:TP=-1.5:LRA=11'
 
         cmd = [
             'ffmpeg',
@@ -1293,15 +1391,17 @@ async def compose_short(request: ComposeShortRequest):
             '-filter_complex', filter_complex,
             '-map', '[out]',
             '-map', '0:a:0',
+            '-af', audio_filter,
             '-c:v', 'libx264',
             '-preset', 'fast',
             '-crf', '22',
             '-c:a', 'aac',
             '-b:a', '128k',
             '-movflags', '+faststart',
-            request.output_path,
-            '-y'
         ]
+        if main_duration:
+            cmd += ['-t', f"{main_duration:.3f}"]
+        cmd += [request.output_path, '-y']
         
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -1318,12 +1418,22 @@ async def compose_short(request: ComposeShortRequest):
             raise HTTPException(status_code=500, detail=f"FFmpeg error: {_ffmpeg_error_tail(error_msg)}")
         
         file_size = os.path.getsize(request.output_path)
-        
-        logger.info(f"compose-short: final short created, size={file_size}, dimensions=1080x1920")
+        out_duration = await _probe_duration(request.output_path)
+
+        logger.info(
+            f"compose-short: final short created, size={file_size}, dimensions=1080x1920, "
+            f"main={main_duration}s -> out={out_duration}s, focus_x={focus_x:.3f}"
+        )
+        if main_duration and out_duration and abs(out_duration - main_duration) > 1.0:
+            logger.warning(
+                f"compose-short: output duration {out_duration:.2f}s drifted from "
+                f"main clip {main_duration:.2f}s"
+            )
         return ComposeShortResponse(
             success=True,
             output_path=request.output_path,
-            file_size=file_size
+            file_size=file_size,
+            duration=out_duration,
         )
         
     except asyncio.TimeoutError:
@@ -1335,6 +1445,204 @@ async def compose_short(request: ComposeShortRequest):
             error=str(e),
             detail=str(e)
         )
+
+
+@app.post("/probe-duration", response_model=ProbeDurationResponse)
+async def probe_duration(request: ProbeDurationRequest):
+    """Container duration of a media file.
+
+    A null duration is a meaningful answer, not just an error: it is how the
+    caller learns a download arrived truncated (a headerless MP4 that ffprobe
+    cannot open at all) before spending minutes on it.
+    """
+    path = _to_local_path(request.path)
+    if not os.path.exists(path):
+        return ProbeDurationResponse(success=False, error=f"Not found: {path}")
+
+    duration = await _probe_duration(path)
+    if duration is None:
+        return ProbeDurationResponse(success=False, error="Unreadable or corrupt media")
+
+    return ProbeDurationResponse(success=True, duration=round(duration, 3))
+
+
+@app.post("/detect-silence", response_model=DetectSilenceResponse)
+async def detect_silence(request: DetectSilenceRequest):
+    """Measured dead air inside one range of a video, via ffmpeg silencedetect.
+
+    The caller's edit plan is built from transcript gaps, but YouTube's
+    auto-captions are timed back-to-back: a segment's end is the next
+    segment's start even across ten seconds of nothing, so gap-based
+    detection finds no silence at all on that path. This listens to the
+    audio instead. Non-fatal: an error returns no silences, and the caller
+    falls back to the transcript-only plan.
+    """
+    try:
+        source = _to_local_path(request.source_path)
+        if not os.path.exists(source):
+            return DetectSilenceResponse(success=False, error=f"Source not found: {source}")
+
+        start = max(0.0, float(request.start_seconds))
+        end = float(request.end_seconds)
+        if end <= start:
+            return DetectSilenceResponse(success=False, error="Invalid range")
+
+        cmd = [
+            'ffmpeg', '-hide_banner', '-nostats',
+            '-ss', f"{start:.3f}", '-t', f"{end - start:.3f}",
+            '-i', source,
+            '-map', '0:a:0',
+            '-af', f"silencedetect=noise={request.noise_db}dB:d={request.min_silence_seconds}",
+            '-f', 'null', '-',
+        ]
+
+        proc = await asyncio.create_subprocess_exec(
+            *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            limit=256 * 1024,
+        )
+        _, stderr = await asyncio.wait_for(proc.communicate(), timeout=180)
+        log = stderr.decode(errors='replace')
+
+        # silencedetect reports offsets relative to the trimmed input; shift
+        # them back onto the source clock before handing them over.
+        silences = []
+        pending = None
+        for line in log.splitlines():
+            if 'silence_start:' in line:
+                try:
+                    pending = float(line.split('silence_start:')[1].strip().split()[0])
+                except (ValueError, IndexError):
+                    pending = None
+            elif 'silence_end:' in line and pending is not None:
+                try:
+                    ends_at = float(line.split('silence_end:')[1].strip().split('|')[0].strip())
+                except (ValueError, IndexError):
+                    pending = None
+                    continue
+                silences.append(SilenceInterval(
+                    start_seconds=round(start + pending, 3),
+                    end_seconds=round(start + ends_at, 3),
+                ))
+                pending = None
+
+        # A silence still open at EOF runs to the end of the range.
+        if pending is not None:
+            silences.append(SilenceInterval(
+                start_seconds=round(start + pending, 3),
+                end_seconds=round(end, 3),
+            ))
+
+        total = sum(x.end_seconds - x.start_seconds for x in silences)
+        logger.info(
+            f"detect-silence: {len(silences)} silence(s), {total:.2f}s of "
+            f"{end - start:.2f}s in {os.path.basename(source)}"
+        )
+        return DetectSilenceResponse(
+            success=True, silences=silences, silent_seconds=round(total, 3)
+        )
+
+    except asyncio.TimeoutError:
+        return DetectSilenceResponse(success=False, error="Silence detection timed out")
+    except Exception as e:
+        logger.warning(f"detect-silence error (non-fatal): {e}")
+        return DetectSilenceResponse(success=False, error=str(e))
+
+
+def _face_focus_x(video_path: str, samples: int) -> tuple:
+    """Median horizontal face centre across evenly-spaced frames.
+
+    A 16:9 talking-head cropped blindly to 9:16 loses whoever is not sitting
+    dead centre. Haar cascades are crude but they only have to answer "which
+    third of the frame is the person in", which is all the crop needs.
+    Returns (focus_x, frames_with_faces, frames_sampled).
+    """
+    import cv2
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return 0.5, 0, 0
+
+    try:
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        width = float(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+        if total <= 0 or width <= 0:
+            return 0.5, 0, 0
+
+        cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        )
+        if cascade.empty():
+            return 0.5, 0, 0
+
+        samples = max(3, min(24, samples))
+        centres = []
+        sampled = 0
+
+        for i in range(samples):
+            # Skip the very first and last frames: cuts and fades live there.
+            pos = int(total * (i + 0.5) / samples)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, pos)
+            ok, frame = cap.read()
+            if not ok or frame is None:
+                continue
+            sampled += 1
+
+            # Detect on a downscaled grayscale copy - 8x less work, same answer.
+            h, w = frame.shape[:2]
+            scale = 480.0 / max(1, w)
+            small = cv2.resize(frame, (int(w * scale), int(h * scale)))
+            gray = cv2.cvtColor(small, cv2.COLOR_BGR2GRAY)
+            gray = cv2.equalizeHist(gray)
+
+            faces = cascade.detectMultiScale(gray, scaleFactor=1.15, minNeighbors=6,
+                                             minSize=(28, 28))
+            if len(faces) == 0:
+                continue
+
+            # The biggest face is the subject; extras are background people.
+            fx, fy, fw, fh = max(faces, key=lambda f: f[2] * f[3])
+            centres.append((fx + fw / 2.0) / float(small.shape[1]))
+
+        if not centres:
+            return 0.5, 0, sampled
+
+        centres.sort()
+        median = centres[len(centres) // 2]
+
+        # Never swing the frame further than necessary: a jittery detection on
+        # a handful of frames should nudge the crop, not fling it to an edge.
+        focus = 0.5 + (median - 0.5) * 0.85
+        return round(min(max(focus, 0.05), 0.95), 4), len(centres), sampled
+    finally:
+        cap.release()
+
+
+@app.post("/video-focus", response_model=VideoFocusResponse)
+async def video_focus(request: VideoFocusRequest):
+    """Where the subject sits horizontally, so a 9:16 crop can follow them.
+
+    Non-fatal by contract: any failure returns focus_x=0.5, which reproduces
+    the plain centre crop the caller would have used anyway.
+    """
+    try:
+        path = _to_local_path(request.video_path)
+        if not os.path.exists(path):
+            return VideoFocusResponse(success=False, error=f"Video not found: {path}")
+
+        focus_x, hits, sampled = await asyncio.to_thread(
+            _face_focus_x, path, request.samples
+        )
+        logger.info(
+            f"video-focus: {os.path.basename(path)} focus_x={focus_x} "
+            f"({hits}/{sampled} frames had a face)"
+        )
+        return VideoFocusResponse(
+            success=True, focus_x=focus_x,
+            frames_with_faces=hits, frames_sampled=sampled,
+        )
+    except Exception as e:
+        logger.warning(f"video-focus error (non-fatal): {e}")
+        return VideoFocusResponse(success=False, error=str(e))
 
 
 @app.post("/generate-thumbnail", response_model=GenerateThumbnailResponse)
