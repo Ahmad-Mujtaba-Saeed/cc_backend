@@ -84,6 +84,21 @@ and "What is a derivative, visually?" are all maths (proof_concept) even though 
 is_math is FALSE for everything else, INCLUDING topics that merely mention numbers, statistics,
 money, dates or growth. A video about company revenue, sports records, population growth or
 "the maths of dating" is NOT a maths video — its numbers are evidence, not the subject.
+
+THE TEST THAT DECIDES THE HARD CASES: what is the video ABOUT?
+If the subject is a THING IN THE WORLD — a headphone, an atom, a bank account, a virus, an
+engine, a market — then the answer is FALSE even when the script states an equation and draws
+a curve, because the maths is the EVIDENCE and the thing is the subject. If the subject is the
+mathematics itself — an identity, a theorem, a figure, an operation, a problem to solve — the
+answer is TRUE.
+  "How noise cancelling headphones work" (states a sine wave, sums two waves) -> FALSE, it is about headphones
+  "What a half life really means" (states N = N0 e^-lt, draws the decay curve) -> FALSE, it is about radioactive decay
+  "Why compound interest feels slow then is not" (states the formula, draws the curve) -> FALSE, it is about money over time
+  "Why does a^2 + b^2 = c^2" -> TRUE, the subject IS the theorem
+  "What is a derivative, visually?" -> TRUE, the subject IS the operation
+Answering FALSE costs a science video NOTHING: the ordinary explainer path draws equations and
+curves natively too (formula_anatomy, function_plot, math_steps are available to every video).
+Answering TRUE for one costs it every photograph, every upload slot, and its whole structure.
 When genuinely unsure, answer false.
 PROMPT;
 
@@ -122,6 +137,32 @@ PROMPT;
         $kind = (string) ($parsed['kind'] ?? '');
         $out = ['kind' => in_array($kind, self::KINDS, true) ? $kind : 'proof_concept'];
 
+        // GUARANTEE OVER PROMPT (bench iter 55). The prompt above now states
+        // the "what is it ABOUT" test outright, but a prompt rule the model
+        // quietly ignores is worth nothing, and this is the most expensive
+        // misroute in the pipeline: three of the bench's thirty scripts — noise
+        // cancelling, compound interest, radioactive half life — came back
+        // `proof_concept` because they state an equation and draw a curve, and
+        // composeProof then produced a 51-72 second single figure, narration
+        // that describes the visual instead of speaking it, and not one picture
+        // in the whole video (47-49 out of 100 against a corpus mean of 85.7).
+        //
+        // So a proof has to LOOK like a mathematical argument in its own words.
+        // Only `proof_concept` is gated: a worked problem is a solve, and a
+        // physics word problem ("a ball thrown from a roof") legitimately
+        // contains none of these markers.
+        //
+        // A false demotion is cheap and a false promotion is not. Since iter 43
+        // the ordinary path offers math_steps, formula_anatomy and function_plot
+        // in its menus, so a demoted maths-concept video still draws its
+        // equation and its curve natively; it merely loses the board. The one
+        // thing that must never be demoted is a FIGURE video, where the uploads
+        // this classifier exists to prevent do the real damage — which is why
+        // the geometry vocabulary is the longest list below.
+        if ($out['kind'] === 'proof_concept' && !self::looksLikeMathArgument($title . ' ' . $script)) {
+            return [];
+        }
+
         $subject = trim((string) ($parsed['subject'] ?? ''));
         if ($subject !== '') {
             $out['subject'] = mb_substr($subject, 0, 80);
@@ -146,6 +187,60 @@ PROMPT;
         }
 
         return $out;
+    }
+
+    /**
+     * Does this text argue MATHEMATICS, rather than use it as evidence?
+     *
+     * The gate on `proof_concept` (see classify()). It asks for one word that
+     * a script explaining a thing in the world would not lean on: the language
+     * of proof, of geometric figures, or of a named mathematical object.
+     *
+     * Deliberately vocabulary-based rather than clever. The failing cases all
+     * STATE equations and DRAW curves, so neither an equals sign nor the word
+     * "curve" can separate them — what separates them is that a proof talks
+     * about triangles, identities, derivatives and theorems, and a headphone
+     * explainer talks about headphones.
+     */
+    public static function looksLikeMathArgument(string $text): bool
+    {
+        $t = mb_strtolower($text);
+
+        // The act of arguing mathematics.
+        $argument = '/\b(prove[sdn]?|proof|theorem|lemma|corollary|axiom|postulate|identity|identities|'
+            . 'derivation|derives?|derived|q\.?e\.?d|counterexample|'
+            . 'must show|we show that|it follows that|holds for (all|every)|by definition)\b/';
+        if (preg_match($argument, $t)) {
+            return true;
+        }
+
+        // Geometry — the case where a misroute costs the most, because the
+        // renderer draws these figures and the generic path would ask for a
+        // photograph of one.
+        $figures = '/\b(triangle|triangles|hypotenuse|right angle|angles?|degrees? angle|'
+            . 'polygon|quadrilateral|parallelogram|rhombus|trapezium|trapezoid|'
+            . 'circumference|diameter|radius|radii|chord|arc length|tangent line|'
+            . 'vertex|vertices|congruent|similar triangles|parallel lines|perpendicular|'
+            . 'bisect(s|or|ed)?|pythagoras|pythagorean|euclid|area of (a|the)|volume of (a|the))\b/';
+        if (preg_match($figures, $t)) {
+            return true;
+        }
+
+        // Named mathematical objects and operations.
+        $objects = '/\b(derivative|derivatives|integral|integrals|integrate|differentiate|'
+            . 'limit of|factorise|factorize|factoring|quadratic|polynomial|binomial|'
+            . 'logarithm|logarithms|matrix|matrices|vector|vectors|scalar|'
+            . 'permutation|combination|factorial|prime number|primes|modulo|'
+            . 'sine rule|cosine rule|trigonometry|trigonometric|sin|cos|tan|'
+            . 'numerator|denominator|coefficients?|inequality|simultaneous equations|'
+            . 'solve for|equation for x|square root of|'
+            // The moves of doing algebra. Gated behind a classifier that has
+            // already said "maths", so "the deciding factors" costing a video
+            // its demotion is a non-event; missing a real solve is not.
+            . 'factors?|factored|factoring|substitute|simplif(y|ies|ied)|'
+            . 'both sides|expand the bracket|middle term|common bracket)\b/';
+
+        return (bool) preg_match($objects, $t);
     }
 
     /**

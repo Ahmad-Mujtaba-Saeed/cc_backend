@@ -1,0 +1,1524 @@
+{
+    "tag": "smoke",
+    "started_at": "2026-09-01T06:53:32+00:00",
+    "aspect": "16:9",
+    "model": "gpt-4.1-mini",
+    "explainer_model": "gpt-4.1-mini",
+    "director_model": "gpt-4.1-mini",
+    "with_director": true,
+    "repeat": 1,
+    "cases": [
+        {
+            "title": "Everything on your boarding pass",
+            "shape": "argument",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Boarding passes look like receipts but hide secret info"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Explain boarding pass fields serve hidden purposes"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Passenger name matches reservation exactly, middle initial matters"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Flight number encodes airline and direction with even/odd digits"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Seat letter shows boarding group, affecting bag handling"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Corner string signals security screening level before airport"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Barcode stores personal data unencrypted, risky to share"
+                },
+                {
+                    "intent": "resolution",
+                    "brief": "Each field added due to past problems"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "Understanding boarding pass reveals hidden travel insights"
+                }
+            ],
+            "attempts": 2,
+            "composed_by_tree": true,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "layout_template": "quote_card",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "A boarding pass looks like a receipt, but almost every field on it is doing something you were never told about."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "A boarding pass looks like a receipt, but almost every field on it is doing something you were never told about.",
+                            "bullets": [
+                                "— anonymous travel insight"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "layout_template": "labeled_diagram",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Each field on a boarding pass serves a hidden purpose beyond what you see. They encode information about your flight, status, and security that helps airlines and airports operate smoothly."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_diagram": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "a clean, centered boarding pass on plain background with no text",
+                                "search_query": "boarding pass plain",
+                                "media_kind": "image",
+                                "guidance": "A clear, well-lit photo of a single boarding pass on a plain background, no text overlays."
+                            },
+                            "heading": "Boarding pass fields",
+                            "callout_suggestions": [
+                                "Passenger Name",
+                                "Flight Number",
+                                "Seat Letter",
+                                "Corner String"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "layout_template": "myth_fact",
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "The passenger name matches the reservation exactly. That middle initial can actually matter at the gate, not just the first and last names."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "The middle initial on a boarding pass doesn't matter.",
+                            "fact": "The passenger name must match the reservation exactly, including middle initial.",
+                            "heading": "Passenger Name Accuracy"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "layout_template": "formula_anatomy",
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "The flight number encodes the airline's two-letter code plus up to four digits. Even numbers usually indicate eastbound or northbound flights, odd numbers the return leg."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_formula": {
+                            "content_type": "formula",
+                            "formula": "XX1234",
+                            "parts": [
+                                {
+                                    "match": "XX",
+                                    "label": "Airline code"
+                                },
+                                {
+                                    "match": "1234",
+                                    "label": "Flight number digits"
+                                }
+                            ],
+                            "heading": "Flight Number Format"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "layout_template": "stat_spotlight",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "The seat letter shows your boarding group, which is set by fare class and status. This is the only field that determines how your bag is handled."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Seat Letter Indicates Boarding Group",
+                            "bullets": [
+                                "Boarding group affects bag handling and boarding order."
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "A short string in the corner, like S or SSSS, signals your security screening level before you even reach the airport."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "boarding pass corner showing security screening string",
+                                "search_query": "boarding pass corner security",
+                                "media_kind": "image",
+                                "guidance": "Close-up photo of a boarding pass corner highlighting the security screening string, clear and focused."
+                            },
+                            "camera_move": "slow_zoom_in"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "The barcode at the bottom is not encrypted. It stores your name, record locator, and frequent flyer number in plain text, so sharing photos of your pass is risky."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "boarding pass barcode close-up",
+                                "search_query": "boarding pass barcode",
+                                "media_kind": "image",
+                                "guidance": "Close-up image of a boarding pass barcode, clear and sharp, showing the barcode area."
+                            },
+                            "camera_move": "slow_zoom_in"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "layout_template": "receipt_card",
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "Every one of these fields was added because something went wrong once. They are solutions to past problems in air travel."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_receipt": {
+                            "content_type": "receipt",
+                            "rows": [
+                                {
+                                    "label": "Passenger name accuracy",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Flight number coding",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Boarding group seat letter",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Security screening string",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Unencrypted barcode risks",
+                                    "value": 1
+                                }
+                            ],
+                            "heading": "Fields Added Due to Past Problems",
+                            "caption": "Each field addresses a specific issue encountered in air travel."
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_9",
+                    "order": 9,
+                    "layout_template": "full_bleed_with_banner",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Understanding your boarding pass reveals hidden travel insights that help you navigate the airport and protect your personal data."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "traveler holding boarding pass at airport gate",
+                                "search_query": "traveler boarding pass airport",
+                                "media_kind": "image",
+                                "guidance": "A natural photo of a traveler holding a boarding pass at an airport gate, showing the pass clearly but not close-up."
+                            }
+                        },
+                        "slot_banner": {
+                            "content_type": "text_block",
+                            "heading": "Unlock Hidden Travel Insights"
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 8.4,
+                    "narration": {
+                        "text": "A boarding pass looks like a receipt, but almost every field on it is doing something you were never told about."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "A boarding pass looks like a receipt, but almost every field on it is doing something you were never told about.",
+                            "bullets": [
+                                "— anonymous travel insight"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Each field on a boarding pass serves a hidden purpose beyond what you see. They encode information about your flight, status, and security that helps airlines and airports operate smoothly."
+                    },
+                    "layout_template": "labeled_diagram",
+                    "slots": {
+                        "slot_diagram": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "a clean, centered boarding pass on plain background with no text",
+                                "search_query": "boarding pass plain",
+                                "guidance": "A clear, well-lit photo of a single boarding pass on a plain background, no text overlays.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": [
+                                "Passenger Name",
+                                "Flight Number",
+                                "Seat Letter",
+                                "Corner String"
+                            ],
+                            "heading": "Boarding pass fields"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 9.2,
+                    "narration": {
+                        "text": "The passenger name matches the reservation exactly. That middle initial can actually matter at the gate, not just the first and last names."
+                    },
+                    "layout_template": "myth_fact",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "The middle initial on a boarding pass doesn't matter.",
+                            "fact": "The passenger name must match the reservation exactly, including middle initial.",
+                            "heading": "Passenger Name Accuracy"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 10.4,
+                    "narration": {
+                        "text": "The flight number encodes the airline's two-letter code plus up to four digits. Even numbers usually indicate eastbound or northbound flights, odd numbers the return leg."
+                    },
+                    "layout_template": "formula_anatomy",
+                    "slots": {
+                        "slot_formula": {
+                            "content_type": "formula",
+                            "formula": "XX1234",
+                            "parts": [
+                                {
+                                    "match": "XX",
+                                    "label": "Airline code"
+                                },
+                                {
+                                    "match": "1234",
+                                    "label": "Flight number digits"
+                                }
+                            ],
+                            "heading": "Flight Number Format"
+                        }
+                    },
+                    "transition": "push_left",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 10.8,
+                    "narration": {
+                        "text": "The seat letter shows your boarding group, which is set by fare class and status. This is the only field that determines how your bag is handled."
+                    },
+                    "layout_template": "stat_spotlight",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Seat Letter Indicates Boarding Group",
+                            "bullets": [
+                                "Boarding group affects bag handling and boarding order."
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 8.4,
+                    "narration": {
+                        "text": "A short string in the corner, like S or SSSS, signals your security screening level before you even reach the airport."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "slow_zoom_in",
+                            "asset_request": {
+                                "description": "boarding pass corner showing security screening string",
+                                "search_query": "boarding pass corner security",
+                                "guidance": "Close-up photo of a boarding pass corner highlighting the security screening string, clear and focused.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 11.6,
+                    "narration": {
+                        "text": "The barcode at the bottom is not encrypted. It stores your name, record locator, and frequent flyer number in plain text, so sharing photos of your pass is risky."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "slow_zoom_in",
+                            "asset_request": {
+                                "description": "boarding pass barcode close-up",
+                                "search_query": "boarding pass barcode",
+                                "guidance": "Close-up image of a boarding pass barcode, clear and sharp, showing the barcode area.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        }
+                    },
+                    "transition": "mask_wipe_diagonal",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "Every one of these fields was added because something went wrong once. They are solutions to past problems in air travel."
+                    },
+                    "layout_template": "receipt_card",
+                    "slots": {
+                        "slot_receipt": {
+                            "content_type": "receipt",
+                            "rows": [
+                                {
+                                    "label": "Passenger name accuracy",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Flight number coding",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Boarding group seat letter",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Security screening string",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Unencrypted barcode risks",
+                                    "value": 1
+                                }
+                            ],
+                            "total": 5,
+                            "heading": "Fields Added Due to Past Problems",
+                            "caption": "Each field addresses a specific issue encountered in air travel."
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_9",
+                    "order": 9,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Understanding your boarding pass reveals hidden travel insights that help you navigate the airport and protect your personal data."
+                    },
+                    "layout_template": "full_bleed_with_banner",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "traveler holding boarding pass at airport gate",
+                                "search_query": "traveler boarding pass airport",
+                                "guidance": "A natural photo of a traveler holding a boarding pass at an airport gate, showing the pass clearly but not close-up.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_banner": {
+                            "content_type": "text_block",
+                            "heading": "Unlock Hidden Travel Insights",
+                            "bullets": [
+                                "Understanding your boarding pass reveals hidden travel insights that help you navigate the airport and protect your pers"
+                            ],
+                            "reveal": "sequential",
+                            "dock": "bottom"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_4: broke a run of 'fade' transitions -> 'push_left'.",
+                "Scene scene_7: broke a run of 'fade' transitions -> 'mask_wipe_diagonal'.",
+                "No peak card in the window starting at 0s (nothing safely upgradeable).",
+                "No peak card in the window starting at 52s (nothing safely upgradeable)."
+            ],
+            "plan_items": [
+                {
+                    "scene_id": "scene_1",
+                    "treatment": "hero_open",
+                    "relation": "opening",
+                    "camera_move": "push_in"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "drift"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "orbit"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "rise"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "sway"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "treatment": "zoom_nest",
+                    "relation": "elaborates",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "treatment": "canvas_hop",
+                    "relation": "consequence",
+                    "camera_move": "settle_back"
+                },
+                {
+                    "scene_id": "scene_9",
+                    "treatment": "canvas_hop",
+                    "relation": "consequence",
+                    "camera_move": "orbit"
+                }
+            ],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "warn",
+                        "code": "static_hold",
+                        "scene_id": "scene_1",
+                        "message": "8.4s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "static_hold",
+                        "scene_id": "scene_5",
+                        "message": "10.8s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card between 0s and 52s."
+                    },
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card in the final stretch (from 52s)."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 2,
+                    "info": 2
+                },
+                "checked_at": "2026-09-01T06:54:14+00:00"
+            },
+            "id": "boarding-pass",
+            "pass": 1,
+            "seconds": 42.3,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 0.8999999999999999,
+                    "variety": 0.9999999999999999,
+                    "media": 0.9249999999999999,
+                    "pacing": 0.8,
+                    "lint": 1,
+                    "flights": 1
+                },
+                "total": 93.4,
+                "findings": [
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no custom_card — the card doc names a boarding pass as its example — if it is not cast here it will not be cast anywhere"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "brief_guidance",
+                        "message": "2 of 4 guidance lines never say what to AVOID (the prompt asks for it)"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "runtime",
+                        "message": "91s against a 70s target (130%)"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:static_hold",
+                        "message": "scene_1: 8.4s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:static_hold",
+                        "message": "scene_5: 10.8s hold with no progressive reveal — split the beat or add bullets."
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 9,
+                        "templates": [
+                            "quote_card",
+                            "labeled_diagram",
+                            "myth_fact",
+                            "formula_anatomy",
+                            "stat_spotlight",
+                            "single_focus",
+                            "receipt_card",
+                            "full_bleed_with_banner"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "labeled_diagram",
+                            "myth_fact",
+                            "formula_anatomy",
+                            "stat_spotlight",
+                            "single_focus",
+                            "single_focus",
+                            "receipt_card",
+                            "full_bleed_with_banner"
+                        ],
+                        "counts": {
+                            "single_focus": 2,
+                            "quote_card": 1,
+                            "labeled_diagram": 1,
+                            "myth_fact": 1,
+                            "formula_anatomy": 1,
+                            "stat_spotlight": 1,
+                            "receipt_card": 1,
+                            "full_bleed_with_banner": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.2222222222222222,
+                        "max_streak": 2,
+                        "streak_template": "single_focus",
+                        "media_scenes": 4,
+                        "media_share": 0.4444444444444444,
+                        "total_seconds": 90.8,
+                        "min_seconds": 8.4,
+                        "max_seconds": 13,
+                        "spread": 4.6,
+                        "brief": {
+                            "slots": 4,
+                            "query_ok": 4,
+                            "kind_ok": 4,
+                            "guidance_with_avoid": 2,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 9,
+                        "templates": [
+                            "quote_card",
+                            "labeled_diagram",
+                            "myth_fact",
+                            "formula_anatomy",
+                            "stat_spotlight",
+                            "single_focus",
+                            "receipt_card",
+                            "full_bleed_with_banner"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "labeled_diagram",
+                            "myth_fact",
+                            "formula_anatomy",
+                            "stat_spotlight",
+                            "single_focus",
+                            "single_focus",
+                            "receipt_card",
+                            "full_bleed_with_banner"
+                        ],
+                        "counts": {
+                            "single_focus": 2,
+                            "quote_card": 1,
+                            "labeled_diagram": 1,
+                            "myth_fact": 1,
+                            "formula_anatomy": 1,
+                            "stat_spotlight": 1,
+                            "receipt_card": 1,
+                            "full_bleed_with_banner": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.2222222222222222,
+                        "max_streak": 2,
+                        "streak_template": "single_focus",
+                        "media_scenes": 4,
+                        "media_share": 0.4444444444444444,
+                        "total_seconds": 70,
+                        "min_seconds": 5,
+                        "max_seconds": 13,
+                        "spread": 8,
+                        "brief": {
+                            "slots": 4,
+                            "query_ok": 4,
+                            "kind_ok": 4,
+                            "guidance_with_avoid": 2,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "argument",
+                    "phases": 9,
+                    "math_mode": false,
+                    "target_seconds": 70,
+                    "attempts": 2,
+                    "composed_by_tree": true,
+                    "validator_warnings": 4
+                }
+            }
+        },
+        {
+            "title": "Four cities, four front doors",
+            "shape": "journey",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Every city has a personality shown in its front doors"
+                },
+                {
+                    "intent": "origin",
+                    "brief": "Introduce front doors as reflections of city character"
+                },
+                {
+                    "intent": "era",
+                    "brief": "Amsterdam doors lean forward with hoisting beams for furniture"
+                },
+                {
+                    "intent": "era",
+                    "brief": "Marrakesh doors are heavy, blank, facing inward to courtyards"
+                },
+                {
+                    "intent": "era",
+                    "brief": "Kyoto doors use wooden lattice and sliding paper screens"
+                },
+                {
+                    "intent": "era",
+                    "brief": "Reykjavik houses painted bright to combat scarce winter light"
+                },
+                {
+                    "intent": "turning_point",
+                    "brief": "Each door solves a unique local problem, not just decoration"
+                },
+                {
+                    "intent": "legacy",
+                    "brief": "Vernacular architecture evolves through many small, lived corrections"
+                }
+            ],
+            "attempts": 1,
+            "composed_by_tree": true,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "layout_template": "full_bleed_with_banner",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "Every city has a personality, and you can read it off the front doors."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "a variety of colorful front doors from different cities",
+                                "search_query": "colorful front doors city",
+                                "media_kind": "image",
+                                "guidance": "A vibrant, well-lit photo showing diverse front doors from multiple cities, avoiding overly staged or artificial looks."
+                            }
+                        },
+                        "slot_banner": {
+                            "content_type": "text_block",
+                            "heading": "Every city has a personality"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "layout_template": "map_card",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Front doors reflect the character of their cities. They tell stories about the people and the environment around them."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_map": {
+                            "content_type": "map",
+                            "pins": [
+                                {
+                                    "label": "Amsterdam",
+                                    "lat": 52.3676,
+                                    "lon": 4.9041
+                                },
+                                {
+                                    "label": "Marrakesh",
+                                    "lat": 31.6295,
+                                    "lon": -7.9811
+                                }
+                            ],
+                            "region": "world"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "layout_template": "full_bleed_with_side_panel",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "In Amsterdam, houses lean forward over the canals. They are narrow and tall, with a hoisting beam at the top because the staircases were too tight to carry furniture up."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "narrow tall Amsterdam houses leaning over a canal with hoisting beams",
+                                "search_query": "Amsterdam canal houses hoisting beam",
+                                "media_kind": "image",
+                                "guidance": "A clear photo of Amsterdam canal houses showing the leaning facade and hoisting beam, preferably in daylight."
+                            }
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Amsterdam Doors",
+                            "bullets": [
+                                "Houses lean forward over canals",
+                                "Narrow and tall design",
+                                "Hoisting beams for moving furniture"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "layout_template": "image_grid",
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "In Marrakesh, the street front is almost blank. Heavy studded doors face inward to courtyards, keeping family life private and protected from the outside world."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_image_1": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "heavy studded Marrakesh door",
+                                "search_query": "Marrakesh heavy door",
+                                "media_kind": "image",
+                                "guidance": "A detailed photo of a heavy, studded door typical in Marrakesh, showing texture and craftsmanship."
+                            },
+                            "label": "Studded Door"
+                        },
+                        "slot_image_2": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "Marrakesh courtyard hidden behind doors",
+                                "search_query": "Marrakesh courtyard",
+                                "media_kind": "image",
+                                "guidance": "A photo showing a private courtyard behind a door in Marrakesh, emphasizing privacy."
+                            },
+                            "label": "Private Courtyard"
+                        },
+                        "slot_image_3": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "Marrakesh street with blank facades",
+                                "search_query": "Marrakesh street blank facade",
+                                "media_kind": "image",
+                                "guidance": "A street view in Marrakesh showing blank facades and minimal street-facing windows."
+                            },
+                            "label": "Blank Facade"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "Kyoto doors use wooden lattice screens and sliding paper doors, creating a boundary that can be opened by just a hand’s width."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "",
+                            "bullets": []
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "In Reykjavik, houses are wrapped in corrugated iron and painted bright colors to brighten the scarce winter light."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "Reykjavik houses painted in bright colors with corrugated iron",
+                                "search_query": "Reykjavik colorful houses corrugated iron",
+                                "media_kind": "image",
+                                "guidance": "A vivid photo of brightly painted Reykjavik houses with corrugated iron siding, in winter light."
+                            },
+                            "camera_move": "slow_zoom_in"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "layout_template": "stat_spotlight",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "Each door solves a unique local problem, not just decoration."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Not Just Decoration",
+                            "bullets": [
+                                "Each door addresses a local challenge"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "layout_template": "big_counter",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "Vernacular architecture evolves through thousands of small, lived corrections, each improving on the last."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_counter": {
+                            "content_type": "text_block",
+                            "heading": "Thousands of Corrections",
+                            "bullets": [
+                                "Small changes made by everyday people"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "Every city has a personality, and you can read it off the front doors."
+                    },
+                    "layout_template": "full_bleed_with_banner",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "a variety of colorful front doors from different cities",
+                                "search_query": "colorful front doors city",
+                                "guidance": "A vibrant, well-lit photo showing diverse front doors from multiple cities, avoiding overly staged or artificial looks.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_banner": {
+                            "content_type": "text_block",
+                            "heading": "Every city has a personality",
+                            "bullets": [
+                                "Every city has a personality, and you can read it off the front doors."
+                            ],
+                            "reveal": "sequential",
+                            "dock": "bottom"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Front doors reflect the character of their cities. They tell stories about the people and the environment around them."
+                    },
+                    "layout_template": "map_card",
+                    "slots": {
+                        "slot_map": {
+                            "content_type": "map",
+                            "pins": [
+                                {
+                                    "label": "Amsterdam",
+                                    "lat": 52.368,
+                                    "lon": 4.904
+                                },
+                                {
+                                    "label": "Marrakesh",
+                                    "lat": 31.63,
+                                    "lon": -7.981
+                                }
+                            ],
+                            "region": "world",
+                            "route": false
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "In Amsterdam, houses lean forward over the canals. They are narrow and tall, with a hoisting beam at the top because the staircases were too tight to carry furniture up."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "pan_up_zoom_in",
+                            "asset_request": {
+                                "description": "narrow tall Amsterdam houses leaning over a canal with hoisting beams",
+                                "search_query": "amsterdam canal houses hoisting",
+                                "guidance": "A clear photo of Amsterdam canal houses showing the leaning facade and hoisting beam, preferably in daylight.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Amsterdam Doors",
+                            "bullets": [
+                                "Houses lean forward over canals",
+                                "Narrow and tall design",
+                                "Hoisting beams for moving furniture"
+                            ],
+                            "reveal": "sequential",
+                            "dock": "right",
+                            "width_pct": 33
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "In Marrakesh, the street front is almost blank. Heavy studded doors face inward to courtyards, keeping family life private and protected from the outside world."
+                    },
+                    "layout_template": "image_grid",
+                    "slots": {
+                        "slot_image_1": {
+                            "content_type": "image",
+                            "label": "Studded Door",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "heavy studded Marrakesh door",
+                                "search_query": "marrakesh heavy door",
+                                "guidance": "A detailed photo of a heavy, studded door typical in Marrakesh, showing texture and craftsmanship.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_image_2": {
+                            "content_type": "image",
+                            "label": "Private Courtyard",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "Marrakesh courtyard hidden behind doors",
+                                "search_query": "marrakesh courtyard",
+                                "guidance": "A photo showing a private courtyard behind a door in Marrakesh, emphasizing privacy.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_image_3": {
+                            "content_type": "image",
+                            "label": "Blank Facade",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "Marrakesh street with blank facades",
+                                "search_query": "marrakesh street blank facade",
+                                "guidance": "A street view in Marrakesh showing blank facades and minimal street-facing windows.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        }
+                    },
+                    "transition": "push_left",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 9.2,
+                    "narration": {
+                        "text": "Kyoto doors use wooden lattice screens and sliding paper doors, creating a boundary that can be opened by just a hand’s width."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Key Point",
+                            "bullets": [
+                                "Kyoto doors use wooden lattice screens and sliding paper doors, creating a boundary that can be opened by just a hand’s "
+                            ],
+                            "reveal": "all_at_once"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "In Reykjavik, houses are wrapped in corrugated iron and painted bright colors to brighten the scarce winter light."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "slow_zoom_in",
+                            "asset_request": {
+                                "description": "Reykjavik houses painted in bright colors with corrugated iron",
+                                "search_query": "reykjavik colorful houses corrugated",
+                                "guidance": "A vivid photo of brightly painted Reykjavik houses with corrugated iron siding, in winter light.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "Each door solves a unique local problem, not just decoration."
+                    },
+                    "layout_template": "stat_spotlight",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Not Just Decoration",
+                            "bullets": [
+                                "Each door addresses a local challenge"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "mask_wipe_diagonal",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "Vernacular architecture evolves through thousands of small, lived corrections, each improving on the last."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Thousands of Corrections",
+                            "bullets": [
+                                "Vernacular architecture evolves through thousands of small, lived corrections, each improving on the last."
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_5/slot_main: text_block empty -> built from narration.",
+                "Scene scene_8: big_counter without a figure -> single_focus.",
+                "Scene scene_4: broke a run of 'fade' transitions -> 'push_left'.",
+                "Scene scene_7: broke a run of 'fade' transitions -> 'mask_wipe_diagonal'.",
+                "No peak card in the window starting at 0s (nothing safely upgradeable)."
+            ],
+            "plan_items": [
+                {
+                    "scene_id": "scene_1",
+                    "treatment": "hero_open",
+                    "relation": "opening",
+                    "camera_move": "push_in"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "treatment": "same_frame",
+                    "relation": "consequence",
+                    "camera_move": "drift"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "treatment": "canvas_hop",
+                    "relation": "contrast",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "orbit"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "treatment": "same_frame",
+                    "relation": "consequence",
+                    "camera_move": "settle_back"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "treatment": "pull_reveal",
+                    "relation": "new_chapter",
+                    "camera_move": "rise"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                }
+            ],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "warn",
+                        "code": "static_hold",
+                        "scene_id": "scene_5",
+                        "message": "9.2s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card between 0s and 50s."
+                    },
+                    {
+                        "severity": "info",
+                        "code": "sync_gap",
+                        "scene_id": "scene_4",
+                        "message": "Spoken but never shown: Marrakesh."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 1,
+                    "info": 2
+                },
+                "checked_at": "2026-09-01T06:54:39+00:00"
+            },
+            "id": "front-doors",
+            "pass": 1,
+            "seconds": 24.8,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 1,
+                    "variety": 0.7000000000000001,
+                    "media": 0.875,
+                    "pacing": 1,
+                    "lint": 1,
+                    "flights": 1
+                },
+                "total": 93.6,
+                "findings": [
+                    {
+                        "severity": "warn",
+                        "code": "single_focus",
+                        "message": "3 of 8 scenes are single_focus (38%)"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "brief_guidance",
+                        "message": "5 of 6 guidance lines never say what to AVOID (the prompt asks for it)"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:static_hold",
+                        "message": "scene_5: 9.2s hold with no progressive reveal — split the beat or add bullets."
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 8,
+                        "templates": [
+                            "full_bleed_with_banner",
+                            "map_card",
+                            "full_bleed_with_side_panel",
+                            "image_grid",
+                            "single_focus",
+                            "stat_spotlight"
+                        ],
+                        "order": [
+                            "full_bleed_with_banner",
+                            "map_card",
+                            "full_bleed_with_side_panel",
+                            "image_grid",
+                            "single_focus",
+                            "single_focus",
+                            "stat_spotlight",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 3,
+                            "full_bleed_with_banner": 1,
+                            "map_card": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "image_grid": 1,
+                            "stat_spotlight": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.375,
+                        "max_streak": 2,
+                        "streak_template": "single_focus",
+                        "media_scenes": 4,
+                        "media_share": 0.5,
+                        "total_seconds": 70.2,
+                        "min_seconds": 6,
+                        "max_seconds": 13,
+                        "spread": 7,
+                        "brief": {
+                            "slots": 6,
+                            "query_ok": 6,
+                            "kind_ok": 6,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 8,
+                        "templates": [
+                            "full_bleed_with_banner",
+                            "map_card",
+                            "full_bleed_with_side_panel",
+                            "image_grid",
+                            "single_focus",
+                            "stat_spotlight",
+                            "big_counter"
+                        ],
+                        "order": [
+                            "full_bleed_with_banner",
+                            "map_card",
+                            "full_bleed_with_side_panel",
+                            "image_grid",
+                            "single_focus",
+                            "single_focus",
+                            "stat_spotlight",
+                            "big_counter"
+                        ],
+                        "counts": {
+                            "single_focus": 2,
+                            "full_bleed_with_banner": 1,
+                            "map_card": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "image_grid": 1,
+                            "stat_spotlight": 1,
+                            "big_counter": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.25,
+                        "max_streak": 2,
+                        "streak_template": "single_focus",
+                        "media_scenes": 4,
+                        "media_share": 0.5,
+                        "total_seconds": 70,
+                        "min_seconds": 6,
+                        "max_seconds": 13,
+                        "spread": 7,
+                        "brief": {
+                            "slots": 6,
+                            "query_ok": 6,
+                            "kind_ok": 6,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "journey",
+                    "phases": 8,
+                    "math_mode": false,
+                    "target_seconds": 70,
+                    "attempts": 1,
+                    "composed_by_tree": true,
+                    "validator_warnings": 5
+                }
+            }
+        }
+    ],
+    "finished_at": "2026-09-01T06:54:39+00:00",
+    "duration_seconds": 67
+}

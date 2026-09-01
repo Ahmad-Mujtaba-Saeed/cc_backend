@@ -70,7 +70,7 @@ class CanvasDirectorService
             ->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $this->model,
                 'messages' => [
-                    ['role' => 'system', 'content' => $this->buildSystemPrompt($aspectRatio)],
+                    ['role' => 'system', 'content' => $this->buildSystemPrompt($aspectRatio, count($scenes))],
                     ['role' => 'user', 'content' => $this->buildScenesBrief($scenes)],
                 ],
                 'temperature' => 0.75,
@@ -94,8 +94,9 @@ class CanvasDirectorService
         return $parsed;
     }
 
-    private function buildSystemPrompt(string $aspectRatio): string
+    private function buildSystemPrompt(string $aspectRatio, int $sceneCount = 8): string
     {
+        $maxFlights = ExplainerRegistry::maxFlights($sceneCount);
         $canvas = ExplainerRegistry::canvas();
         $base = ExplainerRegistry::canvasBaseCard($aspectRatio);
         $patterns = implode(', ', $canvas['journey_patterns'] ?? ['zigzag']);
@@ -137,12 +138,19 @@ THINK RELATION-FIRST. For every scene, before anything else, decide its RELATION
 {$relationRef}
 The relation is the meaning of the cut. Everything else follows from it:
 - "opening"      -> treatment hero_open, no connector.
-- "continues"    -> treatment canvas_hop, dotted connector, placed a comfortable hop away in the journey's flow direction.
-- "elaborates"   -> treatment zoom_nest (give nest.fx/fy: the exact spot in the previous visual being examined), no connector — the dive IS the link.
+- "continues"    -> treatment same_frame. NO FLIGHT: the next card simply takes the frame. Give it no x/y — it inherits the previous scene's place. This is MOST of your scenes.
+- "elaborates"   -> treatment zoom_nest (give nest.fx/fy: the exact spot in the previous visual being examined), no connector — the dive IS the link. At most twice per video.
 - "consequence"  -> treatment canvas_hop, connector style "arrow" (the camera literally rides the drawn arrow), placed FURTHER along the flow so the arrow reads. A ≤3 word label like "so", "the result", "2 years later" is welcome.
 - "contrast"     -> treatment canvas_hop, placed BESIDE the previous scene (same scale, 1.4-1.8 widths away, mirrored across the flow axis) so both share the frame mid-flight. Dotted connector; a label like "vs" is welcome.
 - "callback"     -> treatment canvas_hop + "callback_to": "<scene_id of the earlier scene it returns to>". Long soaring flight back across the map.
 - "new_chapter"  -> treatment pull_reveal, no connector, placed FAR away (3-4 widths) with a direction change — a new act deserves a new part of the map.
+
+THE FLIGHT BUDGET — read this before you place anything.
+A camera flight is PUNCTUATION, not grammar. It marks a topic change. A video where the camera flies between every scene is exhausting to watch and, worse, it drowns out the cards: every layout in this system animates its own content, and none of that reads while the world is sliding past.
+- You may fly at most {$maxFlights} times in this video. That is a HARD budget — a plan with more is cut back automatically, and the ones you lose are the ones that mattered least, so choose them yourself.
+- Everything else is "same_frame": no flight, no travel, no connector. The camera holds and the next card takes the frame.
+- Spend the budget on real breaks: a new chapter first, then a callback, then a contrast, then a consequence. Never on "continues".
+- A same_frame scene needs NO x, y, w or h. Emit only its scene_id, relation "continues", treatment "same_frame" and a hold_move.
 You may override the derived treatment when a scene genuinely earns it — at most twice each per video:
 - overlay_focus: one strong visual deserves a guided tour — the camera lands, pushes INTO the image's focal point, and eases back out. Perfect with callouts.
 - kinetic_break: a punchy stat or turning point should SMASH in — the flight is short and hard, landing like a cut with an impact hit. Best on a typography-only scene.
@@ -151,7 +159,8 @@ TREATMENTS reference:
 {$treatmentRef}
 
 HARD VARIETY RULES (a monotone journey is a failed job):
-- Never the same treatment more than twice in a row. Never more than three "continues" in a row — real stories turn.
+- Never the same treatment more than twice in a row EXCEPT same_frame, which is the quiet default and may run as long as the story stays on one thread.
+- Never more than four "continues" in a row — real stories turn, and a turn is where a flight earns its place.
 - The journey must BEND: never place more than three consecutive scenes along the same straight direction (no long rows, no long columns). Curve the path, switch direction at chapter breaks, use vertical AND horizontal space.
 - Vary hop distances: intimate steps (1.2 widths) for tightly-linked ideas, long expressive flights (3+) for shifts.
 - At most {$maxArrows} "arrow" connectors per video — an arrow must mean causality. Dotted is the quiet default; "none" for dives and chapter breaks.
@@ -175,14 +184,15 @@ OUTPUT — return ONLY a JSON object of this exact shape (one item per scene, EV
   "world": { "width": 9000, "height": 6000 },
   "items": [
     { "scene_id": "scene_1", "relation": "opening", "treatment": "hero_open", "x": 1200, "y": 2600, "w": {$base['w']}, "h": {$base['h']}, "emphasis": "hero", "hold_move": "push_in"{$propsExample} },
-    { "scene_id": "scene_2", "relation": "elaborates", "treatment": "zoom_nest", "nest": { "fx": 0.62, "fy": 0.35 }, "hold_move": "breathe" },
-    { "scene_id": "scene_3", "relation": "consequence", "treatment": "canvas_hop", "x": 4400, "y": 1800, "w": {$base['w']}, "h": {$base['h']}, "hold_move": "drift" },
-    { "scene_id": "scene_4", "relation": "callback", "callback_to": "scene_1", "treatment": "canvas_hop", "x": 2300, "y": 4300, "w": {$base['w']}, "h": {$base['h']}, "hold_move": "breathe" }
+    { "scene_id": "scene_2", "relation": "continues", "treatment": "same_frame", "hold_move": "breathe" },
+    { "scene_id": "scene_3", "relation": "continues", "treatment": "same_frame", "hold_move": "drift" },
+    { "scene_id": "scene_4", "relation": "new_chapter", "treatment": "pull_reveal", "x": 6200, "y": 1500, "w": {$base['w']}, "h": {$base['h']}, "hold_move": "settle_back" },
+    { "scene_id": "scene_5", "relation": "continues", "treatment": "same_frame", "hold_move": "breathe" },
+    { "scene_id": "scene_6", "relation": "callback", "callback_to": "scene_1", "treatment": "canvas_hop", "x": 2300, "y": 4300, "w": {$base['w']}, "h": {$base['h']}, "hold_move": "orbit" }
   ],
   "connectors": [
-    { "from": "scene_1", "to": "scene_2", "style": "none", "label": "" },
-    { "from": "scene_2", "to": "scene_3", "style": "arrow", "label": "the result" },
-    { "from": "scene_1", "to": "scene_4", "style": "dotted", "label": "remember?" }
+    { "from": "scene_3", "to": "scene_4", "style": "none", "label": "" },
+    { "from": "scene_1", "to": "scene_6", "style": "dotted", "label": "remember?" }
   ]
 }
 Return valid JSON only — no markdown, no commentary.

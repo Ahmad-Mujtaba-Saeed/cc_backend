@@ -571,12 +571,29 @@ class ShotListValidator
      * stages curve → marks → tangent → shade on one clock, so a merged scene
      * is precisely the "figure the narration keeps pointing back at".
      * Math mode only, like every math merge.
+     *
+     * TWO LIMITS, both from the bench (iter 55). A run of six plot beats used
+     * to become ONE card holding 60% of the video — 72 seconds on compound
+     * interest, 51 on noise cancelling — for two compounding reasons:
+     *
+     *  - nothing capped the RUN, so the merge was happy to eat a whole act;
+     *  - the merged duration was the SUM of the parts, and each part was the
+     *    composer's padded per-scene estimate, so the padding was summed too.
+     *
+     * So a figure now absorbs at most {@see MAX_PLOT_MERGE} consecutive plots
+     * (a curve, then two things done to it — past that the next beat deserves
+     * its own frame), and the merged scene is timed from the narration it
+     * actually has to speak rather than from the arithmetic of its parts.
      */
+    private const MAX_PLOT_MERGE = 3;
+
     private function mergeEvolvingPlots(array $scenes): array
     {
         if (!$this->mathMode) {
             return $scenes;
         }
+        // How many scenes have been folded into each surviving figure.
+        $absorbed = [];
 
         $exprOf = function (array $scene): string {
             $slot = $scene['slots']['slot_plot'] ?? [];
@@ -592,6 +609,7 @@ class ShotListValidator
                 && ($out[$lastKey]['layout_template'] ?? '') === 'function_plot'
                 && $exprOf($scene) !== ''
                 && $exprOf($scene) === $exprOf($out[$lastKey])
+                && ($absorbed[$lastKey] ?? 1) < self::MAX_PLOT_MERGE
             ) {
                 $a = &$out[$lastKey];
                 $sa = $a['slots']['slot_plot'];
@@ -622,14 +640,22 @@ class ShotListValidator
                 }
 
                 $a['slots']['slot_plot'] = $sa;
-                $a['narration'] = ['text' => trim(
+                $merged = trim(
                     (string) ($a['narration']['text'] ?? '') . ' ' . (string) ($scene['narration']['text'] ?? '')
-                )];
-                $a['duration_seconds'] = round(
-                    (float) ($a['duration_seconds'] ?? 0) + (float) ($scene['duration_seconds'] ?? 0),
-                    2
                 );
+                $a['narration'] = ['text' => $merged];
+                // Timed from what has to be SAID over the figure — the sum of
+                // the parts carried each part's padding with it. Floored at
+                // the longest single beat so a merge can never shorten the
+                // card, and capped so one figure cannot own the video.
+                $a['duration_seconds'] = round(min(30.0, max(
+                    3.0,
+                    (float) ($a['duration_seconds'] ?? 0),
+                    (float) ($scene['duration_seconds'] ?? 0),
+                    str_word_count($merged) / 2.5 + 0.8
+                )), 2);
                 unset($a);
+                $absorbed[$lastKey] = ($absorbed[$lastKey] ?? 1) + 1;
                 $this->warn('Consecutive plots of the same curve merged into one evolving figure.');
                 $this->changed = true;
                 continue;
@@ -1014,7 +1040,7 @@ class ShotListValidator
                 'stat_spotlight', 'quote_card',
                 'versus_card', 'animated_chart', 'big_counter', 'checklist_card', 'icon_grid',
                 'timeline_card', 'step_flow', 'before_after', 'list_ranking', 'progress_meter', 'quote_portrait',
-                'phone_mockup', 'photo_stack', 'map_card', 'headline_ticker', 'myth_fact', 'pictogram_percent',
+                'phone_mockup', 'photo_stack', 'image_grid', 'custom_card', 'map_card', 'headline_ticker', 'myth_fact', 'pictogram_percent',
                 'cycle_diagram', 'spectrum_card', 'quadrant_map', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card', 'venn_card', 'term_card', 'receipt_card', 'decision_tree',
                 'practice_card', 'common_mistake',
                 'math_steps', 'geometry_diagram', 'function_plot', 'scenario_diagram', 'formula_anatomy',
@@ -1617,6 +1643,26 @@ class ShotListValidator
             case 'photo_stack': {
                 $scene['layout_template'] = 'single_focus';
                 $scene['slots'] = ['slot_main' => $slots['slot_photo_1'] ?? $this->genericTextBlock('')];
+                return $scene;
+            }
+
+            case 'image_grid': {
+                // Past the cap, keep the strongest single picture rather than
+                // a second grid — the card's whole point is that it is rare.
+                $scene['layout_template'] = 'single_focus';
+                $scene['slots'] = ['slot_main' => $slots['slot_image_1'] ?? $this->genericTextBlock('')];
+                return $scene;
+            }
+
+            case 'custom_card': {
+                // There is nothing to salvage from a fragment — it is one
+                // bespoke picture. Past the cap the beat becomes plain text
+                // built from its own narration.
+                $scene['layout_template'] = 'single_focus';
+                $scene['slots'] = ['slot_main' => $this->genericTextBlock(
+                    (string) ($scene['narration']['text'] ?? ''),
+                    $slots['slot_custom']['heading'] ?? null
+                )];
                 return $scene;
             }
 
@@ -2599,6 +2645,7 @@ class ShotListValidator
             'pictogram' => $this->clampPictogramContent($slot) ?? $this->genericTextBlock($narrationText),
             'formula' => $this->clampFormulaAnatomyContent($slot) ?? $this->genericTextBlock($narrationText),
             'cycle' => $this->clampCycleContent($slot) ?? $this->genericTextBlock($narrationText),
+            'custom_html' => $this->clampCustomHtmlContent($slot) ?? $this->genericTextBlock($narrationText),
             'spectrum' => $this->clampSpectrumContent($slot) ?? $this->genericTextBlock($narrationText),
             'quadrant' => $this->clampQuadrantContent($slot) ?? $this->genericTextBlock($narrationText),
             'layers' => $this->clampLayerStackContent($slot) ?? $this->genericTextBlock($narrationText),
@@ -3888,6 +3935,56 @@ class ShotListValidator
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
             $clean['caption'] = mb_substr($caption, 0, 60);
+        }
+
+        return $clean;
+    }
+
+    /**
+     * Clamp a custom_html payload: the fragment is SANITIZED here, once, and
+     * what is stored on the slot is the safe version.
+     *
+     * Doing it in the validator rather than the renderer is the whole design.
+     * The renderer mounts this markup into the render browser, so if it
+     * sanitized at render there would be two implementations of "what is safe"
+     * that could disagree — and the storyboard would be showing the user
+     * something different from what ships. Here it happens once, on the way
+     * in, and every later consumer (renderer, preview, revision pass, the
+     * storyboard UI) reads the same cleaned fragment.
+     *
+     * Null when nothing usable survives, so the caller degrades to text.
+     */
+    private function clampCustomHtmlContent(array $slot): ?array
+    {
+        $result = CustomHtml::sanitize(
+            (string) ($slot['html'] ?? ''),
+            (string) ($slot['css'] ?? '')
+        );
+
+        foreach ($result['warnings'] as $warning) {
+            $this->warn($warning);
+            $this->changed = true;
+        }
+
+        if (!$result['ok']) {
+            return null;
+        }
+
+        $clean = [
+            'content_type' => 'custom_html',
+            'html' => $result['html'],
+        ];
+        if ($result['css'] !== '') {
+            $clean['css'] = $result['css'];
+        }
+
+        $heading = trim((string) ($slot['heading'] ?? ''));
+        if ($heading !== '') {
+            $clean['heading'] = mb_substr($heading, 0, 60);
+        }
+        $caption = trim((string) ($slot['caption'] ?? ''));
+        if ($caption !== '') {
+            $clean['caption'] = mb_substr($caption, 0, 90);
         }
 
         return $clean;
@@ -5218,6 +5315,92 @@ class ShotListValidator
                 return $scene;
             }
 
+            case 'image_grid': {
+                // The grid's argument is SIMULTANEITY — several pictures on
+                // screen together so the viewer compares them. Everything here
+                // protects that: too few cells is not a grid, cells that say
+                // the same thing are not a comparison, and a portrait frame
+                // cannot hold six of anything legibly.
+                $cells = [];
+                for ($i = 1; $i <= 6; $i++) {
+                    $cell = $slots["slot_image_{$i}"] ?? null;
+                    if (!is_array($cell) || !in_array($cell['content_type'] ?? '', ['image', 'video'], true)) {
+                        continue;
+                    }
+                    $cell['content_type'] = 'image';
+                    $cells[] = $cell;
+                }
+
+                // Near-duplicate cells are the failure this card invites: asked
+                // for four examples with only one real subject in the beat, a
+                // model writes the same picture four times and the grid becomes
+                // a wall of the same photo. Compare the SUBJECTS, not the whole
+                // brief, since the guidance sentences are formulaic by design.
+                $unique = [];
+                $kept = [];
+                foreach ($cells as $cell) {
+                    $words = MediaBrief::significantWords((string) ($cell['asset_request']['description'] ?? ''));
+                    $duplicate = false;
+                    foreach ($kept as $earlier) {
+                        if ($this->sameSubject($words, $earlier)) {
+                            $duplicate = true;
+                            break;
+                        }
+                    }
+                    if ($duplicate) {
+                        $this->warn("Scene {$sceneId}: image grid repeated the same subject -> cell dropped.");
+                        $this->changed = true;
+                        continue;
+                    }
+                    if ($words !== []) {
+                        $kept[] = $words;
+                    }
+                    $unique[] = $cell;
+                }
+                $cells = $unique;
+
+                // Six is the ceiling in every aspect. A 2x3 portrait grid was
+                // probed at 1080x1920 and reads cleanly, so the tighter
+                // portrait cap this once had was guessing against evidence.
+                $max = 6;
+                if (count($cells) > $max) {
+                    $this->warn("Scene {$sceneId}: image grid trimmed to {$max} cells.");
+                    $this->changed = true;
+                    $cells = array_slice($cells, 0, $max);
+                }
+
+                if (count($cells) < 3) {
+                    $this->changed = true;
+                    if (count($cells) === 2) {
+                        // Two pictures side by side is a real card — just not
+                        // this one.
+                        $this->warn("Scene {$sceneId}: image grid with two pictures -> split_side_by_side.");
+                        $scene['layout_template'] = 'split_side_by_side';
+                        $scene['slots'] = ['slot_left' => $cells[0], 'slot_right' => $cells[1]];
+                        return $scene;
+                    }
+                    if (count($cells) === 1) {
+                        $this->warn("Scene {$sceneId}: image grid with one picture -> single_focus.");
+                        $scene['layout_template'] = 'single_focus';
+                        $scene['slots'] = ['slot_main' => $cells[0]];
+                        return $scene;
+                    }
+
+                    return $degradeToText('image grid without pictures');
+                }
+
+                // Captions ride on each cell's `label`, the same field
+                // photo_stack prints under its prints.
+                $renumbered = [];
+                foreach ($cells as $i => $cell) {
+                    $cell['label'] = mb_substr(trim((string) ($cell['label'] ?? '')), 0, 24);
+                    $renumbered['slot_image_' . ($i + 1)] = $cell;
+                }
+                $scene['slots'] = $renumbered;
+
+                return $scene;
+            }
+
             case 'photo_stack': {
                 // Collect the provided prints in order and renumber them into a
                 // contiguous run (the two trailing slots are optional). Fewer
@@ -5675,6 +5858,23 @@ class ShotListValidator
                 return $scene;
             }
 
+            case 'custom_card': {
+                $raw = is_array($slots['slot_custom'] ?? null) ? $slots['slot_custom'] : [];
+                $clean = $this->clampCustomHtmlContent($raw);
+                if ($clean === null) {
+                    // Nothing usable survived the sanitizer. The narration is
+                    // still good — the beat becomes an ordinary text card
+                    // rather than a blank frame.
+                    return $degradeToText(
+                        'custom card had no usable html',
+                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null
+                    );
+                }
+                $scene['slots'] = ['slot_custom' => $clean];
+
+                return $scene;
+            }
+
             case 'cycle_diagram': {
                 $raw = is_array($slots['slot_cycle'] ?? null) ? $slots['slot_cycle'] : [];
                 $cycle = $this->clampCycleContent($raw);
@@ -5840,6 +6040,31 @@ class ShotListValidator
         return null;
     }
 
+    /**
+     * Are two image-grid cells asking for the same picture?
+     *
+     * Word OVERLAP, not an equality test on a key: a model that repeats a
+     * subject rephrases it rather than copying it, so "a red sports car on a
+     * coastal road", "a coastal road with a red sports car" and "a red sports
+     * car, on a road by the coast" are three spellings of one photo. Sharing
+     * most of their meaning-bearing words is what makes them the same, and
+     * two thirds is the line — enough that "a red sports car" and "a yellow
+     * school bus" are plainly different, tight enough to catch a rephrase.
+     *
+     * @param  string[]  $a
+     * @param  string[]  $b
+     */
+    private function sameSubject(array $a, array $b): bool
+    {
+        if ($a === [] || $b === []) {
+            return false;
+        }
+        $shared = count(array_intersect($a, $b));
+        $union = count(array_unique(array_merge($a, $b)));
+
+        return $union > 0 && ($shared / $union) >= 0.6;
+    }
+
     private function validateMediaSlot(string $sceneId, string $slotKey, string $contentType, array $slot, string $narrationText): array
     {
         $description = '';
@@ -5866,11 +6091,26 @@ class ShotListValidator
             }
         }
 
+        // The media BRIEF (search query + the plain sentence the user reads +
+        // whether this beat wants a still or motion). `description` stays what
+        // it always was — the AI image prompt — and the extra keys are what
+        // let the storyboard offer free stock beside "Generate with AI"
+        // instead of only a file picker. Any of the three the planner wrote
+        // is kept; the rest are derived. See {@see MediaBrief}.
+        $request = is_array($slot['asset_request'] ?? null) ? $slot['asset_request'] : [];
+        $request['description'] = $description;
+        $brief = MediaBrief::build($request, $contentType, $this->aspectRatio);
+        // The user's own extra art direction for the AI (iter 50) is not the
+        // planner's to lose on a re-validation.
+        if (trim((string) ($request['instruction'] ?? '')) !== '') {
+            $brief['instruction'] = trim((string) $request['instruction']);
+        }
+
         $clean = [
             'content_type' => $contentType,
             'label' => (string) ($slot['label'] ?? ''),
             'camera_move' => $cameraMove,
-            'asset_request' => ['description' => $description],
+            'asset_request' => $brief,
             'asset_ref' => $slot['asset_ref'] ?? null,
             'callouts' => $this->normalizeCallouts($slot['callouts'] ?? []),
             'callout_suggestions' => $suggestions,
@@ -6096,7 +6336,7 @@ class ShotListValidator
             'content_type' => $type,
             'label' => (string) ($original['label'] ?? ''),
             'camera_move' => $this->resolveCameraMove($original['camera_move'] ?? null, $desc),
-            'asset_request' => ['description' => $desc],
+            'asset_request' => MediaBrief::build(['description' => $desc], $type, $this->aspectRatio),
             'asset_ref' => null,
         ];
     }

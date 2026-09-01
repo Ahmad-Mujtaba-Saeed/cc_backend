@@ -84,6 +84,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/explainer/projects/{project}/aspect-variants', [ExplainerController::class, 'toggleAspectVariants']);
     Route::post('/explainer/projects/{project}/brand', [ExplainerController::class, 'setBrand']);
     Route::post('/explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}/asset', [ExplainerController::class, 'uploadAsset']);
+    // Free media library (§8b): search the stock providers for a slot, then
+    // adopt one hit into it. The search is cached per query and read-only;
+    // adopting downloads server-side from the service's own result.
+    Route::get('/explainer/projects/{project}/media-search', [ExplainerController::class, 'searchMedia'])
+        ->middleware('throttle:60,1');
+    Route::post('/explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}/media', [ExplainerController::class, 'adoptMedia'])
+        ->middleware('throttle:40,1');
     // Draw (or re-draw) an image slot with AI, on demand, with the user's own
     // art direction. Throttled: each call is a real image-model charge.
     Route::post('/explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}/generate', [ExplainerController::class, 'generateSlotImage'])

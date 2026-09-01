@@ -1,5 +1,5 @@
 {
-  "version": 41,
+  "version": 45,
   "motion_styles": {
     "default": "auto",
     "styles": {
@@ -127,7 +127,7 @@
   "ai_images": {
     "max_total": 8,
     "max_illustrations": 7,
-    "max_slot_fills": 8
+    "max_slot_fills": 14
   },
   "math_mode": {
     "max_per_video": {
@@ -163,6 +163,7 @@
     ],
     "default_journey_pattern": "zigzag",
     "treatments": {
+      "same_frame": "NO FLIGHT. The next card simply takes the frame this one is in \u2014 a cut, not a journey. THE DEFAULT between beats of the same thread: the card's own reveal carries the change, and the camera stays put. Most scenes in a video should be this.",
       "hero_open": "Opening beat: the camera starts tight inside this scene's visual and settles back to frame it. Use ONLY for scene 1.",
       "canvas_hop": "The camera lifts off the previous scene and flies across the canvas to this one. The default move between distinct ideas.",
       "zoom_nest": "This scene physically lives INSIDE a focal point of the previous scene's visual, tiny until the camera dives straight into it. Use when this scene is a detail, consequence, or 'inside' the previous idea. Needs nest.fx / nest.fy (0..1 focal point in the previous region).",
@@ -170,7 +171,7 @@
       "kinetic_break": "A SMASH CUT: the flight into this scene is short and hard, landing with an impact. Use for a punchy stat or a turning point — best on a typography-only scene. At most twice per video.",
       "pull_reveal": "The camera pulls out wide so the previous scene and this one share the frame before settling here. Use for consequences or 'bigger picture' beats."
     },
-    "default_treatment": "canvas_hop",
+    "default_treatment": "same_frame",
     "relations": {
       "opening": "Scene 1 only: the cold open that establishes the world.",
       "continues": "The next step of the same thread of thought. The default flow.",
@@ -183,6 +184,18 @@
     "default_relation": "continues",
     "max_arrows": 3,
     "max_consecutive_treatment": 2,
+    "flights": {
+      "_comment": "A camera flight across the canvas is punctuation, not grammar. It marks a TOPIC CHANGE. Everything else holds the frame and lets the card do the work. max_share is the fraction of a video's cuts that may fly, floored at min_per_video so a short video still gets one.",
+      "max_share": 0.3,
+      "min_per_video": 1,
+      "relations": [
+        "new_chapter",
+        "callback",
+        "contrast",
+        "consequence"
+      ],
+      "max_dives": 2
+    },
     "connector_styles": [
       "dotted",
       "arrow",
@@ -236,7 +249,7 @@
         "asset_request"
       ],
       "supports_camera_move": true,
-      "description": "A still image the user will upload (or that was uploaded). Always describe what is needed in asset_request.description."
+      "description": "A still picture for this beat. asset_request.description is the drawable SUBJECT (it doubles as the AI image prompt); also give search_query (2-4 plain stock-search words), media_kind (\"image\"|\"video\"|\"either\") and guidance (one sentence to the USER about what shot works and what to avoid). The user can then take the free stock suggestions, generate it with AI, or upload their own."
     },
     "video": {
       "label": "Video Clip",
@@ -244,7 +257,7 @@
         "asset_request"
       ],
       "supports_camera_move": true,
-      "description": "A short video clip the user will upload. Describe what is needed in asset_request.description."
+      "description": "A short video clip for this beat. Same asset_request fields as image (description, search_query, media_kind, guidance) — the storyboard offers free stock footage for it, and the user can upload their own instead."
     },
     "text_block": {
       "label": "Text / Bullets",
@@ -537,6 +550,14 @@
       ],
       "supports_camera_move": false,
       "description": "The word-problem SETUP drawn as a schematic: layout = the SHAPE of the sketch, pick the ONE that looks like the situation — \"arc\" when the thing goes up and comes back down (projectiles, thrown balls: a real parabola with the peak on top and a dashed trajectory — NEVER draw a projectile as a flat chain), \"climb\" when it rises (ascent, tanks filling, growth), \"fall\" when it drops (released objects, draining), \"compare\" when two or more rivals are weighed side by side (A vs B, which is faster/cheaper, when equal — ONE entity per parallel lane), \"split\" when one source fans out into outcomes (probability trees, ways something can happen, work shared, a whole divided — the FIRST entity is the source, the rest are the branches), \"cycle\" when a closed loop of stages returns to the start (a repeating process, a clock/orbit/lap — entities are the stages in loop order), \"line\" (default) for flat left-to-right stories (two things approaching, A to B distance). entities = 2-4 actors ordered by the layout (arc: launch → peak → landing; split: source first) [{label <=16 (\"Car\", \"Tank A\", \"Destination\"), sprite?: a concrete drawable OBJECT in <=8 words (\"a red hatchback car, side view\", \"a water tank\") — the system draws it as a cut-out image that sits ON the diagram in place of the icon box; give a sprite to EVERY actor that is a concrete thing (a scene of real objects beats a row of boxes), and leave it out only for an abstract place/stage. icon?: from the ICON LIBRARY (car, map-pin, flag, truck, clock, droplet, users...), value?: the GIVEN value written under the box in math notation (\"v = 20 km/min\", \"t = 20 min\"), emphasis?: \"key\" on the SINGLE entity the question is really about (the FIND, the winner, the pay-off branch) — an accent frame lifts it out of the crowd}]. connectors = one per gap (positional) [{label?: what the connection means — the motion (\"distance d\", \"rises\"), the branch's probability/share for split (\"0.6\", \"3/4\"), the rate/price driving a compare lane (\"60 km/h\"), sub?: a value or \"?\" riding under the line, style?: arrow|line|both (both = two things moving toward each other)}]. question?: the thing being asked, stamped as an accent chip (\"d = ?\"). Boxes pop in order, connectors draw between them along the shape — the problem is assembled on screen before the algebra starts."
+    },
+    "custom_html": {
+      "label": "Custom Card",
+      "required": [
+        "html"
+      ],
+      "supports_camera_move": false,
+      "description": "A visual you AUTHOR yourself in a small fragment of HTML (inline SVG allowed) plus optional css, for the one beat in a video that no other card can express \u2014 a boarding pass, a chat thread, a scoreboard, a nutrition label, a keyboard, a receipt printer. LAST RESORT ONLY: if any other card fits, that card is better, because it is designed, typeset and animated for you. The fragment is sanitised (no script, no network, no shadows or gradients) and its css is scoped to the card. Animate it ONLY with data-at (0..1 through the scene), data-word (land on that narration word) and data-anim (fade|rise|pop|slide|grow) \u2014 never with css animations. Use the theme variables var(--accent), var(--text), var(--muted), var(--panel), var(--bg) for colour and var(--font-display), var(--font-body), var(--font-mono) for type, so the card matches the video."
     },
     "stock_video": {
       "label": "Stock B-Roll",
@@ -1337,6 +1358,65 @@
             "image",
             "video"
           ]
+        }
+      }
+    },
+    "custom_card": {
+      "label": "Custom Card",
+      "description": "A visual authored as a small HTML/SVG fragment, for the beat no other card fits. use_when: the script needs a specific THING drawn \u2014 a boarding pass, a chat exchange, a scoreboard, a nutrition label, a keyboard layout \u2014 and no registry card can express it. Always prefer a real card when one fits. At most 2 per video.",
+      "max_per_video": 2,
+      "slots": {
+        "slot_custom": {
+          "label": "Custom",
+          "allowed": [
+            "custom_html"
+          ]
+        }
+      }
+    },
+    "image_grid": {
+      "label": "Image Grid",
+      "description": "3-6 pictures on screen AT ONCE in a grid, each with a short caption, landing one at a time as the narration names them and all staying visible. use_when: a beat needs SEVERAL pictures together so the viewer compares them \u2014 four examples of the same thing, the six variants, the three species, what these cities have in common. The difference from photo_stack: a stack shows one print at a time, this shows them all. At most 1 per video.",
+      "max_per_video": 1,
+      "slots": {
+        "slot_image_1": {
+          "label": "Image 1",
+          "allowed": [
+            "image"
+          ]
+        },
+        "slot_image_2": {
+          "label": "Image 2",
+          "allowed": [
+            "image"
+          ]
+        },
+        "slot_image_3": {
+          "label": "Image 3",
+          "allowed": [
+            "image"
+          ]
+        },
+        "slot_image_4": {
+          "label": "Image 4",
+          "allowed": [
+            "image"
+          ],
+          "optional": true
+        },
+        "slot_image_5": {
+          "label": "Image 5",
+          "allowed": [
+            "image"
+          ],
+          "optional": true
+        },
+        "slot_image_6": {
+          "label": "Image 6",
+          "allowed": [
+            "image"
+          ],
+          "optional": true
         }
       }
     },

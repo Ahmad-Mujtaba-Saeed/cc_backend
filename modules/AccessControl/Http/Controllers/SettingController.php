@@ -207,10 +207,22 @@ class SettingController extends Controller
      */
     private function stockState(): array
     {
+        $grouped = ApiCredential::groupedForAdmin();
+        $library = new \Modules\Project\Services\MediaLibraryService();
+
         return [
             'pexels_configured' => ApiCredential::hasActive('pexels'),
             'pixabay_configured' => ApiCredential::hasActive('pixabay'),
-            'credentials' => ApiCredential::groupedForAdmin()['pexels'] ?? [],
+            'credentials' => $grouped['pexels'] ?? [],
+            // The explainer's free media library searches five sources; two
+            // of them need no key at all, so this list is what tells an admin
+            // which ones are already working and which a key would unlock.
+            'media_providers' => $library->providers(),
+            'media_credentials' => [
+                'pexels' => $grouped['pexels'] ?? [],
+                'pixabay' => $grouped['pixabay'] ?? [],
+                'unsplash' => $grouped['unsplash'] ?? [],
+            ],
         ];
     }
 

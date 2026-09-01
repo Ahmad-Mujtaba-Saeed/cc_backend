@@ -23,37 +23,37 @@ class GenericStoryboardComposerService
 {
     /** Per-intent template menus — L2 as data. First entry = degrade target hint. */
     private const MENUS = [
-        'hook' => ['single_focus', 'stat_spotlight', 'quote_card', 'full_bleed_with_banner', 'phone_mockup', 'split_side_by_side', 'animated_chart'],
-        'context' => ['single_focus', 'full_bleed_with_side_panel', 'labeled_diagram', 'cycle_diagram', 'formula_anatomy', 'term_card', 'layer_stack', 'hierarchy_card'],
-        'point' => ['single_focus', 'animated_chart', 'stat_spotlight', 'quote_card', 'myth_fact', 'pictogram_percent', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'spectrum_card', 'quadrant_map', 'venn_card', 'receipt_card', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack'],
+        'hook' => ['single_focus', 'stat_spotlight', 'quote_card', 'full_bleed_with_banner', 'phone_mockup', 'split_side_by_side', 'animated_chart', 'image_grid'],
+        'context' => ['single_focus', 'full_bleed_with_side_panel', 'labeled_diagram', 'cycle_diagram', 'formula_anatomy', 'term_card', 'layer_stack', 'hierarchy_card', 'image_grid', 'custom_card'],
+        'point' => ['single_focus', 'animated_chart', 'stat_spotlight', 'quote_card', 'myth_fact', 'pictogram_percent', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'spectrum_card', 'quadrant_map', 'venn_card', 'receipt_card', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'image_grid', 'custom_card'],
         'counter' => ['single_focus', 'quote_card', 'myth_fact', 'common_mistake'],
         'resolution' => ['single_focus', 'animated_chart', 'pictogram_percent', 'receipt_card', 'proportion_flow', 'evidence_card', 'practice_card'],
         'origin' => ['single_focus', 'map_card', 'full_bleed_with_banner'],
-        'era' => ['single_focus', 'timeline_card', 'map_card', 'full_bleed_with_side_panel'],
-        'turning_point' => ['single_focus', 'stat_spotlight', 'quote_card', 'before_after', 'myth_fact'],
-        'legacy' => ['single_focus', 'big_counter'],
+        'era' => ['single_focus', 'timeline_card', 'map_card', 'full_bleed_with_side_panel', 'image_grid'],
+        'turning_point' => ['single_focus', 'stat_spotlight', 'quote_card', 'before_after', 'myth_fact', 'image_grid', 'custom_card'],
+        'legacy' => ['single_focus', 'big_counter', 'image_grid'],
         'contenders' => ['split_side_by_side', 'versus_card'],
-        'round' => ['single_focus', 'versus_card', 'before_after', 'split_side_by_side', 'spectrum_card', 'scale_comparison'],
-        'verdict' => ['single_focus', 'versus_card', 'checklist_card', 'spectrum_card', 'quadrant_map', 'venn_card', 'decision_tree'],
+        'round' => ['single_focus', 'versus_card', 'before_after', 'split_side_by_side', 'spectrum_card', 'scale_comparison', 'image_grid'],
+        'verdict' => ['single_focus', 'versus_card', 'checklist_card', 'spectrum_card', 'quadrant_map', 'venn_card', 'decision_tree', 'image_grid'],
         'setup' => ['single_focus', 'term_card'],
         'ranking_reveal' => ['list_ranking'],
         'number_one' => ['single_focus', 'full_bleed_with_banner', 'stat_spotlight'],
-        'aspect' => ['single_focus', 'split_side_by_side', 'animated_chart', 'icon_grid', 'phone_mockup', 'labeled_diagram', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'math_steps', 'venn_card', 'common_mistake', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card'],
-        'payoff' => ['single_focus', 'practice_card', 'icon_grid', 'checklist_card', 'full_bleed_with_banner'],
+        'aspect' => ['single_focus', 'split_side_by_side', 'animated_chart', 'icon_grid', 'phone_mockup', 'labeled_diagram', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'math_steps', 'venn_card', 'common_mistake', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card', 'image_grid', 'custom_card'],
+        'payoff' => ['single_focus', 'practice_card', 'icon_grid', 'checklist_card', 'full_bleed_with_banner', 'image_grid', 'custom_card'],
 
         // The `demo` shape. A walkthrough is a SCREEN video: its natural cards
         // are the device mockup, the split with the screenshot beside the
         // instruction, and the photo stack for a set of results — not the wall
         // of bullets a demo used to become.
-        'problem' => ['single_focus', 'stat_spotlight', 'myth_fact', 'common_mistake', 'icon_grid', 'pictogram_percent', 'animated_chart', 'checklist_card'],
+        'problem' => ['single_focus', 'stat_spotlight', 'myth_fact', 'common_mistake', 'icon_grid', 'pictogram_percent', 'animated_chart', 'checklist_card', 'image_grid', 'custom_card'],
         'product_intro' => ['full_bleed_with_banner', 'single_focus', 'phone_mockup', 'term_card', 'icon_grid', 'split_side_by_side'],
         // single_focus sits LAST here on purpose. A walkthrough step is a
         // screen, and a screen belongs in a frame — offered first, the plain
         // card swallowed six consecutive "paste the link / pick a template /
         // press generate" beats and the walkthrough read as a bulleted list
         // with pictures instead of a product actually being driven.
-        'demo_step' => ['phone_mockup', 'split_side_by_side', 'full_bleed_with_side_panel', 'before_after', 'step_flow', 'icon_grid', 'single_focus'],
-        'result' => ['photo_stack', 'phone_mockup', 'before_after', 'split_side_by_side', 'single_focus', 'checklist_card', 'big_counter', 'icon_grid'],
+        'demo_step' => ['phone_mockup', 'split_side_by_side', 'full_bleed_with_side_panel', 'before_after', 'step_flow', 'icon_grid', 'single_focus', 'custom_card'],
+        'result' => ['photo_stack', 'image_grid', 'phone_mockup', 'before_after', 'split_side_by_side', 'single_focus', 'checklist_card', 'big_counter', 'icon_grid', 'custom_card'],
         'second_feature' => ['phone_mockup', 'split_side_by_side', 'full_bleed_with_side_panel', 'step_flow', 'icon_grid', 'single_focus'],
     ];
 
@@ -61,7 +61,7 @@ class GenericStoryboardComposerService
      *  anti-monotony pass and the media-coverage check below. */
     private const MEDIA_TEMPLATES = [
         'phone_mockup', 'split_side_by_side', 'full_bleed_with_banner', 'full_bleed_with_side_panel',
-        'before_after', 'photo_stack', 'labeled_diagram', 'single_focus',
+        'before_after', 'photo_stack', 'image_grid', 'labeled_diagram', 'single_focus',
     ];
 
     /**
@@ -106,7 +106,9 @@ class GenericStoryboardComposerService
         'icon_grid' => 'slot_icons: {content_type:"icons", items:[3-9 {icon: a lucide name, label: 1-2 words}], heading?}',
         'phone_mockup' => 'slot_screen: {content_type:"image", asset_request:{description: the SCREEN content}, frame:"phone"|"browser"} — the card for ANY screen: a website, an app, a dashboard, a settings page, a progress bar. Use "browser" for a desktop/web UI and "phone" for a mobile app. A walkthrough may use it for several consecutive steps (up to 6 per video), but break up long runs with split_side_by_side or full_bleed_with_side_panel so the framing changes',
         'step_flow' => 'slot_steps: {content_type:"steps", items:[3-5 {label: <=4 words naming the action, icon?: a lucide name}], heading?} — a one-way process drawn as connected nodes; use it ONCE to preview or recap a multi-action walkthrough, never in place of showing the actions themselves',
-        'photo_stack' => 'slot_photo_1, slot_photo_2 (+ optional slot_photo_3, slot_photo_4): each {content_type:"image", asset_request:{description}} — 2-4 related shots flipped through like prints. Ideal for showing several OUTPUTS at once (the clips it produced, the variants it made). At most 1 per video',
+        'custom_card' => 'slot_custom: {content_type:"custom_html", html: a SELF-CONTAINED fragment (inline <svg> allowed, no <script>, no <img>, no links, no external anything), css?: a few plain rules — class selectors only, no @media/@keyframes/@import, heading?: <=60, caption?: <=90} — THE LAST RESORT. Use it ONLY when the beat needs a specific THING drawn that no other card can express: a boarding pass, a chat exchange, a scoreboard, a nutrition label, a keyboard layout, a parking ticket, a periodic-table cell. If ANY other card fits the beat, that card is better — it is already typeset, animated and tested, and this one is not. REACH FOR IT, THOUGH, whenever the near-miss card would need a PICTURE of the thing. A text-message exchange is this card, NOT phone_mockup: a phone_mockup needs a real screenshot, and a generated one comes back with garbled text. Same for a printed ticket, a form, a receipt from a named shop, a scoreboard, a label, a certificate, a search-results page — if the beat is about what the OBJECT SAYS, draw it here rather than asking for a photograph of it. Never use it for a chart (animated_chart), a comparison (versus_card/split_side_by_side), a list (checklist_card/icon_grid), a process (step_flow/cycle_diagram), an equation (formula_anatomy/math_steps) or a photo (single_focus). STYLE: colour with var(--accent), var(--text), var(--muted), var(--panel), var(--line) and type with var(--font-display), var(--font-body), var(--font-mono) so the card matches the video; flat only — shadows, gradients and blurs are stripped. BUILD IT WITH HTML AND CSS, not SVG: an svg <text> element does not wrap, so any sentence in one runs straight off the edge. Use <div>/<p>/<table> with flex or grid for anything containing WORDS, and drop to inline <svg> only for shapes — a line, an arrow, a ring, a bar. SIZE: author against a 1000px-wide canvas and let the height be whatever the content needs — never set a fixed pixel height, and never author a tall canvas for a wide video. The card is scaled to fit the frame, so a fragment that is much taller than it is wide renders small in 16:9. MOTION: never write css animations (they are stripped — the renderer drives the clock). Instead put data-at="0.35" (a 0..1 point in the scene) or data-word="gate" (land when the narrator says that word) on the elements that should arrive one at a time, optionally with data-anim="fade|rise|pop|slide|grow". An element with no cue is visible from the start, so give at least two elements a cue — a card that arrives all at once in a video that runs for eight seconds is a still image. At most 2 per video',
+        'photo_stack' => 'slot_photo_1, slot_photo_2 (+ optional slot_photo_3, slot_photo_4): each {content_type:"image", asset_request:{description}} — 2-4 related shots flipped through like prints, ONE at a time. At most 1 per video',
+        'image_grid' => 'slot_image_1, slot_image_2, slot_image_3 (+ optional slot_image_4, slot_image_5, slot_image_6): each {content_type:"image", asset_request:{description: a DIFFERENT concrete photographable subject}, label: a 1-3 word caption <=24 chars}, and slot_image_1 may carry heading?: <=40 — 3-6 pictures on screen AT ONCE, landing one at a time as the narration names them and all staying visible. ONLY when the beat genuinely needs several pictures TOGETHER so the viewer compares them (four examples, the six variants, the three species, what these places have in common) and the narration actually walks through them. Every cell must be a DIFFERENT subject — repeating one picture with different words is the failure this card invites, and a repeated cell is dropped. One picture is single_focus, two is split_side_by_side, a sequence shown one at a time is photo_stack. At most 1 per video',
         'labeled_diagram' => 'slot_diagram: {content_type:"image", asset_request:{description: ONE clean centered subject on a plain background, no text}, heading?: <=40 chars, callout_suggestions:[2-4 short part names, <=4 words each]} — use for "how X works"/parts-of-X beats; the labels are drawn natively over the image',
         'myth_fact' => 'slot_myth_fact: {content_type:"myth_fact", myth: the belief as people say it (<=140), fact: the correction with the receipts (<=140), heading?: <=40} — use when the script debunks a widespread belief; never for mere comparisons',
         'pictogram_percent' => 'slot_pictogram: {content_type:"pictogram", filled: the numerator (decimals fine, 6.4), of: the denominator (usually 10), label: who the share is ("of gamers finish the story"), unit?: "%" to display the percentage} — ONLY for shares of PEOPLE; other percentages use progress_meter',
@@ -261,9 +263,14 @@ PACING — the single biggest quality lever. A video whose every scene is the sa
 
 VARIETY — never use the same layout_template twice in a row, and do not let "single_focus" take more than a third of the scenes. It is the fallback, not the default: whenever a beat qualifies for a real card in its menu, use the real card.
 
-VISUALS — a video of nothing but text cards is a slideshow, not an explainer. At least a third of the scenes must carry an image slot (content_type "image"). Reach for the media cards in the menus (phone_mockup, split_side_by_side, before_after, photo_stack, the full_bleed pair), and remember single_focus itself can be an image.
+VISUALS — a video of nothing but text cards is a slideshow, not an explainer. At least a third of the scenes must carry an image slot (content_type "image"). Reach for the media cards in the menus (phone_mockup, split_side_by_side, before_after, photo_stack, image_grid, the full_bleed pair), and remember single_focus itself can be an image.
 - For a real-world subject, asset_request.description is a concrete photographable scene — never text, charts or diagrams.
 - For SCREEN content (a website, an app, a settings page, a result), describe the screen literally ("the Vreato dashboard with a YouTube URL pasted into the input field") and put it in a phone_mockup with the right frame. These are the shots a product owner already has and will upload.
+
+THE MEDIA BRIEF — every image/video slot's asset_request carries THREE more fields, because the user is shown free stock results for the slot and has to be able to judge them:
+- "search_query": 2-4 PLAIN words that would find this on a stock site ("busy trading floor", "solar panels desert"). Not prompt language — a stock search box takes nouns, not "a lone figure silhouetted against...".
+- "media_kind": "image" when a still says it, "video" when the beat is ABOUT movement (a machine running, a crowd, liquid pouring, a process happening), "either" when both work. Prefer "video" for at most a third of the media slots.
+- "guidance": ONE sentence written TO THE USER telling them what shot works here and what to avoid ("A wide daylight shot of a real newsroom with people at desks — not a posed stock handshake, and nothing with readable text on screens.").
 PROMPT;
 
         // The guide is the brief from the person who commissioned the video.
@@ -514,7 +521,7 @@ PROMPT;
         if ($withMedia < $wantMedia) {
             $faults[] = "- Only {$withMedia} of {$total} scenes carry an image slot; at least {$wantMedia} must. "
                 . 'Put the visual beats on media cards (phone_mockup, split_side_by_side, before_after, '
-                . 'photo_stack, the full_bleed pair, or single_focus with an image).';
+                . 'photo_stack, image_grid, the full_bleed pair, or single_focus with an image).';
         }
 
         // Flat pacing: near-identical durations across the whole video.

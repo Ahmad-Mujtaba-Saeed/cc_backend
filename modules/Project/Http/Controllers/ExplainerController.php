@@ -18,6 +18,7 @@ use Modules\Project\Services\CanvasDirectorService;
 use Modules\Project\Services\CompositionDirectorService;
 use Modules\Project\Services\ExplainerScriptWriterService;
 use Modules\Project\Contracts\MusicProviderInterface;
+use Modules\Project\Services\MediaLibraryService;
 use Modules\Project\Services\MusicProviderFactory;
 use Modules\Project\Services\TemplateSettingsService;
 use Modules\Project\Support\CanvasPlanValidator;
@@ -37,6 +38,8 @@ use Modules\User\Models\User;
  *   GET    /explainer/projects/{project}/storyboard         scenes + slots + upload state
  *   POST   /explainer/projects/{project}/reanalyze          re-run analysis
  *   POST   /explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}/asset   upload
+ *   GET    /explainer/projects/{project}/media-search                       free stock search
+ *   POST   /explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}/media  use a stock hit
  *   DELETE /explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}/asset   remove
  *   POST   /explainer/projects/{project}/render             render to MP4
  *   GET    /explainer/projects/{project}/status             lightweight poll
@@ -554,6 +557,205 @@ class ExplainerController extends Controller
                 'asset_request' => $request_,
             ],
         ]);
+    }
+
+    /**
+     * Search the free media library for a slot.
+     *
+     * This is the third way to fill a media slot, beside "Generate with AI"
+     * and an upload: real photographs and footage from Pexels, Pixabay,
+     * Unsplash, Openverse and Wikimedia Commons. Two of those need no API key,
+     * so the panel is useful on a fresh install and gets better as an admin
+     * adds keys.
+     *
+     * Read-only and cached per query, so it is safe to call on every panel
+     * open — the throttle is there for the providers benefit, not ours.
+     */
+    public function searchMedia(Request $request, Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $validated = $request->validate([
+            'query' => 'required|string|max:80',
+            'kind' => 'sometimes|string|in:image,video',
+            'providers' => 'sometimes|array|max:6',
+            'providers.*' => 'string|max:24',
+        ]);
+
+        $library = new MediaLibraryService();
+        $orientation = $this->orientationFor($project);
+
+        $results = $library->search(
+            (string) $validated['query'],
+            (string) ($validated['kind'] ?? 'image'),
+            $orientation,
+            array_values(array_filter((array) ($validated['providers'] ?? []))),
+        );
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'query' => trim((string) $validated['query']),
+                'kind' => (string) ($validated['kind'] ?? 'image'),
+                'orientation' => $orientation,
+                'results' => $results,
+                'providers' => $library->providers(),
+            ],
+        ]);
+    }
+
+    /**
+     * Put a chosen library result into a slot.
+     *
+     * The client sends WHICH result it picked (provider + id + the query it
+     * came from), never a URL. The server then re-runs the same search — a
+     * cache hit, so it costs nothing — and downloads the url from its OWN
+     * copy of the result. That is deliberate: accepting a download URL from
+     * the browser would turn this endpoint into a request forwarder pointed
+     * at anything the caller likes.
+     */
+    public function adoptMedia(Request $request, Project $project, string $sceneId, string $slotKey): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+        if ($this->revisionRunning($project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A revision is being applied — wait for it to finish.',
+            ], 409);
+        }
+
+        $validated = $request->validate([
+            'provider' => 'required|string|max:24',
+            'id' => 'required|string|max:120',
+            'query' => 'required|string|max:80',
+            'kind' => 'sometimes|string|in:image,video',
+        ]);
+
+        $scene = $project->explainerScenes()->where('scene_id', $sceneId)->first();
+        if (!$scene || !isset($scene->slots[$slotKey])) {
+            return response()->json(['success' => false, 'message' => 'Unknown scene or slot'], 404);
+        }
+        $contentType = $scene->slots[$slotKey]['content_type'] ?? null;
+        if (!in_array($contentType, ['image', 'video'], true)) {
+            return response()->json(['success' => false, 'message' => 'This slot does not take a picture or a clip'], 422);
+        }
+
+        $kind = (string) ($validated['kind'] ?? 'image');
+        if ($contentType === 'video' && $kind !== 'video') {
+            return response()->json(['success' => false, 'message' => 'This slot needs a video clip'], 422);
+        }
+
+        $library = new MediaLibraryService();
+        $candidate = null;
+        foreach ($library->search(
+            (string) $validated['query'],
+            $kind,
+            $this->orientationFor($project),
+            [(string) $validated['provider']],
+        ) as $hit) {
+            if (($hit['id'] ?? null) === $validated['id']) {
+                $candidate = $hit;
+                break;
+            }
+        }
+
+        if ($candidate === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'That result is no longer available — search again and pick another.',
+            ], 409);
+        }
+
+        \Modules\Project\Services\CostTracker::setContext($project);
+
+        $extension = $candidate['kind'] === 'video'
+            ? 'mp4'
+            : $this->imageExtension((string) $candidate['download_url']);
+        $relative = "projects/{$project->id}/explainer/library_{$sceneId}_{$slotKey}_" . Str::random(8) . ".{$extension}";
+
+        if ($library->download($candidate, $relative) === null) {
+            return response()->json([
+                'success' => false,
+                'message' => 'That file could not be downloaded. Try another result.',
+            ], 502);
+        }
+
+        if ($candidate['kind'] === 'video') {
+            // Same treatment an upload gets: Remotion cannot render a
+            // variable-frame-rate clip or one with the moov atom at the end.
+            $this->normalizeVideoForRender(Storage::disk('public')->path($relative));
+        }
+
+        $previous = ExplainerAsset::where('project_id', $project->id)
+            ->where('scene_id', $sceneId)->where('slot_key', $slotKey)->first();
+        if ($previous && $previous->path !== $relative && Storage::disk('public')->exists($previous->path)) {
+            Storage::disk('public')->delete($previous->path);
+        }
+
+        $asset = ExplainerAsset::updateOrCreate(
+            ['project_id' => $project->id, 'scene_id' => $sceneId, 'slot_key' => $slotKey],
+            [
+                'type' => $candidate['kind'],
+                'path' => $relative,
+                // `library:` and not `stock:`: a hand-picked file must survive
+                // a re-analysis the way an upload does. See assetSource().
+                'original_name' => 'library:' . $candidate['id'],
+            ]
+        );
+
+        // Attribution travels with the SLOT, not with the asset row: it is
+        // part of what the storyboard shows and what a credits frame would
+        // read from, and it must survive the file being replaced.
+        $slots = $scene->slots;
+        $slots[$slotKey]['media_credit'] = [
+            'provider' => $candidate['provider'],
+            'provider_label' => $candidate['provider_label'],
+            'author' => $candidate['credit']['author'] ?? '',
+            'source_url' => $candidate['credit']['source_url'] ?? '',
+            'license' => $candidate['license'] ?? '',
+        ];
+        $scene->update(['slots' => $slots]);
+        $this->markStoryboardEdited($project);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'asset' => [
+                    'url' => $asset->url,
+                    'type' => $asset->type,
+                    'source' => 'library',
+                    'name' => $asset->original_name,
+                ],
+                'media_credit' => $slots[$slotKey]['media_credit'],
+            ],
+        ]);
+    }
+
+    /** The orientation a slots media should be, for this projects aspect. */
+    private function orientationFor(Project $project): string
+    {
+        return match ($project->aspect_ratio ?? '16:9') {
+            '9:16' => 'portrait',
+            '1:1' => 'square',
+            default => 'landscape',
+        };
+    }
+
+    /** Keep the source format when it is one the renderer reads. */
+    private function imageExtension(string $url): string
+    {
+        $path = strtolower((string) parse_url($url, PHP_URL_PATH));
+        foreach (['png', 'webp', 'jpeg', 'jpg'] as $extension) {
+            if (str_ends_with($path, '.' . $extension)) {
+                return $extension === 'jpeg' ? 'jpg' : $extension;
+            }
+        }
+
+        return 'jpg';
     }
 
     public function deleteAsset(Project $project, string $sceneId, string $slotKey): JsonResponse
@@ -1434,6 +1636,7 @@ class ExplainerController extends Controller
         }
 
         $schemeName = $project->settings['color_scheme'] ?? null;
+        $mediaLibrary = new MediaLibraryService();
 
         return [
             'id' => $project->id,
@@ -1477,6 +1680,13 @@ class ExplainerController extends Controller
             // library, so the UI says so instead of offering dead controls.
             'music_configured' => MusicProviderFactory::make()->isConfigured(),
             'music_provider' => MusicProviderFactory::provider(),
+            // Free media library: whether the recommendation panel has any
+            // source at all, and which ones (so the UI can say "add an
+            // Unsplash key" rather than silently offering fewer results).
+            'media_library' => [
+                'available' => $mediaLibrary->isAvailable(),
+                'providers' => $mediaLibrary->providers(),
+            ],
             'analysis_attempts' => $project->settings['analysis_attempts'] ?? null,
             'script_skeleton' => $project->settings['script_skeleton'] ?? null,
             'auto_visuals' => $autoVisuals,
@@ -1561,7 +1771,17 @@ class ExplainerController extends Controller
      */
     private function assetSource(string $originalName): string
     {
-        foreach (['slot-fill:' => 'ai', 'stock:' => 'stock', 'sprite:' => 'sprite'] as $prefix => $source) {
+        foreach ([
+            'slot-fill:' => 'ai',
+            // A clip the RENDER fetched by itself vs. one the user picked out
+            // of the free library by hand. They are different things to the
+            // user and, more importantly, to StoryboardDiff: an auto-fetched
+            // clip is discarded when its query changes, a hand-picked one is
+            // as sacred as an upload.
+            'stock:' => 'stock',
+            'library:' => 'library',
+            'sprite:' => 'sprite',
+        ] as $prefix => $source) {
             if (str_starts_with($originalName, $prefix)) {
                 return $source;
             }

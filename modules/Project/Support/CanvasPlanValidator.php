@@ -188,6 +188,12 @@ class CanvasPlanValidator
         // Now anchor every zoom_nest region inside its (final) parent.
         $items = $this->applyNesting($items);
 
+        // Flights are punctuation: every scene the budget did not fund now
+        // sits exactly where its predecessor sat, so the camera has nowhere to
+        // travel and the cut is a cut. Runs AFTER the layout passes, because
+        // it copies final boxes.
+        $items = $this->collapseSameFrame($items);
+
         // ---- Connectors (relation-driven) -------------------------------------
         $labelByPair = [];
         foreach ((array) ($plan['connectors'] ?? []) as $conn) {
@@ -243,7 +249,14 @@ class CanvasPlanValidator
                 // openers like "So ...", "But ...", "Now ..." are the story
                 // telling us how this scene connects.
                 $inferred = $this->inferRelation($context[$item['scene_id']]['narration'] ?? '');
-                if ($inferred !== null && ($inferBudget[$inferred] ?? 0) > 0 && $item['treatment'] === 'canvas_hop') {
+                // `same_frame` is the default treatment now, so restricting
+                // this to canvas_hop would silence the inference on almost
+                // every scene — and reading "But ..." at the head of a beat is
+                // exactly how the flight budget FINDS the cut worth flying.
+                if ($inferred !== null
+                    && ($inferBudget[$inferred] ?? 0) > 0
+                    && in_array($item['treatment'], ['canvas_hop', 'same_frame'], true)
+                ) {
                     $inferBudget[$inferred]--;
                     $item['relation'] = $inferred;
                 } else {
@@ -281,7 +294,11 @@ class CanvasPlanValidator
             $run = ($t === $lastTreatment) ? $run + 1 : 1;
             $lastTreatment = $t;
 
-            if ($run <= $maxRun) {
+            // A run of quiet cuts is the NORMAL shape of a video now, not a
+            // monotony bug. This rule exists to stop nineteen identical
+            // FLIGHTS; breaking a run of same_frame would put the flights
+            // straight back, which is the thing the budget just removed.
+            if ($t === 'same_frame' || $run <= $maxRun) {
                 continue;
             }
 
@@ -303,6 +320,12 @@ class CanvasPlanValidator
             $run = 1;
         }
 
+        // ---- Flight budget ----------------------------------------------------
+        // LAST, deliberately: the run-breaker above mints pull_reveals and
+        // dives of its own to vary a monotone stretch, and the budget has to
+        // have the final word on how much of this video actually moves.
+        $items = $this->applyFlightBudget($items);
+
         // ---- Cycle repeated hold moves ----------------------------------------
         $holdCycle = ExplainerRegistry::canvas()['hold_moves'] ?? ['breathe', 'push_in', 'drift', 'orbit', 'rise'];
         $holdRun = 0;
@@ -318,6 +341,148 @@ class CanvasPlanValidator
                 $lastHold = $next;
                 $holdRun = 1;
             }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Spend the flight budget (§3.3).
+     *
+     * A camera flight across the canvas used to be the treatment for four of
+     * the seven relations, which meant nearly every cut in every video was a
+     * flight — the journey read as constant travel and nothing the cards did
+     * could compete with it. A flight is punctuation: it marks a TOPIC CHANGE.
+     *
+     * So flights are now funded, not assumed. Candidates are ranked by how
+     * much of a break they really are (a new chapter outranks a callback
+     * outranks a contrast outranks a consequence), the budget is a share of
+     * the video's cuts, and everything else becomes `same_frame` — the next
+     * card takes the frame, the camera holds, and the card's own reveal
+     * carries the beat.
+     *
+     * The relation is NOT changed. A scene is still a consequence of the one
+     * before it; it just does not fly to say so. Connectors, sound and the
+     * card's own choreography all still read the relation.
+     */
+    private function applyFlightBudget(array $items): array
+    {
+        $count = count($items);
+        if ($count < 2) {
+            return $items;
+        }
+
+        $budget = ExplainerRegistry::maxFlights($count);
+        $ranked = ExplainerRegistry::flightRelations();
+        $maxDives = ExplainerRegistry::maxDives();
+
+        // Rank every candidate: relation priority first, then earlier scenes,
+        // so a video's flights land on its most meaningful breaks.
+        $candidates = [];
+        foreach ($items as $i => $item) {
+            if ($i === 0) {
+                continue;
+            }
+            $relation = (string) ($item['relation'] ?? 'continues');
+            $rank = array_search($relation, $ranked, true);
+            if ($rank === false) {
+                continue;
+            }
+            $candidates[] = ['index' => $i, 'rank' => (int) $rank];
+        }
+        usort($candidates, fn ($a, $b) => [$a['rank'], $a['index']] <=> [$b['rank'], $b['index']]);
+
+        $funded = [];
+        foreach (array_slice($candidates, 0, $budget) as $candidate) {
+            $funded[$candidate['index']] = true;
+        }
+
+        $dives = 0;
+        $grounded = 0;
+        foreach ($items as $i => &$item) {
+            if ($i === 0) {
+                continue;
+            }
+            $treatment = (string) ($item['treatment'] ?? 'same_frame');
+
+            // A dive is not a flight — it goes INTO the picture already on
+            // screen rather than across the map — but it is still camera
+            // motion, so it carries its own small budget.
+            if ($treatment === 'zoom_nest') {
+                if (++$dives <= $maxDives) {
+                    continue;
+                }
+                $item['treatment'] = 'same_frame';
+                $item['relation'] = 'continues';
+                unset($item['nest'], $item['parent_id']);
+                $grounded++;
+                continue;
+            }
+
+            // These two are not journeys across the canvas: overlay_focus
+            // tours the visual it already landed on, and hero_open is scene 1.
+            if (in_array($treatment, ['overlay_focus', 'hero_open', 'same_frame'], true)) {
+                continue;
+            }
+
+            if (isset($funded[$i])) {
+                // A funded flight keeps whatever expressive treatment it has.
+                if ($treatment === 'same_frame') {
+                    $item['treatment'] = ($item['relation'] ?? '') === 'new_chapter' ? 'pull_reveal' : 'canvas_hop';
+                }
+                continue;
+            }
+
+            $item['treatment'] = 'same_frame';
+            $grounded++;
+        }
+        unset($item);
+
+        if ($grounded > 0) {
+            $this->warn("Canvas: {$grounded} flight(s) grounded to hold the frame (budget {$budget}).");
+        }
+
+        return $items;
+    }
+
+    /**
+     * Put every `same_frame` scene exactly where its predecessor sits.
+     *
+     * This is what makes the cut a cut: with both regions occupying the same
+     * world box, the camera has nowhere to travel, and the arriving card
+     * simply replaces the departing one in the frame.
+     *
+     * A scene whose predecessor has no usable box (a nested region positioned
+     * relative to its parent) cannot be collapsed onto it, so it keeps its own
+     * place and flies — the honest fallback rather than a broken frame.
+     */
+    private function collapseSameFrame(array $items): array
+    {
+        for ($i = 1; $i < count($items); $i++) {
+            if (($items[$i]['treatment'] ?? '') !== 'same_frame') {
+                continue;
+            }
+            $previous = $items[$i - 1];
+            $box = [
+                'x' => $previous['x'] ?? null,
+                'y' => $previous['y'] ?? null,
+                'w' => $previous['w'] ?? null,
+                'h' => $previous['h'] ?? null,
+            ];
+            if (in_array(null, $box, true)) {
+                $this->warn("Canvas: {$items[$i]['scene_id']} could not hold the frame (no box to inherit) -> hop.");
+                $items[$i]['treatment'] = 'canvas_hop';
+                continue;
+            }
+
+            $items[$i]['x'] = (float) $box['x'];
+            $items[$i]['y'] = (float) $box['y'];
+            $items[$i]['w'] = (float) $box['w'];
+            $items[$i]['h'] = (float) $box['h'];
+            // It shares its predecessor's place, so it inherits its depth too
+            // — a stacked pair must not be pushed apart by overlap resolution
+            // or drawn as two stations.
+            $items[$i]['depth'] = $previous['depth'] ?? 0;
         }
 
         return $items;
@@ -644,6 +809,11 @@ class CanvasPlanValidator
             if (in_array($to['treatment'] ?? '', ['zoom_nest', 'pull_reveal'], true)) {
                 $style = 'none'; // the camera move IS the connection
             }
+            // Nothing to draw between two regions in the same place: a
+            // connector needs a journey, and this cut has none.
+            if (($to['treatment'] ?? '') === 'same_frame') {
+                $style = 'none';
+            }
             if ($style === 'arrow' && ++$arrows > $maxArrows) {
                 $style = 'dotted';
             }
@@ -678,23 +848,38 @@ class CanvasPlanValidator
             $items[] = $this->autoPlacedItem($sid, $i, $items, $base, 160);
         }
 
-        // Even the deterministic fallback gets story rhythm: every 5th hop
-        // becomes a wide reveal so the journey breathes.
+        // The fallback obeys the flight budget too, or a director outage
+        // would silently restore the wall-to-wall travel this whole pass
+        // exists to remove. Every FLIGHT_EVERY-th scene is a real break; the
+        // rest hold the frame, stacked on the scene before them. Mirrored by
+        // autoItem() in the renderer's autoLayout.ts.
+        $flightEvery = max(2, (int) round(1 / max(0.05, ExplainerRegistry::flights()['max_share'])));
         foreach ($items as $i => &$item) {
-            if ($i > 0 && $i % 5 === 4) {
+            if ($i === 0) {
+                continue;
+            }
+            if ($i % $flightEvery === 0) {
                 $item['treatment'] = 'pull_reveal';
                 $item['relation'] = 'new_chapter';
+                continue;
             }
+            $item['treatment'] = 'same_frame';
+            $item['relation'] = 'continues';
+            $item['x'] = $items[$i - 1]['x'];
+            $item['y'] = $items[$i - 1]['y'];
+            $item['w'] = $items[$i - 1]['w'];
+            $item['h'] = $items[$i - 1]['h'];
         }
         unset($item);
 
         $connectors = [];
         for ($i = 0; $i < count($sceneIds) - 1; $i++) {
-            $toTreatment = $items[$i + 1]['treatment'] ?? 'canvas_hop';
+            $toTreatment = $items[$i + 1]['treatment'] ?? 'same_frame';
             $connectors[] = [
                 'from' => $sceneIds[$i],
                 'to' => $sceneIds[$i + 1],
-                'style' => $toTreatment === 'pull_reveal' ? 'none' : 'dotted',
+                // No journey, no line: only a real flight is drawn.
+                'style' => in_array($toTreatment, ['pull_reveal', 'same_frame'], true) ? 'none' : 'dotted',
                 'label' => '',
                 'relation' => $items[$i + 1]['relation'] ?? 'continues',
             ];

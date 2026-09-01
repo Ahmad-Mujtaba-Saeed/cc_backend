@@ -35,7 +35,7 @@ class SceneBudgetLinter
     private const ANIMATED_CARDS = [
         'versus_card', 'animated_chart', 'big_counter', 'checklist_card', 'icon_grid',
         'timeline_card', 'step_flow', 'before_after', 'list_ranking', 'progress_meter',
-        'quote_portrait', 'phone_mockup', 'photo_stack', 'map_card', 'headline_ticker',
+        'quote_portrait', 'phone_mockup', 'photo_stack', 'image_grid', 'custom_card', 'map_card', 'headline_ticker',
         'labeled_diagram', 'myth_fact', 'pictogram_percent', 'cycle_diagram', 'spectrum_card', 'quadrant_map', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card', 'venn_card', 'term_card', 'receipt_card', 'decision_tree', 'practice_card', 'common_mistake',
         'math_steps', 'geometry_diagram', 'function_plot', 'scenario_diagram', 'formula_anatomy',
         'chapter_cover', 'outro_card',

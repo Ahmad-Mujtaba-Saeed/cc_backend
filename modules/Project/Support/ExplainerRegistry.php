@@ -465,6 +465,54 @@ class ExplainerRegistry
         return (int) (self::canvas()['max_consecutive_treatment'] ?? 2);
     }
 
+    /**
+     * Flight budget (§3.3): a camera flight across the canvas is punctuation,
+     * not grammar. It marks a topic change; everything else holds the frame.
+     *
+     * @return array{max_share: float, min_per_video: int, relations: string[], max_dives: int}
+     */
+    public static function flights(): array
+    {
+        $f = self::canvas()['flights'] ?? [];
+
+        return [
+            'max_share' => (float) ($f['max_share'] ?? 0.3),
+            'min_per_video' => (int) ($f['min_per_video'] ?? 1),
+            'relations' => array_values(array_filter(
+                (array) ($f['relations'] ?? ['new_chapter', 'callback', 'contrast', 'consequence']),
+                'is_string'
+            )),
+            'max_dives' => (int) ($f['max_dives'] ?? 2),
+        ];
+    }
+
+    /**
+     * How many of a video's cuts may be flights.
+     *
+     * A share rather than a fixed number, so a 20-scene documentary gets more
+     * punctuation than a 5-scene short — floored at min_per_video so even a
+     * tiny video keeps one real move in it.
+     */
+    public static function maxFlights(int $sceneCount): int
+    {
+        $flights = self::flights();
+        $cuts = max(0, $sceneCount - 1);
+
+        return max($flights['min_per_video'], (int) floor($cuts * $flights['max_share']));
+    }
+
+    /** Relations that can earn a flight, most deserving first. */
+    public static function flightRelations(): array
+    {
+        return self::flights()['relations'];
+    }
+
+    /** Per-video cap on zoom_nest dives (camera motion, but not a flight). */
+    public static function maxDives(): int
+    {
+        return self::flights()['max_dives'];
+    }
+
     public static function propAnimations(): array
     {
         return self::canvas()['prop_animations'] ?? ['float'];
