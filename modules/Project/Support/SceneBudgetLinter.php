@@ -652,7 +652,11 @@ class SceneBudgetLinter
     private static function sceneHasMedia(array $scene): bool
     {
         foreach (($scene['slots'] ?? []) as $slot) {
-            if (in_array($slot['content_type'] ?? '', ['image', 'video'], true)) {
+            // A drawn motif (iter 62) is this scene's picture. It carries no
+            // heading and no bullets, so every rule that asks "does this scene
+            // have a visual?" has to count it — otherwise the dead-air rule
+            // merges the one scene in the video that draws its own subject.
+            if (in_array($slot['content_type'] ?? '', ['image', 'video', 'vector_motif'], true)) {
                 return true;
             }
         }

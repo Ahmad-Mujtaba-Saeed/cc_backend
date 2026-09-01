@@ -134,6 +134,19 @@ class ExplainerPreviewService
             $payload['storyboard_rev'] = (int) $settings['storyboard_rev'];
         }
 
+        // Smoothness knobs, added on the same conditional terms and for the
+        // same reason: a project that never touched them must keep the hash it
+        // has, or every finished video in the system reads as stale the day
+        // these shipped. A project that DID touch them has a genuinely
+        // different render — 60fps is a different clock, and the blur changes
+        // every flight frame.
+        if (!empty($settings['render_fps'])) {
+            $payload['render_fps'] = (int) $settings['render_fps'];
+        }
+        if (array_key_exists('motion_blur_enabled', $settings)) {
+            $payload['motion_blur'] = (bool) $settings['motion_blur_enabled'];
+        }
+
         return substr(md5(json_encode($payload, JSON_UNESCAPED_UNICODE)), 0, 20);
     }
 
@@ -217,7 +230,10 @@ class ExplainerPreviewService
         $end = (float) $window['end'];
         $t = $start + max(0.0, ($end - $start)) * 0.65;
 
-        return (int) round($t * ExplainerRegistry::fps());
+        // The still is captured by the SAME composition the render uses, so the
+        // frame index has to be counted on the project's own clock — a 60fps
+        // project previewed at 30fps frames lands halfway through the video.
+        return (int) round($t * ExplainerRegistry::resolveFps($project->settings ?? []));
     }
 
     /** Keep the preview directory from growing without bound. */

@@ -77,6 +77,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/explainer/projects/{project}/motion-style', [ExplainerController::class, 'setMotionStyle']);
     Route::post('/explainer/projects/{project}/skin', [ExplainerController::class, 'setSkin']);
     Route::post('/explainer/projects/{project}/board-style', [ExplainerController::class, 'setBoardStyle']);
+    Route::post('/explainer/projects/{project}/smooth-motion', [ExplainerController::class, 'setSmoothMotion']);
     Route::post('/explainer/projects/{project}/preview', [ExplainerController::class, 'preview']);
     Route::post('/explainer/projects/{project}/composition-mode', [ExplainerController::class, 'setCompositionMode']);
     Route::post('/explainer/projects/{project}/chapter-chip', [ExplainerController::class, 'toggleChapterChip']);

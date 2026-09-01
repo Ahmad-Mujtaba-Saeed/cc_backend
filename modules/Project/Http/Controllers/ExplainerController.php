@@ -1325,6 +1325,49 @@ class ExplainerController extends Controller
     }
 
     /**
+     * Smooth motion: the frame rate this project renders at, and whether the
+     * camera's fast flights are motion-blurred.
+     *
+     * These are the two levers on judder. 60fps halves how far the camera
+     * travels between frames — on the golden fixture the peak hop moves 533px
+     * in one frame at 30, which the eye reads as steps rather than speed — and
+     * roughly doubles render time, which is why it is opt-in per project
+     * rather than a global bump. The blur (copilot.md §2.10) is on by default
+     * and costs ~25% more world renders on the ~14% of frames that are moving
+     * fast enough to need it.
+     */
+    public function setSmoothMotion(Request $request, Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $settings = $project->settings ?? [];
+
+        if ($request->has('render_fps')) {
+            $fps = (int) $request->input('render_fps');
+            if (!in_array($fps, ExplainerRegistry::fpsOptions(), true)) {
+                return response()->json(['success' => false, 'message' => 'Invalid frame rate'], 422);
+            }
+            $settings['render_fps'] = $fps;
+        }
+
+        if ($request->has('motion_blur')) {
+            $settings['motion_blur_enabled'] = filter_var(
+                $request->input('motion_blur'),
+                FILTER_VALIDATE_BOOLEAN
+            );
+        }
+
+        $project->update(['settings' => $settings]);
+
+        return response()->json(['success' => true, 'data' => [
+            'render_fps' => ExplainerRegistry::resolveFps($settings),
+            'motion_blur' => ExplainerRegistry::motionBlurEnabled($settings),
+        ]]);
+    }
+
+    /**
      * Switch how the video is composed: "hybrid" (AI-chaptered mix of canvas
      * journeys and slides), "canvas_journey" (one big world canvas the camera
      * flies across) or classic "slides" (scene-by-scene transitions).
@@ -1720,6 +1763,10 @@ class ExplainerController extends Controller
                 ? $project->settings['board_style']
                 : (string) ($project->settings['board_style_auto'] ?? 'slate'),
             'board_styles' => ExplainerRegistry::boardStyles(),
+            // Smoothness: the render clock and the camera shutter.
+            'render_fps' => ExplainerRegistry::resolveFps($project->settings ?? []),
+            'render_fps_options' => ExplainerRegistry::fpsOptions(),
+            'motion_blur' => ExplainerRegistry::motionBlurEnabled($project->settings ?? []),
             // Live style preview: `current_look` changes whenever a
             // look-affecting setting changes (so the UI refreshes the still),
             // and differing from `rendered_look` means the finished MP4 no

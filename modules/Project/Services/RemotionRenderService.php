@@ -131,7 +131,10 @@ class RemotionRenderService
         $payload = [
             'project_id' => (string) $project->id,
             'output_path' => $outputAbsolutePath,
-            'fps' => ExplainerRegistry::fps(),
+            // Per-project frame rate: 60 halves the camera's per-frame travel,
+            // which is the strongest smoothness lever there is, at roughly
+            // double the render time. Unset = the registry's 30.
+            'fps' => ExplainerRegistry::resolveFps($settings),
             'width' => $width,
             'height' => $height,
             'shot_list' => [
@@ -160,6 +163,12 @@ class RemotionRenderService
                 // pre-field payloads render byte-identically.
                 'backdrop' => [
                     'enabled' => ($settings['backdrop_enabled'] ?? true) !== false,
+                ],
+                // Camera motion blur (§2.10): stacked shutter samples of the
+                // canvas world on fast flights. On by default — the strobe it
+                // removes is a defect, not a taste.
+                'motion_blur' => [
+                    'enabled' => ExplainerRegistry::motionBlurEnabled($settings),
                 ],
                 // Chapter progress chip (§10.3, default off) + brand kit
                 // (§10.4): the logo watermark ships as a URL; the brand

@@ -43,6 +43,52 @@ class ExplainerRegistry
         return (int) (self::all()['fps'] ?? 30);
     }
 
+    /**
+     * The frame rates a project may render at (registry `render_fps.options`).
+     *
+     * @return int[]
+     */
+    public static function fpsOptions(): array
+    {
+        $options = self::all()['render_fps']['options'] ?? [self::fps()];
+
+        return array_values(array_unique(array_map('intval', (array) $options)));
+    }
+
+    /**
+     * The frame rate ONE project renders at.
+     *
+     * 60fps halves how far the camera travels between frames, which is the
+     * single biggest smoothness lever the renderer has — and it roughly
+     * doubles render time, so it is a per-project opt-in rather than a global
+     * bump. An unknown or missing setting falls back to the registry default,
+     * so every pre-existing project keeps rendering at exactly 30.
+     *
+     * @param array<string,mixed> $settings Project settings.
+     */
+    public static function resolveFps(array $settings): int
+    {
+        $requested = (int) ($settings['render_fps'] ?? 0);
+
+        return in_array($requested, self::fpsOptions(), true) ? $requested : self::fps();
+    }
+
+    /**
+     * Camera motion blur (copilot.md §2.10) — on unless the project turned it
+     * off. The renderer treats a missing flag as ON too; both sides default the
+     * same way so a payload written before the flag existed still blurs.
+     *
+     * @param array<string,mixed> $settings Project settings.
+     */
+    public static function motionBlurEnabled(array $settings): bool
+    {
+        if (array_key_exists('motion_blur_enabled', $settings)) {
+            return (bool) $settings['motion_blur_enabled'];
+        }
+
+        return (bool) (self::all()['motion_blur']['default'] ?? true);
+    }
+
     public static function defaultSceneSeconds(): float
     {
         return (float) (self::all()['default_scene_seconds'] ?? 6);
@@ -306,6 +352,16 @@ class ExplainerRegistry
     public static function iconNames(): array
     {
         return self::all()['icon_grid']['icons'] ?? [];
+    }
+
+    /**
+     * Per-video cap on drawn motifs (iter 62). Each one costs a focused LLM
+     * call, and a video whose every beat is a little diagram is as monotonous
+     * as one whose every beat is a bullet list.
+     */
+    public static function maxVectorMotifs(): int
+    {
+        return (int) (self::all()['vector_motif']['max_per_video'] ?? 3);
     }
 
     /** Per-video cap on auto-fetched stock b-roll slots (§8). */

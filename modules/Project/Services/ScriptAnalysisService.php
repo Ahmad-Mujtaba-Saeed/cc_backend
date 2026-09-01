@@ -6,6 +6,7 @@ use Modules\Project\Support\LlmModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Modules\Project\Support\ExplainerRegistry;
+use Modules\Project\Support\MediaBrief;
 
 /**
  * ScriptAnalysisService
@@ -143,6 +144,13 @@ class ScriptAnalysisService
             $parsed = $this->synthesizeMissingVisuals($parsed, $mathTopic, $script);
         }
 
+        // The composer names what it wants DRAWN; a second focused pass draws
+        // it (iter 62). Splitting the two is the whole point: choosing which
+        // beat deserves a picture of its subject and doing coordinate geometry
+        // are different jobs, and a model composing nine scenes has no
+        // attention left for the second one.
+        $parsed = $this->drawRequestedMotifs($parsed);
+
         Log::info('ScriptAnalysisService: shot list received', [
             'scene_count' => count($parsed['scenes'] ?? []),
         ]);
@@ -229,6 +237,105 @@ class ScriptAnalysisService
         }
 
         $parsed['scenes'] = array_values($scenes);
+
+        return $parsed;
+    }
+
+    /**
+     * Draw every `vector_motif` slot the composer asked for (iter 62).
+     *
+     * A motif arrives as a `subject` and no shapes. This fills in the shapes,
+     * up to the registry's per-video cap — each one is a focused LLM call, and
+     * a video whose every beat is a little diagram is as monotonous as one
+     * whose every beat is a bullet list.
+     *
+     * Failure is never fatal and never leaves a hole. A request past the cap,
+     * or one the drawing pass could not satisfy, is turned into an ordinary
+     * IMAGE slot carrying the same subject as its description and search
+     * query, so the beat still gets a picture through the routes that already
+     * exist — stock, AI or an upload. That degrade matters more than the
+     * feature: the alternative is a slot that renders as empty space.
+     */
+    private function drawRequestedMotifs(array $parsed): array
+    {
+        $scenes = array_values((array) ($parsed['scenes'] ?? []));
+        if ($scenes === []) {
+            return $parsed;
+        }
+
+        // Find the pending requests first, so the cap applies to the video and
+        // not to whichever scenes happen to come first in an inner loop.
+        $pending = [];
+        foreach ($scenes as $si => $scene) {
+            foreach ((array) (is_array($scene) ? ($scene['slots'] ?? []) : []) as $key => $slot) {
+                if (!is_array($slot) || ($slot['content_type'] ?? '') !== 'vector_motif') {
+                    continue;
+                }
+                if (is_array($slot['shapes'] ?? null) && $slot['shapes'] !== []) {
+                    continue;
+                }
+                if (trim((string) ($slot['subject'] ?? '')) === '') {
+                    continue;
+                }
+                $pending[] = [$si, $key];
+            }
+        }
+
+        if ($pending === []) {
+            return $parsed;
+        }
+
+        $cap = ExplainerRegistry::maxVectorMotifs();
+        $service = null;
+        $drawn = 0;
+
+        foreach ($pending as [$si, $key]) {
+            $slot = $scenes[$si]['slots'][$key];
+            $subject = (string) $slot['subject'];
+            $result = null;
+
+            if ($drawn < $cap) {
+                try {
+                    $service ??= new VectorMotifService();
+                    $result = $service->draw(
+                        $subject,
+                        (string) ($scenes[$si]['narration']['text'] ?? ''),
+                        $this->title
+                    );
+                } catch (\Throwable $e) {
+                    Log::info('ScriptAnalysisService: motif drawing unavailable', ['error' => $e->getMessage()]);
+                    $result = null;
+                }
+            }
+
+            if ($result !== null) {
+                $slot['shapes'] = $result['shapes'];
+                if ($result['caption'] !== '') {
+                    $slot['caption'] = $result['caption'];
+                }
+                $scenes[$si]['slots'][$key] = $slot;
+                $drawn++;
+                continue;
+            }
+
+            // Degrade to a picture request rather than to nothing.
+            $scenes[$si]['slots'][$key] = [
+                'content_type' => 'image',
+                'asset_request' => [
+                    'description' => $subject,
+                    'search_query' => MediaBrief::deriveQuery($subject),
+                    'media_kind' => 'image',
+                    'guidance' => 'A clear, simple shot of ' . rtrim($subject, '.') . '.',
+                ],
+            ];
+            Log::info('ScriptAnalysisService: motif request degraded to an image slot', [
+                'scene' => $si,
+                'reason' => $drawn >= $cap ? 'per-video cap' : 'drawing failed',
+            ]);
+        }
+
+        $parsed['scenes'] = array_values($scenes);
+        Log::info('ScriptAnalysisService: motifs drawn', ['drawn' => $drawn, 'requested' => count($pending)]);
 
         return $parsed;
     }

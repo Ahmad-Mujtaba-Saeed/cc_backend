@@ -1,5 +1,5 @@
 {
-  "version": 45,
+  "version": 47,
   "motion_styles": {
     "default": "auto",
     "styles": {
@@ -117,6 +117,56 @@
     }
   },
   "fps": 30,
+  "render_fps": {
+    "default": 30,
+    "options": [
+      30,
+      60
+    ],
+    "label": "Smooth motion",
+    "use_when": "60 renders every camera move at half the per-frame travel, so fast flights read as motion instead of steps; it roughly doubles render time"
+  },
+  "motion_blur": {
+    "default": true,
+    "label": "Motion blur",
+    "use_when": "stacked shutter samples of the world on fast camera flights; off restores hard-edged frames"
+  },
+  "vector_motif": {
+    "max_per_video": 3,
+    "view": 100,
+    "max_shapes": 16,
+    "kinds": [
+      "circle",
+      "rect",
+      "line",
+      "arrow",
+      "path",
+      "icon",
+      "label"
+    ],
+    "colors": [
+      "accent",
+      "ink",
+      "muted",
+      "paper",
+      "none"
+    ],
+    "anims": [
+      "draw",
+      "pop",
+      "rise",
+      "fade",
+      "sweep"
+    ],
+    "lives": [
+      "breathe",
+      "float",
+      "sway",
+      "orbit",
+      "pulse"
+    ],
+    "use_when": "the beat is about a concrete object or mechanism the viewer should SEE, and no registry card draws it"
+  },
   "default_scene_seconds": 6,
   "composition_modes": [
     "hybrid",
@@ -559,6 +609,14 @@
       "supports_camera_move": false,
       "description": "A visual you AUTHOR yourself in a small fragment of HTML (inline SVG allowed) plus optional css, for the one beat in a video that no other card can express \u2014 a boarding pass, a chat thread, a scoreboard, a nutrition label, a keyboard, a receipt printer. LAST RESORT ONLY: if any other card fits, that card is better, because it is designed, typeset and animated for you. The fragment is sanitised (no script, no network, no shadows or gradients) and its css is scoped to the card. Animate it ONLY with data-at (0..1 through the scene), data-word (land on that narration word) and data-anim (fade|rise|pop|slide|grow) \u2014 never with css animations. Use the theme variables var(--accent), var(--text), var(--muted), var(--panel), var(--bg) for colour and var(--font-display), var(--font-body), var(--font-mono) for type, so the card matches the video."
     },
+    "vector_motif": {
+      "label": "Drawn Motif",
+      "required": [
+        "subject"
+      ],
+      "supports_camera_move": false,
+      "description": "A small VECTOR DRAWING of the thing this beat is about — a glass bottle melting into a new jar, a packet hopping between routers, a seed becoming a tree. Give ONLY `subject`: one plain sentence naming the concrete object or mechanism to draw, in the video's own words. A second focused pass does the drawing and animates it on the narration, so you are choosing WHAT is drawn, not drawing it. Use it when the beat has a physical thing or mechanism the viewer should SEE, no card in the registry draws it, and a stock photograph would be generic. Do NOT use it for numbers (chart, pictogram, big_counter), for a process of named steps (step_flow), for a comparison (versus_card) or for anything abstract that has no shape."
+    },
     "stock_video": {
       "label": "Stock B-Roll",
       "required": [
@@ -843,8 +901,9 @@
           "allowed": [
             "image",
             "video",
-            "text_block"
-          ]
+            "text_block",
+            "vector_motif"
+]
         }
       }
     },
@@ -857,16 +916,18 @@
           "allowed": [
             "image",
             "video",
-            "text_block"
-          ]
+            "text_block",
+            "vector_motif"
+]
         },
         "slot_right": {
           "label": "Right",
           "allowed": [
             "image",
             "video",
-            "text_block"
-          ]
+            "text_block",
+            "vector_motif"
+]
         }
       }
     },
@@ -879,16 +940,18 @@
           "allowed": [
             "image",
             "video",
-            "text_block"
-          ]
+            "text_block",
+            "vector_motif"
+]
         },
         "slot_bottom": {
           "label": "Bottom",
           "allowed": [
             "image",
             "video",
-            "text_block"
-          ]
+            "text_block",
+            "vector_motif"
+]
         }
       }
     },

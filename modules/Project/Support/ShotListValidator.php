@@ -1016,7 +1016,11 @@ class ShotListValidator
     private function sceneHasMedia(array $scene): bool
     {
         foreach (($scene['slots'] ?? []) as $slot) {
-            if (in_array($slot['content_type'] ?? '', ['image', 'video'], true)) {
+            // A drawn motif (iter 62) is this scene's picture. It carries no
+            // heading and no bullets, so every rule that asks "does this scene
+            // have a visual?" has to count it — otherwise the dead-air rule
+            // merges the one scene in the video that draws its own subject.
+            if (in_array($slot['content_type'] ?? '', ['image', 'video', 'vector_motif'], true)) {
                 return true;
             }
         }
@@ -2774,6 +2778,7 @@ class ShotListValidator
             'formula' => $this->clampFormulaAnatomyContent($slot) ?? $this->genericTextBlock($narrationText),
             'cycle' => $this->clampCycleContent($slot) ?? $this->genericTextBlock($narrationText),
             'custom_html' => $this->clampCustomHtmlContent($slot) ?? $this->genericTextBlock($narrationText),
+            'vector_motif' => $this->clampVectorMotifContent($slot) ?? $this->genericTextBlock($narrationText),
             'spectrum' => $this->clampSpectrumContent($slot) ?? $this->genericTextBlock($narrationText),
             'quadrant' => $this->clampQuadrantContent($slot) ?? $this->genericTextBlock($narrationText),
             'layers' => $this->clampLayerStackContent($slot) ?? $this->genericTextBlock($narrationText),
@@ -4113,6 +4118,75 @@ class ShotListValidator
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
             $clean['caption'] = mb_substr($caption, 0, 90);
+        }
+
+        return $clean;
+    }
+
+    /**
+     * Clamp a vector_motif payload (iter 62).
+     *
+     * A motif arrives in one of two states and both are legal here:
+     *
+     *  - **drawn** — it has `shapes`, because the drawing pass has run. They
+     *    are repaired by {@see VectorMotif::sanitize()}: every number clamped
+     *    into the 100x100 view, every enum defaulted, unknown primitives and
+     *    invisible shapes dropped, ids de-duplicated. The model is allowed to
+     *    be sloppy about everything except intent.
+     *
+     *  - **pending** — it has only a `subject`, because the composer asked for
+     *    a drawing and `VectorMotifService` has not run yet (or could not).
+     *    Kept, so the drawing pass can still find it, and so a re-analysis
+     *    does not silently lose the request.
+     *
+     * A slot with neither is not a motif at all and returns null, which sends
+     * the caller to the text degrade like every other clamp here.
+     *
+     * The repair lives on the way IN rather than at render for the same reason
+     * `custom_html` sanitises here: the storyboard, the preview and the render
+     * must all be looking at the same drawing.
+     */
+    private function clampVectorMotifContent(array $slot): ?array
+    {
+        $subject = trim((string) ($slot['subject'] ?? ''));
+        $hasShapes = is_array($slot['shapes'] ?? null) && $slot['shapes'] !== [];
+
+        if ($subject === '' && !$hasShapes) {
+            return null;
+        }
+
+        $clean = ['content_type' => 'vector_motif'];
+        if ($subject !== '') {
+            $clean['subject'] = mb_substr($subject, 0, 200);
+        }
+
+        $heading = trim((string) ($slot['heading'] ?? ''));
+        if ($heading !== '') {
+            $clean['heading'] = mb_substr($heading, 0, 60);
+        }
+
+        if (!$hasShapes) {
+            // Pending: the drawing pass has not run. Nothing to repair yet.
+            return $clean;
+        }
+
+        $icons = array_flip(ExplainerRegistry::iconNames());
+        $result = VectorMotif::sanitize($slot, static fn (string $name) => isset($icons[$name]));
+
+        foreach ($result['warnings'] as $warning) {
+            $this->warn($warning);
+            $this->changed = true;
+        }
+
+        if (!$result['ok']) {
+            // The drawing did not survive. A subject still can, so the beat
+            // can be re-drawn on the next pass instead of being demoted here.
+            return $subject === '' ? null : $clean;
+        }
+
+        $clean['shapes'] = $result['shapes'];
+        if ($result['caption'] !== '') {
+            $clean['caption'] = $result['caption'];
         }
 
         return $clean;

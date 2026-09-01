@@ -38,6 +38,30 @@ class ExplainerSceneAssembler
         foreach ($scenes as $scene) {
             $slots = $scene->slots ?? [];
             foreach ($slots as $slotKey => &$slot) {
+                // A motif that still has no shapes at RENDER time never got
+                // drawn — the analyze-time pass was capped, failed, or the slot
+                // was written later by the "Edit with AI" revision, which does
+                // not draw. It becomes an ordinary picture request here rather
+                // than an empty rectangle, and then falls through the image
+                // handling below like any other one. This is the last stop
+                // before the payload, so it is the right place for the
+                // guarantee: whatever produced the slot, the beat gets a
+                // visual.
+                if (($slot['content_type'] ?? '') === 'vector_motif'
+                    && !is_array($slot['shapes'] ?? null)
+                ) {
+                    $subject = trim((string) ($slot['subject'] ?? ''));
+                    $slot = [
+                        'content_type' => 'image',
+                        'asset_request' => [
+                            'description' => $subject !== '' ? $subject : 'a simple illustration of this idea',
+                            'search_query' => MediaBrief::deriveQuery($subject),
+                            'media_kind' => 'image',
+                            'guidance' => 'A clear, simple shot of ' . rtrim($subject, '.') . '.',
+                        ],
+                    ];
+                }
+
                 if (!in_array($slot['content_type'] ?? null, ['image', 'video'], true)) {
                     continue;
                 }
