@@ -111,8 +111,19 @@ class LlmModels
      * The model a given role should actually use.
      *
      * Roles: 'explainer' (script writing, analysis, composing, packaging…),
-     * 'math' (the maths escalation valve), 'director' (canvas/composition),
-     * 'vlm' (vision review — never handed a text-only model).
+     * 'planner' (the L1 act planner — see below), 'math' (the maths
+     * escalation valve), 'director' (canvas/composition), 'vlm' (vision
+     * review — never handed a text-only model).
+     *
+     * `planner` was split out of `explainer` on the evidence of the iter-55
+     * bench: run the whole corpus on gpt-4.1 and the CONTENT gets better
+     * (media coverage 77 -> 88, six scripts gain 9-14 points) while the SHAPE
+     * gets worse — the UN's six organs became a `countdown`, four cities became
+     * a `countdown`, a boarding pass became a `journey`, and each wrong spine
+     * then hides the one card that beat needed behind a menu it is not on.
+     * Two jobs, two appetites; splitting the role is what lets one be upgraded
+     * without the other. Unset, it resolves to the explainer model, so this
+     * changes nothing until someone sets it.
      */
     public static function for(string $role): string
     {
@@ -131,8 +142,9 @@ class LlmModels
     /**
      * The role's env/config default, ignoring any admin override.
      *
-     * `math` is the odd one: it is an opt-in escalation on top of the
-     * explainer model, so an unset value means "same as explainer".
+     * `math` and `planner` are the odd ones: both are opt-in adjustments on
+     * top of the explainer model, so an unset value means "same as explainer"
+     * and an untouched install behaves exactly as it always did.
      */
     public static function configured(string $role): string
     {
@@ -140,6 +152,11 @@ class LlmModels
             $math = config('services.openai.explainer_model_math');
 
             return is_string($math) && $math !== '' ? $math : self::configured('explainer');
+        }
+        if ($role === 'planner') {
+            $planner = config('services.openai.planner_model');
+
+            return is_string($planner) && $planner !== '' ? $planner : self::configured('explainer');
         }
 
         [$key, $default] = self::ROLE_CONFIG[$role] ?? self::ROLE_CONFIG['explainer'];

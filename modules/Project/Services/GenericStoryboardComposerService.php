@@ -305,7 +305,7 @@ PROMPT;
             }
 
             $scenes = $this->mapScenes($parsed, $skeleton);
-            $faults = $this->critique($scenes, $skeleton, $targetSeconds);
+            $faults = $this->critique($scenes, $skeleton, $targetSeconds, $script);
 
             if ($best === null || count($faults) < count($bestFaults)) {
                 $best = $scenes;
@@ -430,6 +430,23 @@ PROMPT;
     }
 
     /**
+     * Objects whose whole point is WHAT THEY SAY. A generated photograph of one
+     * comes back with garbled text, which is why `custom_card` exists — and the
+     * bench found it cast ZERO times in thirty scripts, including the two
+     * written for it. See {@see nudgeCustomCard()}.
+     */
+    private const DRAWABLE_OBJECTS = [
+        'boarding pass', 'plane ticket', 'train ticket', 'parking ticket', 'receipt',
+        'invoice', 'nutrition label', 'ingredients label', 'price tag', 'barcode',
+        'text message', 'text messages', 'chat thread', 'chat exchange', 'dm',
+        'scoreboard', 'scorecard', 'league table', 'certificate', 'diploma',
+        'prescription', 'payslip', 'bank statement', 'utility bill', 'menu card',
+        'search results', 'error message', 'warning label', 'road sign', 'number plate',
+        'licence plate', 'license plate', 'passport stamp', 'library card', 'id card',
+        'periodic table cell', 'keyboard layout', 'seating chart', 'flight board',
+    ];
+
+    /**
      * The rules worth a second call: monotony, missing visuals, flat pacing,
      * and dropped phases. Returns one plain-language line per violation —
      * empty means the draft is good. Deliberately the same three failures the
@@ -439,7 +456,7 @@ PROMPT;
      * @param  array|null $scenes  a mapped draft (null = nothing yet)
      * @return array<int, string>
      */
-    private function critique(?array $scenes, array $skeleton, int $targetSeconds = 0): array
+    private function critique(?array $scenes, array $skeleton, int $targetSeconds = 0, string $script = ''): array
     {
         if ($scenes === null || $scenes === []) {
             return [];
@@ -561,6 +578,79 @@ PROMPT;
             }
         }
 
+        $nudge = $this->nudgeCustomCard($scenes, $skeleton, $script);
+        if ($nudge !== null) {
+            $faults[] = $nudge;
+        }
+
         return $faults;
+    }
+
+    /**
+     * The one card the model never reaches for on its own.
+     *
+     * The bench (iter 55) ran thirty scripts and `custom_card` was cast ZERO
+     * times — including on a script about what every field of a boarding pass
+     * means and one about the tells in a scam text, which are two of the
+     * examples in its own doc line. The card is not too rare, it is invisible:
+     * it sits last in a long menu behind cards the model already trusts.
+     *
+     * So when the script plainly names a drawable OBJECT — a thing whose point
+     * is what it SAYS — and no scene cast the card on a phase that offers it,
+     * the retry is told once, by name and by phase. It is a nudge, not a rule:
+     * the model may still decline, and nothing is rewritten if it does.
+     *
+     * The fear that held this back was misfiring on `demo`, where phone_mockup
+     * is genuinely right. The bench measured that at 0 of 4 runs, and the
+     * object list below is deliberately concrete enough that "the dashboard"
+     * or "the settings page" cannot match it.
+     */
+    private function nudgeCustomCard(array $scenes, array $skeleton, string $script): ?string
+    {
+        if ($script === '' || in_array('custom_card', array_column($scenes, 'layout_template'), true)) {
+            return null;
+        }
+
+        $haystack = mb_strtolower($script);
+        $object = null;
+        foreach (self::DRAWABLE_OBJECTS as $needle) {
+            if (str_contains($haystack, $needle)) {
+                $object = $needle;
+                break;
+            }
+        }
+        // The other reliable tell is the object SPEAKING. A script that quotes
+        // what a thing says is a script about what is printed on it — and the
+        // scam-text script does exactly that ("The message says your parcel
+        // could not be delivered") without ever using the phrase "text message".
+        if ($object === null && preg_match(
+            '/\bthe (message|text|email|letter|note|sign|label|receipt|ticket|form|card|screen|headline|notice)'
+            . ' (says|said|reads|asks|shows)\b/',
+            $haystack,
+            $m
+        ) === 1) {
+            $object = $m[1];
+        }
+        if ($object === null) {
+            return null;
+        }
+
+        // Only worth saying if a phase can actually carry it.
+        $phase = null;
+        foreach (array_values($skeleton) as $i => $p) {
+            if (in_array('custom_card', self::menuFor((string) ($p['intent'] ?? '')), true)) {
+                $phase = $i + 1;
+                break;
+            }
+        }
+        if ($phase === null) {
+            return null;
+        }
+
+        return "- The script is about a \"{$object}\" — an object whose whole point is what it SAYS. "
+            . "A generated photograph of one comes back with garbled text, so draw it instead: put it on "
+            . "\"custom_card\" (phase {$phase} or any later phase that offers it) as a small HTML fragment "
+            . 'with the real fields laid out, and give at least two elements a data-at or data-word cue so it '
+            . 'arrives a piece at a time. If a beat genuinely does not need the object drawn, keep the card you chose.';
     }
 }

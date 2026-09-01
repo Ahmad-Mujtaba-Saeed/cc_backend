@@ -2,6 +2,7 @@
 
 namespace Modules\Project\Services;
 
+use Modules\Project\Support\CardSuitability;
 use Modules\Project\Support\LlmModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -222,7 +223,12 @@ PROMPT;
             $response = Http::withToken($this->apiKey)
                 ->timeout(45)
                 ->post('https://api.openai.com/v1/chat/completions', LlmModels::tune([
-                    'model' => LlmModels::for('explainer'),
+                    // The `planner` role, not `explainer`: picking the story
+                    // SPINE and writing the scenes are different jobs, and the
+                    // iter-55 bench measured a model that is better at the
+                    // second and worse at the first. Unset, it resolves to the
+                    // explainer model — today's behaviour exactly.
+                    'model' => LlmModels::for('planner'),
                     'messages' => [
                         ['role' => 'system', 'content' => $system],
                         ['role' => 'user', 'content' => "SCRIPT / TOPIC:\n" . mb_substr(trim($script), 0, 2400)],
@@ -238,7 +244,7 @@ PROMPT;
                 return [];
             }
             CostTracker::recordChat(
-                LlmModels::for('explainer'),
+                LlmModels::for('planner'),
                 $response->json('usage'),
                 'script_skeleton'
             );
@@ -254,7 +260,8 @@ PROMPT;
 
         return $this->repairGeneric(
             (string) ($parsed['shape'] ?? ''),
-            is_array($parsed['phases'] ?? null) ? $parsed['phases'] : []
+            is_array($parsed['phases'] ?? null) ? $parsed['phases'] : [],
+            $script
         );
     }
 
@@ -266,11 +273,14 @@ PROMPT;
      *
      * @return array<int, array{intent: string, brief: string}>
      */
-    public function repairGeneric(string $shape, array $raw): array
+    public function repairGeneric(string $shape, array $raw, string $script = ''): array
     {
         $shape = strtolower(trim($shape));
         if (!isset(self::GENERIC_SHAPES[$shape])) {
             $shape = 'generic';
+        }
+        if ($shape === 'journey') {
+            [$shape, $raw] = $this->demoteTimelessJourney($raw, $script);
         }
         $order = self::GENERIC_SHAPES[$shape];
 
@@ -351,6 +361,71 @@ PROMPT;
         }
 
         return $out;
+    }
+
+    /**
+     * A journey with no TIME in it is not a journey.
+     *
+     * Bench iter 55: the water cycle and the five layers of the atmosphere were
+     * both planned as `journey` — hook / origin / era / era / era / legacy —
+     * because their sections come in a fixed order. But `era` offers only
+     * timeline_card, map_card and the full-bleeds, so the two cards those
+     * scripts exist for (`cycle_diagram`, `layer_stack`, both documented with
+     * those exact examples) were not on any menu to be chosen, and the beats
+     * landed on a MAP CARD instead: one for "86% of evaporation comes off the
+     * ocean", one for "the troposphere is the bottom twelve kilometres".
+     *
+     * Ordered is not the same as chronological. When neither the phase briefs
+     * NOR the script carries a single time marker, the spine is rebuilt as
+     * `generic`, whose `aspect` menu is where the structural cards live.
+     *
+     * Conservative on purpose — it demotes only when there is NO chronology
+     * anywhere, so a history video that merely writes terse briefs keeps its
+     * timeline as long as its script says "1956" or "the 1960s" somewhere. The
+     * cost of a wrong demotion is losing `timeline_card`; the cost of a wrong
+     * journey is a map of the atmosphere.
+     *
+     * @param  array $raw  the planner's phases
+     * @return array{0: string, 1: array}  [shape, phases]
+     */
+    private function demoteTimelessJourney(array $raw, string $script): array
+    {
+        $texts = [$script];
+        foreach ($raw as $p) {
+            if (is_array($p)) {
+                $texts[] = (string) (is_scalar($p['brief'] ?? null) ? $p['brief'] : '');
+            }
+        }
+        foreach ($texts as $text) {
+            if (trim($text) !== '' && CardSuitability::looksChronological($text)) {
+                return ['journey', $raw];   // a real chronology — leave it alone
+            }
+        }
+
+        // Same beats, re-labelled onto the generic spine: where it starts is
+        // context, each chapter is a facet, what it left behind is the payoff.
+        $map = [
+            'hook' => 'hook',
+            'origin' => 'context',
+            'era' => 'aspect',
+            'turning_point' => 'aspect',
+            'legacy' => 'payoff',
+        ];
+        $moved = [];
+        foreach ($raw as $p) {
+            if (!is_array($p)) {
+                continue;
+            }
+            $intent = strtolower(trim((string) (is_scalar($p['intent'] ?? null) ? $p['intent'] : '')));
+            $p['intent'] = $map[$intent] ?? $intent;
+            $moved[] = $p;
+        }
+
+        Log::info('ScriptSkeletonService: journey with no chronology -> generic', [
+            'phases' => count($moved),
+        ]);
+
+        return ['generic', $moved];
     }
 
     private function genericFallbackBrief(string $intent): string

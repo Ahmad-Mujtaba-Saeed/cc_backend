@@ -17,8 +17,18 @@ docker compose exec -T app php scratchpad/bench.php --tag=baseline
 # one script, six times, to measure a stochastic cast
 docker compose exec -T app php scratchpad/bench.php --only=boarding-pass --repeat=6 --tag=custom6
 
-# the same corpus on a stronger model (restored on exit)
+# the same corpus on a stronger model (the admin setting is restored on exit,
+# and on SIGTERM — a killed run used to leave the live app on `auto`)
 docker compose exec -T app php scratchpad/bench.php --model=gpt-4.1 --tag=strong
+
+# TIERED: move one role only, everything else pinned to what it is today
+docker compose exec -T app php scratchpad/bench.php --tag=tier-composer \
+    --role=explainer:gpt-4.1,planner:gpt-4.1-mini
+
+# one run file from several, later tags winning case by case — so an A/B after
+# a fix does not need all thirty cases re-run
+docker compose exec -T app php scratchpad/bench/splice-runs.php \
+    baseline after-routing --out=baseline-post
 
 # read a run; re-scores from the stored storyboards, so this is free
 docker compose exec -T app php scratchpad/bench-report.php baseline
@@ -29,8 +39,15 @@ docker compose exec -T app php scratchpad/bench-report.php baseline --full   # e
 docker compose exec -T app php scratchpad/bench-check.php
 ```
 
-`--resume` continues a run that died; `--no-director` skips the canvas pass
-(cheaper, and flights go unscored); `--limit`, `--only`, `--skip` narrow it.
+`--resume` continues a run that died — it skips only cases that SUCCEEDED, so a
+rate-limited case is retried rather than counted as a result. A 429 is retried
+twice in place (25s, 60s) before a case is recorded as failed, because "is the
+strong model better?" must not quietly become "how many of its calls got
+through?". `--no-director` skips the canvas pass (cheaper, and flights go
+unscored); `--limit`, `--only`, `--skip` narrow it.
+
+**What a run costs** (measured off `render_cost_events`): the full 30 scripts is
+about **$0.16 on gpt-4.1-mini** and about **$1.75 on gpt-4.1**.
 
 ## What it runs
 
@@ -87,6 +104,21 @@ storyboards, so an argument about the rubric costs nothing.
 `function_plot` / `formula_anatomy` (the iter-43 globalisation). A regression in
 `MathTopicService` or in the ratio safety net shows up here as a `routing`
 error, not as a mysteriously worse video.
+
+## Noise: a single-run delta is not evidence
+
+The composer runs at temperature 0.4, and some scripts swing hard. Measured on
+this corpus (iter 58): `front-doors` scored 91.6 / 77.3 / 91.4 on three
+identical runs, and `text-scam` has been seen at 58.3, 63.8, 64.0, 78.0 and
+96.4. So:
+
+- **Per-case claims need `--repeat=3` or more.** A one-run difference under
+  about 15 points on a single script says nothing.
+- **The corpus MEAN over 30 scripts is much steadier** than any one case, and
+  is the number to compare between runs.
+- A structural change (a card that was not on any menu becoming reachable) can
+  be asserted directly in a check script instead — cheaper and certain. That is
+  what `shape-menu-check.php` does.
 
 ## What it cannot tell you
 

@@ -1,0 +1,63 @@
+{
+    "tag": "tier-composer",
+    "started_at": "2026-09-01T08:30:55+00:00",
+    "aspect": "16:9",
+    "model": "auto",
+    "explainer_model": "gpt-4.1",
+    "math_model": "gpt-4.1-mini",
+    "director_model": "gpt-4.1-mini",
+    "role_models": {
+        "explainer": "gpt-4.1",
+        "planner": "gpt-4.1-mini",
+        "math": "gpt-4.1-mini",
+        "director": "gpt-4.1-mini",
+        "general": "gpt-4.1-mini",
+        "vlm": "gpt-4.1-mini"
+    },
+    "with_director": true,
+    "repeat": 1,
+    "cases": [
+        {
+            "error": "Script analysis failed (HTTP 429) @ ScriptAnalysisService.php:336",
+            "id": "city-flooding",
+            "pass": 1,
+            "seconds": 96.2
+        },
+        {
+            "error": "Script analysis failed (HTTP 429) @ ScriptAnalysisService.php:336",
+            "id": "airline-seats",
+            "pass": 1,
+            "seconds": 98.3
+        },
+        {
+            "error": "Script analysis failed (HTTP 429) @ ScriptAnalysisService.php:336",
+            "id": "sleep-eight-hours",
+            "pass": 1,
+            "seconds": 97
+        },
+        {
+            "error": "Script analysis failed (HTTP 429) @ ScriptAnalysisService.php:336",
+            "id": "minimum-wage",
+            "pass": 1,
+            "seconds": 92.9
+        },
+        {
+            "error": "Script analysis failed (HTTP 429) @ ScriptAnalysisService.php:336",
+            "id": "glass-recycling",
+            "pass": 1,
+            "seconds": 93.2
+        },
+        {
+            "error": "Script analysis failed (HTTP 429) @ ScriptAnalysisService.php:336",
+            "id": "shipping-container",
+            "pass": 1,
+            "seconds": 96.1
+        },
+        {
+            "error": "Script analysis failed (HTTP 429) @ ScriptAnalysisService.php:336",
+            "id": "penicillin",
+            "pass": 1,
+            "seconds": 96.4
+        }
+    ]
+}

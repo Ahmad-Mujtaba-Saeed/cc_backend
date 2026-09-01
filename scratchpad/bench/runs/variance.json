@@ -1,0 +1,3905 @@
+{
+    "tag": "variance",
+    "started_at": "2026-09-01T10:21:42+00:00",
+    "aspect": "16:9",
+    "model": "gpt-4.1-mini",
+    "explainer_model": "gpt-4.1-mini",
+    "math_model": "gpt-4.1-mini",
+    "director_model": "gpt-4.1-mini",
+    "role_models": [],
+    "with_director": false,
+    "repeat": 3,
+    "cases": [
+        {
+            "title": "How a delivery text scam works",
+            "shape": "argument",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Introduce the scam message about undelivered parcel and fee"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Explain timing targets people expecting parcels on Tuesday afternoons"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Sender uses mobile number, unlike real couriers with registered short codes"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Link mimics courier domain but controlled by scammer"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Page requests £1.99, focusing on card details, not money"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Follow-up call from bank fraud team to get verification code"
+                },
+                {
+                    "intent": "resolution",
+                    "brief": "Scam’s structure: small urgent ask followed by a trust-leveraging call"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "Why that sentence and scam design effectively trap victims"
+                }
+            ],
+            "attempts": 1,
+            "composed_by_tree": false,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The message says your parcel could not be delivered and asks for one small fee. Here is why that particular sentence works."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "opening",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "The Scam Message",
+                            "bullets": [
+                                "Parcel not delivered notice",
+                                "Requests a small fee",
+                                "Why this sentence works"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "It arrives on a Tuesday afternoon, when a lot of people genuinely are expecting something. The scam does not need to be believable to everyone. It needs to be believable to the fraction who have a parcel out."
+                    },
+                    "layout_template": "layer_stack",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_layers": {
+                            "content_type": "layers",
+                            "layers": [
+                                {
+                                    "label": "Tuesday Afternoon",
+                                    "caption": "Peak parcel delivery time"
+                                },
+                                {
+                                    "label": "People Expecting Parcels",
+                                    "caption": "Many await deliveries"
+                                },
+                                {
+                                    "label": "Scam Target Audience",
+                                    "caption": "Only a fraction need to believe"
+                                }
+                            ],
+                            "highlight_index": 2,
+                            "heading": "Timing Targets Parcel Recipients"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "The sender is a mobile number, not a company name, because a real courier sends from a registered short code. That is the first tell."
+                    },
+                    "layout_template": "versus_card",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "label": "Scam Sender Number",
+                            "camera_move": "pan_right",
+                            "asset_request": {
+                                "description": "Screenshot of a scam SMS from a mobile number",
+                                "search_query": "sms scam message mobile number",
+                                "media_kind": "image",
+                                "guidance": "Close-up of a phone screen showing a scam SMS from a mobile number, no company name."
+                            }
+                        },
+                        "slot_right": {
+                            "content_type": "image",
+                            "label": "Real Courier Short Code",
+                            "camera_move": "pan_left",
+                            "asset_request": {
+                                "description": "Screenshot of a real courier SMS from a registered short code",
+                                "search_query": "sms courier short code",
+                                "media_kind": "image",
+                                "guidance": "Close-up of a phone screen showing a legitimate courier SMS from a short code."
+                            }
+                        },
+                        "slot_versus": {
+                            "content_type": "versus",
+                            "left": {
+                                "label": "Scam Sender",
+                                "stats": [
+                                    "Mobile number",
+                                    "No company name"
+                                ]
+                            },
+                            "right": {
+                                "label": "Real Courier",
+                                "stats": [
+                                    "Registered short code",
+                                    "Company name shown"
+                                ]
+                            },
+                            "verdict": "Mobile number reveals scam"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "The link is the second. It reads like the courier's domain with one extra word in front of it, and the part your phone shows you is the part before the first slash, which is the part the scammer controls."
+                    },
+                    "layout_template": "animated_chart",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_chart": {
+                            "chart_type": "bar",
+                            "values": [
+                                75,
+                                15,
+                                10
+                            ],
+                            "labels": [
+                                "Courier domain",
+                                "Extra word added",
+                                "Visible URL part"
+                            ],
+                            "unit": "%",
+                            "highlight_index": 2,
+                            "source": "Scam URL analysis",
+                            "caption": "Most visible URL part is scam-controlled"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "Then the page asks for one pound ninety-nine. The money is not the point. The card number is the point, and so is the fact that you typed it voluntarily."
+                    },
+                    "layout_template": "quote_card",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Scam Motivation",
+                            "body": "“The small fee is a lure; your card details and voluntary input are the real targets.”"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The last step happens days later: a phone call from your bank's fraud team, who already have half your details and need the code they just texted you."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "Bank Fraud Call",
+                            "camera_move": "pedestal_up",
+                            "asset_request": {
+                                "description": "Person receiving a suspicious phone call about bank fraud",
+                                "search_query": "bank fraud phone call",
+                                "media_kind": "image",
+                                "guidance": "A close-up of a worried person holding a phone, representing a bank fraud call."
+                            }
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "The whole thing is one shape. A small, plausible, urgent ask, and then a second contact that leans on the first."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Scam Structure",
+                            "bullets": [
+                                "Small urgent fee request",
+                                "Follow-up call leverages trust",
+                                "Two-step trap design"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_8",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Here is why that particular sentence works."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "consequence",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Why It Works",
+                            "bullets": [
+                                "Targets parcel receivers",
+                                "Looks urgent but small",
+                                "Leverages trust with follow-up"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The message says your parcel could not be delivered and asks for one small fee. Here is why that particular sentence works."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "The Scam Message",
+                            "bullets": [
+                                "Parcel not delivered notice",
+                                "Requests a small fee",
+                                "Why this sentence works"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 14,
+                    "narration": {
+                        "text": "It arrives on a Tuesday afternoon, when a lot of people genuinely are expecting something. The scam does not need to be believable to everyone. It needs to be believable to the fraction who have a parcel out."
+                    },
+                    "layout_template": "layer_stack",
+                    "slots": {
+                        "slot_layers": {
+                            "content_type": "layers",
+                            "layers": [
+                                {
+                                    "label": "Tuesday Afternoon",
+                                    "caption": "Peak parcel delivery time"
+                                },
+                                {
+                                    "label": "People Expecting Parcels",
+                                    "caption": "Many await deliveries"
+                                },
+                                {
+                                    "label": "Scam Target Audience",
+                                    "caption": "Only a fraction need to believe"
+                                }
+                            ],
+                            "highlight_index": 2,
+                            "heading": "Timing Targets Parcel Recipients"
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "The sender is a mobile number, not a company name, because a real courier sends from a registered short code. That is the first tell."
+                    },
+                    "layout_template": "versus_card",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "label": "Scam Sender Number",
+                            "camera_move": "pan_right",
+                            "asset_request": {
+                                "description": "Screenshot of a scam SMS from a mobile number",
+                                "search_query": "sms scam message mobile",
+                                "guidance": "Close-up of a phone screen showing a scam SMS from a mobile number, no company name.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_right": {
+                            "content_type": "image",
+                            "label": "Real Courier Short Code",
+                            "camera_move": "pan_left",
+                            "asset_request": {
+                                "description": "Screenshot of a real courier SMS from a registered short code",
+                                "search_query": "sms courier short code",
+                                "guidance": "Close-up of a phone screen showing a legitimate courier SMS from a short code.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_versus": {
+                            "content_type": "versus",
+                            "left": {
+                                "label": "Scam Sender",
+                                "stats": [
+                                    "Mobile number",
+                                    "No company name"
+                                ]
+                            },
+                            "right": {
+                                "label": "Real Courier",
+                                "stats": [
+                                    "Registered short code",
+                                    "Company name shown"
+                                ]
+                            },
+                            "verdict": "Mobile number reveals scam"
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 14,
+                    "narration": {
+                        "text": "The link is the second. It reads like the courier's domain with one extra word in front of it, and the part your phone shows you is the part before the first slash, which is the part the scammer controls."
+                    },
+                    "layout_template": "animated_chart",
+                    "slots": {
+                        "slot_chart": {
+                            "content_type": "chart",
+                            "chart_type": "bar",
+                            "values": [
+                                75,
+                                15,
+                                10
+                            ],
+                            "labels": [
+                                "Courier domain",
+                                "Extra word added",
+                                "Visible URL part"
+                            ],
+                            "unit": "%",
+                            "caption": "Most visible URL part is scam-controlled",
+                            "highlight_index": 2,
+                            "source": "Scam URL analysis"
+                        }
+                    },
+                    "transition": "zoom_out_in",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "Then the page asks for one pound ninety-nine. The money is not the point. The card number is the point, and so is the fact that you typed it voluntarily."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Scam Motivation",
+                            "bullets": [
+                                "Then the page asks for one pound ninety-nine."
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 11.2,
+                    "narration": {
+                        "text": "The last step happens days later: a phone call from your bank's fraud team, who already have half your details and need the code they just texted you."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "Bank Fraud Call",
+                            "camera_move": "pedestal_up",
+                            "asset_request": {
+                                "description": "Person receiving a suspicious phone call about bank fraud",
+                                "search_query": "bank fraud phone call",
+                                "guidance": "A close-up of a worried person holding a phone, representing a bank fraud call.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "The whole thing is one shape. A small, plausible, urgent ask, and then a second contact that leans on the first."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Scam Structure",
+                            "bullets": [
+                                "Small urgent fee request",
+                                "Follow-up call leverages trust",
+                                "Two-step trap design"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "push_up",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Here is why that particular sentence works."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Why It Works",
+                            "bullets": [
+                                "Targets parcel receivers",
+                                "Looks urgent but small",
+                                "Leverages trust with follow-up"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "whip_pan",
+                    "relation": "consequence",
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_2: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_3: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_4: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_5: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_6: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_7: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_8: 'consequence' relation -> signature transition 'whip_pan'.",
+                "Scene scene_4: broke a run of 'stack_push' transitions -> 'zoom_out_in'.",
+                "Scene scene_7: broke a run of 'stack_push' transitions -> 'push_up'.",
+                "No peak card in the window starting at 49s (nothing safely upgradeable)."
+            ],
+            "plan_items": [],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "warn",
+                        "code": "static_hold",
+                        "scene_id": "scene_5",
+                        "message": "12.0s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "template_streak",
+                        "scene_id": "scene_8",
+                        "message": "\"single_focus\" runs 3+ scenes in a row — the rhythm flatlines."
+                    },
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card in the final stretch (from 49s)."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 2,
+                    "info": 1
+                },
+                "checked_at": "2026-09-01T10:22:51+00:00"
+            },
+            "id": "text-scam",
+            "pass": 1,
+            "seconds": 66.9,
+            "spend_usd": 0.0069,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 0.35,
+                    "variety": 0.35,
+                    "media": 0.9,
+                    "pacing": 0.6,
+                    "lint": 1,
+                    "flights": 0.5
+                },
+                "total": 64,
+                "findings": [
+                    {
+                        "severity": "error",
+                        "code": "missed_beat",
+                        "message": "no custom_card/labeled_diagram/myth_fact/common_mistake — the text message itself has to be on screen with its tells pointed at"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no custom_card — a chat exchange is the card doc's own example of what NOT to ask a phone_mockup for"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no step_flow/checklist_card/timeline_card — the two-contact shape is a sequence"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "streak",
+                        "message": "single_focus runs 3 scenes in a row"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "single_focus",
+                        "message": "4 of 8 scenes are single_focus (50%)"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "model_ignored_variety",
+                        "message": "composer draft: streak 3, single_focus 4/8 — the variety rule is advisory and was not followed"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "brief_guidance",
+                        "message": "2 of 3 guidance lines never say what to AVOID (the prompt asks for it)"
+                    },
+                    {
+                        "severity": "error",
+                        "code": "runtime",
+                        "message": "92s against a 65s target (142%)"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:static_hold",
+                        "message": "scene_5: 12.0s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:template_streak",
+                        "message": "scene_8: \"single_focus\" runs 3+ scenes in a row — the rhythm flatlines."
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 8,
+                        "templates": [
+                            "single_focus",
+                            "layer_stack",
+                            "versus_card",
+                            "animated_chart",
+                            "quote_card"
+                        ],
+                        "order": [
+                            "single_focus",
+                            "layer_stack",
+                            "versus_card",
+                            "animated_chart",
+                            "quote_card",
+                            "single_focus",
+                            "single_focus",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 4,
+                            "layer_stack": 1,
+                            "versus_card": 1,
+                            "animated_chart": 1,
+                            "quote_card": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.5,
+                        "max_streak": 3,
+                        "streak_template": "single_focus",
+                        "media_scenes": 2,
+                        "media_share": 0.25,
+                        "total_seconds": 92.2,
+                        "min_seconds": 10,
+                        "max_seconds": 14,
+                        "spread": 4,
+                        "brief": {
+                            "slots": 3,
+                            "query_ok": 3,
+                            "kind_ok": 3,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 8,
+                        "templates": [
+                            "single_focus",
+                            "layer_stack",
+                            "versus_card",
+                            "animated_chart",
+                            "quote_card"
+                        ],
+                        "order": [
+                            "single_focus",
+                            "layer_stack",
+                            "versus_card",
+                            "animated_chart",
+                            "quote_card",
+                            "single_focus",
+                            "single_focus",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 4,
+                            "layer_stack": 1,
+                            "versus_card": 1,
+                            "animated_chart": 1,
+                            "quote_card": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.5,
+                        "max_streak": 3,
+                        "streak_template": "single_focus",
+                        "media_scenes": 2,
+                        "media_share": 0.25,
+                        "total_seconds": 84,
+                        "min_seconds": 10,
+                        "max_seconds": 11,
+                        "spread": 1,
+                        "brief": {
+                            "slots": 3,
+                            "query_ok": 3,
+                            "kind_ok": 3,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "argument",
+                    "phases": 8,
+                    "math_mode": false,
+                    "target_seconds": 65,
+                    "attempts": 1,
+                    "composed_by_tree": false,
+                    "validator_warnings": 10
+                }
+            }
+        },
+        {
+            "title": "How a delivery text scam works",
+            "shape": "argument",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Introduce the scam message about undelivered parcel and fee"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Explain timing targets people expecting parcels on Tuesday afternoons"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Sender uses mobile number, unlike real couriers with registered short codes"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Link mimics courier domain but controlled by scammer"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Page requests £1.99, focusing on card details, not money"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Follow-up call from bank fraud team to get verification code"
+                },
+                {
+                    "intent": "resolution",
+                    "brief": "Scam’s structure: small urgent ask followed by a second contact"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "Why this sentence and approach effectively trap victims"
+                }
+            ],
+            "attempts": 1,
+            "composed_by_tree": false,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The message says your parcel could not be delivered and asks for one small fee."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "opening",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Scam Message Alert",
+                            "bullets": [
+                                "Parcel undelivered claim",
+                                "Requests a small fee",
+                                "Designed to prompt action"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "It arrives on a Tuesday afternoon, when a lot of people genuinely are expecting something. The scam does not need to be believable to everyone. It needs to be believable to the fraction who have a parcel out."
+                    },
+                    "layout_template": "layer_stack",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_layers": {
+                            "layers": [
+                                {
+                                    "label": "Tuesday Afternoon",
+                                    "caption": "Peak parcel delivery time"
+                                },
+                                {
+                                    "label": "Recipients Expecting Parcels",
+                                    "caption": "Targeted fraction of people"
+                                },
+                                {
+                                    "label": "Others Ignored",
+                                    "caption": "Not everyone needs to believe"
+                                }
+                            ],
+                            "highlight_index": 1,
+                            "heading": "Timing Targets Parcel Expecters"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The sender is a mobile number, not a company name, because a real courier sends from a registered short code. That is the first tell."
+                    },
+                    "layout_template": "versus_card",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "label": "Scam Sender Number",
+                            "camera_move": "pan_right",
+                            "asset_request": {
+                                "description": "Mobile phone screen showing a text from a mobile number sender",
+                                "search_query": "mobile text message number sender",
+                                "media_kind": "image",
+                                "guidance": "Close-up of a phone screen with a text message from a mobile number, no company name."
+                            }
+                        },
+                        "slot_right": {
+                            "content_type": "image",
+                            "label": "Real Courier Short Code",
+                            "camera_move": "pan_left",
+                            "asset_request": {
+                                "description": "Mobile phone screen showing a text from a registered courier short code",
+                                "search_query": "mobile text message short code",
+                                "media_kind": "image",
+                                "guidance": "Close-up of a phone screen with a text message from a courier short code, clearly branded."
+                            }
+                        },
+                        "slot_versus": {
+                            "left": {
+                                "label": "Scam Sender",
+                                "stats": [
+                                    "From mobile number",
+                                    "No company name",
+                                    "Easier to spoof"
+                                ]
+                            },
+                            "right": {
+                                "label": "Real Courier",
+                                "stats": [
+                                    "From registered short code",
+                                    "Company name shown",
+                                    "More trustworthy"
+                                ]
+                            },
+                            "verdict": "Mobile number sender is a scam tell"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The link is the second. It reads like the courier's domain with one extra word in front of it, and the part your phone shows you is the part before the first slash, which is the part the scammer controls."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "Fake Courier Link on Phone",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "Close-up of phone screen showing a scam link resembling a courier domain with an extra word",
+                                "search_query": "mobile phone scam link",
+                                "media_kind": "image",
+                                "guidance": "Clear focus on the URL bar showing a fake courier domain with an extra word prefix."
+                            }
+                        },
+                        "slot_panel": {
+                            "content_type": "explanation_box",
+                            "heading": "Fake Link Control",
+                            "body": "The scammer controls the part before the first slash, making the link look legitimate but redirecting you."
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "Then the page asks for one pound ninety-nine. The money is not the point. The card number is the point, and so is the fact that you typed it voluntarily."
+                    },
+                    "layout_template": "quote_card",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Scammer's Trick",
+                            "bullets": [
+                                "£1.99 fee request",
+                                "Money is a distraction",
+                                "Card details are the real target",
+                                "Voluntary typing is key"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "The last step happens days later: a phone call from your bank's fraud team, who already have half your details and need the code they just texted you."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "Bank Fraud Call",
+                            "camera_move": "push_in",
+                            "asset_request": {
+                                "description": "Phone screen showing an incoming call labeled as bank fraud team",
+                                "search_query": "phone call fraud alert",
+                                "media_kind": "image",
+                                "guidance": "Close-up of phone screen receiving a call from a bank fraud team, urgent tone."
+                            }
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The whole thing is one shape. A small, plausible, urgent ask, and then a second contact that leans on the first."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "consequence",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Scam Structure",
+                            "bullets": [
+                                "Small, urgent fee request",
+                                "Follow-up call for verification",
+                                "Second contact builds on first",
+                                "Designed to trap victims"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_8",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Here is why that particular sentence works."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "consequence",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "The Trick Explained",
+                            "bullets": [
+                                "Targets those expecting parcels",
+                                "Uses urgency and plausibility",
+                                "Leads victims to act quickly",
+                                "A sentence that hooks effectively"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The message says your parcel could not be delivered and asks for one small fee."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Scam Message Alert",
+                            "bullets": [
+                                "Parcel undelivered claim",
+                                "Requests a small fee",
+                                "Designed to prompt action"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 14,
+                    "narration": {
+                        "text": "It arrives on a Tuesday afternoon, when a lot of people genuinely are expecting something. The scam does not need to be believable to everyone. It needs to be believable to the fraction who have a parcel out."
+                    },
+                    "layout_template": "layer_stack",
+                    "slots": {
+                        "slot_layers": {
+                            "content_type": "layers",
+                            "layers": [
+                                {
+                                    "label": "Tuesday Afternoon",
+                                    "caption": "Peak parcel delivery time"
+                                },
+                                {
+                                    "label": "Recipients Expecting Par",
+                                    "caption": "Targeted fraction of people"
+                                },
+                                {
+                                    "label": "Others Ignored",
+                                    "caption": "Not everyone needs to believe"
+                                }
+                            ],
+                            "highlight_index": 1,
+                            "heading": "Timing Targets Parcel Expecters"
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The sender is a mobile number, not a company name, because a real courier sends from a registered short code. That is the first tell."
+                    },
+                    "layout_template": "versus_card",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "label": "Scam Sender Number",
+                            "camera_move": "pan_right",
+                            "asset_request": {
+                                "description": "Mobile phone screen showing a text from a mobile number sender",
+                                "search_query": "mobile text message number",
+                                "guidance": "Close-up of a phone screen with a text message from a mobile number, no company name.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_right": {
+                            "content_type": "image",
+                            "label": "Real Courier Short Code",
+                            "camera_move": "pan_left",
+                            "asset_request": {
+                                "description": "Mobile phone screen showing a text from a registered courier short code",
+                                "search_query": "mobile text message short",
+                                "guidance": "Close-up of a phone screen with a text message from a courier short code, clearly branded.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_versus": {
+                            "content_type": "versus",
+                            "left": {
+                                "label": "Scam Sender",
+                                "stats": [
+                                    "From mobile number",
+                                    "No company name",
+                                    "Easier to spoof"
+                                ]
+                            },
+                            "right": {
+                                "label": "Real Courier",
+                                "stats": [
+                                    "From registered short code",
+                                    "Company name shown",
+                                    "More trustworthy"
+                                ]
+                            },
+                            "verdict": "Mobile number sender is a scam tell"
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 14,
+                    "narration": {
+                        "text": "The link is the second. It reads like the courier's domain with one extra word in front of it, and the part your phone shows you is the part before the first slash, which is the part the scammer controls."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "Fake Courier Link on Phone",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "Close-up of phone screen showing a scam link resembling a courier domain with an extra word",
+                                "search_query": "mobile phone scam link",
+                                "guidance": "Clear focus on the URL bar showing a fake courier domain with an extra word prefix.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_panel": {
+                            "content_type": "explanation_box",
+                            "heading": "Fake Link Control",
+                            "body": "The scammer controls the part before the first slash, making the link look legitimate but redirecting you.",
+                            "dock": "right",
+                            "width_pct": 33
+                        }
+                    },
+                    "transition": "zoom_out_in",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "Then the page asks for one pound ninety-nine. The money is not the point. The card number is the point, and so is the fact that you typed it voluntarily."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Scammer's Trick",
+                            "bullets": [
+                                "£1.99 fee request",
+                                "Money is a distraction",
+                                "Card details are the real target",
+                                "Voluntary typing is key"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 11.2,
+                    "narration": {
+                        "text": "The last step happens days later: a phone call from your bank's fraud team, who already have half your details and need the code they just texted you."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "Bank Fraud Call",
+                            "camera_move": "push_in",
+                            "asset_request": {
+                                "description": "Phone screen showing an incoming call labeled as bank fraud team",
+                                "search_query": "phone call fraud alert",
+                                "guidance": "Close-up of phone screen receiving a call from a bank fraud team, urgent tone.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The whole thing is one shape. A small, plausible, urgent ask, and then a second contact that leans on the first."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Scam Structure",
+                            "bullets": [
+                                "Small, urgent fee request",
+                                "Follow-up call for verification",
+                                "Second contact builds on first",
+                                "Designed to trap victims"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "whip_pan",
+                    "relation": "consequence",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Here is why that particular sentence works."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "The Trick Explained",
+                            "bullets": [
+                                "Targets those expecting parcels",
+                                "Uses urgency and plausibility",
+                                "Leads victims to act quickly",
+                                "A sentence that hooks effectively"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "whip_pan",
+                    "relation": "consequence",
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_2: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_3: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_4: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_5: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_6: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_7: 'consequence' relation -> signature transition 'whip_pan'.",
+                "Scene scene_8: 'consequence' relation -> signature transition 'whip_pan'.",
+                "Scene scene_4: broke a run of 'stack_push' transitions -> 'zoom_out_in'.",
+                "No peak card in the window starting at 50s (nothing safely upgradeable)."
+            ],
+            "plan_items": [],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "warn",
+                        "code": "template_streak",
+                        "scene_id": "scene_8",
+                        "message": "\"single_focus\" runs 3+ scenes in a row — the rhythm flatlines."
+                    },
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card in the final stretch (from 50s)."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 1,
+                    "info": 1
+                },
+                "checked_at": "2026-09-01T10:23:44+00:00"
+            },
+            "id": "text-scam",
+            "pass": 2,
+            "seconds": 52.6,
+            "spend_usd": 0.0136,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 0.35,
+                    "variety": 0.35,
+                    "media": 0.8875,
+                    "pacing": 0.6,
+                    "lint": 1,
+                    "flights": 0.5
+                },
+                "total": 63.8,
+                "findings": [
+                    {
+                        "severity": "error",
+                        "code": "missed_beat",
+                        "message": "no custom_card/labeled_diagram/myth_fact/common_mistake — the text message itself has to be on screen with its tells pointed at"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no custom_card — a chat exchange is the card doc's own example of what NOT to ask a phone_mockup for"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no step_flow/checklist_card/timeline_card — the two-contact shape is a sequence"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "streak",
+                        "message": "single_focus runs 3 scenes in a row"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "single_focus",
+                        "message": "4 of 8 scenes are single_focus (50%)"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "model_ignored_variety",
+                        "message": "composer draft: streak 3, single_focus 4/8 — the variety rule is advisory and was not followed"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "brief_guidance",
+                        "message": "3 of 4 guidance lines never say what to AVOID (the prompt asks for it)"
+                    },
+                    {
+                        "severity": "error",
+                        "code": "runtime",
+                        "message": "94s against a 65s target (145%)"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:template_streak",
+                        "message": "scene_8: \"single_focus\" runs 3+ scenes in a row — the rhythm flatlines."
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 8,
+                        "templates": [
+                            "single_focus",
+                            "layer_stack",
+                            "versus_card",
+                            "full_bleed_with_side_panel",
+                            "quote_card"
+                        ],
+                        "order": [
+                            "single_focus",
+                            "layer_stack",
+                            "versus_card",
+                            "full_bleed_with_side_panel",
+                            "quote_card",
+                            "single_focus",
+                            "single_focus",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 4,
+                            "layer_stack": 1,
+                            "versus_card": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "quote_card": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.5,
+                        "max_streak": 3,
+                        "streak_template": "single_focus",
+                        "media_scenes": 3,
+                        "media_share": 0.375,
+                        "total_seconds": 94.2,
+                        "min_seconds": 10,
+                        "max_seconds": 14,
+                        "spread": 4,
+                        "brief": {
+                            "slots": 4,
+                            "query_ok": 4,
+                            "kind_ok": 4,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 8,
+                        "templates": [
+                            "single_focus",
+                            "layer_stack",
+                            "versus_card",
+                            "full_bleed_with_side_panel",
+                            "quote_card"
+                        ],
+                        "order": [
+                            "single_focus",
+                            "layer_stack",
+                            "versus_card",
+                            "full_bleed_with_side_panel",
+                            "quote_card",
+                            "single_focus",
+                            "single_focus",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 4,
+                            "layer_stack": 1,
+                            "versus_card": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "quote_card": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.5,
+                        "max_streak": 3,
+                        "streak_template": "single_focus",
+                        "media_scenes": 3,
+                        "media_share": 0.375,
+                        "total_seconds": 85,
+                        "min_seconds": 10,
+                        "max_seconds": 11,
+                        "spread": 1,
+                        "brief": {
+                            "slots": 4,
+                            "query_ok": 4,
+                            "kind_ok": 4,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "argument",
+                    "phases": 8,
+                    "math_mode": false,
+                    "target_seconds": 65,
+                    "attempts": 1,
+                    "composed_by_tree": false,
+                    "validator_warnings": 9
+                }
+            }
+        },
+        {
+            "title": "How a delivery text scam works",
+            "shape": "argument",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Introduce the scam message about undelivered parcel and fee"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Explain timing targets people expecting parcels on Tuesday afternoons"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Sender uses mobile number, unlike real couriers with registered short codes"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Link mimics courier domain but controlled by scammer"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Page requests £1.99, but real goal is card details and voluntary input"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Follow-up call from bank fraud team to get authentication code"
+                },
+                {
+                    "intent": "resolution",
+                    "brief": "Scam’s shape: small urgent ask followed by a second contact"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "Why that sentence works to trap the fraction expecting parcels"
+                }
+            ],
+            "attempts": 1,
+            "composed_by_tree": false,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The message says your parcel could not be delivered and asks for one small fee."
+                    },
+                    "layout_template": "stat_spotlight",
+                    "relation": "opening",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Parcel Delivery Scam",
+                            "bullets": [
+                                "Message claims undelivered parcel",
+                                "Requests a small fee"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "It arrives on a Tuesday afternoon, when a lot of people genuinely are expecting something. The scam does not need to be believable to everyone. It needs to be believable to the fraction who have a parcel out."
+                    },
+                    "layout_template": "text_block",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Timing Targets Parcel Expecters",
+                            "bullets": [
+                                "Sent Tuesday afternoons",
+                                "Targets people expecting parcels",
+                                "Only needs to fool a fraction"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The sender is a mobile number, not a company name, because a real courier sends from a registered short code. That is the first tell."
+                    },
+                    "layout_template": "versus_card",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "label": "Scam SMS sender",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "Screenshot of a scam SMS showing a mobile number as sender",
+                                "search_query": "sms scam mobile number",
+                                "media_kind": "image",
+                                "guidance": "Close-up of a phone screen with a scam text from a mobile number, clear legible sender info."
+                            }
+                        },
+                        "slot_right": {
+                            "content_type": "image",
+                            "label": "Real courier sender",
+                            "camera_move": "ken_burns_reverse",
+                            "asset_request": {
+                                "description": "Screenshot of a legitimate courier SMS from a registered short code",
+                                "search_query": "courier sms short code",
+                                "media_kind": "image",
+                                "guidance": "Close-up of a phone screen with a legitimate courier message from a short code, clear sender info."
+                            }
+                        },
+                        "slot_versus": {
+                            "left": {
+                                "label": "Scam Sender",
+                                "stats": [
+                                    "Mobile number shown",
+                                    "No company name"
+                                ]
+                            },
+                            "right": {
+                                "label": "Real Courier",
+                                "stats": [
+                                    "Registered short code",
+                                    "Company name shown"
+                                ]
+                            },
+                            "verdict": "Mobile number sender is a scam tell"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The link is the second. It reads like the courier's domain with one extra word in front of it, and the part your phone shows you is the part before the first slash, which is the part the scammer controls."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "Scam URL example",
+                            "camera_move": "zoom_in_snap",
+                            "asset_request": {
+                                "description": "Close-up of a phone screen showing a scam URL that mimics a courier domain with an extra word prefix",
+                                "search_query": "scam url phone screen",
+                                "media_kind": "image",
+                                "guidance": "Clear focus on the URL bar showing the scam domain part before the slash, with the extra word prefix visible."
+                            }
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "Then the page asks for one pound ninety-nine. The money is not the point. The card number is the point, and so is the fact that you typed it voluntarily."
+                    },
+                    "layout_template": "quote_card",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Scam Page Request",
+                            "body": "“The £1.99 fee is a lure — the real goal is your card details and voluntary input.”"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The last step happens days later: a phone call from your bank's fraud team, who already have half your details and need the code they just texted you."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "Fraud team phone call",
+                            "camera_move": "pan_right",
+                            "asset_request": {
+                                "description": "Phone showing an incoming call labeled as bank fraud team or suspicious call",
+                                "search_query": "phone call bank fraud",
+                                "media_kind": "image",
+                                "guidance": "Close-up of a phone screen with an incoming call from a bank fraud team or suspicious caller."
+                            }
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The whole thing is one shape. A small, plausible, urgent ask, and then a second contact that leans on the first."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Scam Structure",
+                            "bullets": [
+                                "Small urgent fee request",
+                                "Follow-up call for verification",
+                                "Second contact builds on first"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_8",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "Here is why that particular sentence works: it arrives when many expect parcels, making the scam believable to just enough people."
+                    },
+                    "layout_template": "single_focus",
+                    "relation": "continues",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "The Trick Worth Remembering",
+                            "bullets": [
+                                "Targets parcel expecters' timing",
+                                "Small ask feels urgent and plausible",
+                                "Leads to voluntary sharing of details"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The message says your parcel could not be delivered and asks for one small fee."
+                    },
+                    "layout_template": "stat_spotlight",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Parcel Delivery Scam",
+                            "bullets": [
+                                "Message claims undelivered parcel",
+                                "Requests a small fee"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "It arrives on a Tuesday afternoon, when a lot of people genuinely are expecting something. The scam does not need to be believable to everyone. It needs to be believable to the fraction who have a parcel out."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Key Point",
+                            "bullets": [
+                                "It arrives on a Tuesday afternoon, when a lot of people genuinely are expecting something."
+                            ],
+                            "reveal": "all_at_once"
+                        }
+                    },
+                    "transition": "fade"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The sender is a mobile number, not a company name, because a real courier sends from a registered short code. That is the first tell."
+                    },
+                    "layout_template": "versus_card",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "label": "Scam SMS sender",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "Screenshot of a scam SMS showing a mobile number as sender",
+                                "search_query": "sms scam mobile number",
+                                "guidance": "Close-up of a phone screen with a scam text from a mobile number, clear legible sender info.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_right": {
+                            "content_type": "image",
+                            "label": "Real courier sender",
+                            "camera_move": "ken_burns_reverse",
+                            "asset_request": {
+                                "description": "Screenshot of a legitimate courier SMS from a registered short code",
+                                "search_query": "courier sms short code",
+                                "guidance": "Close-up of a phone screen with a legitimate courier message from a short code, clear sender info.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_versus": {
+                            "content_type": "versus",
+                            "left": {
+                                "label": "Scam Sender",
+                                "stats": [
+                                    "Mobile number shown",
+                                    "No company name"
+                                ]
+                            },
+                            "right": {
+                                "label": "Real Courier",
+                                "stats": [
+                                    "Registered short code",
+                                    "Company name shown"
+                                ]
+                            },
+                            "verdict": "Mobile number sender is a scam tell"
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 14,
+                    "narration": {
+                        "text": "The link is the second. It reads like the courier's domain with one extra word in front of it, and the part your phone shows you is the part before the first slash, which is the part the scammer controls."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "Scam URL example",
+                            "camera_move": "zoom_in_snap",
+                            "asset_request": {
+                                "description": "Close-up of a phone screen showing a scam URL that mimics a courier domain with an extra word prefix",
+                                "search_query": "scam url phone screen",
+                                "guidance": "Clear focus on the URL bar showing the scam domain part before the slash, with the extra word prefix visible.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "Then the page asks for one pound ninety-nine. The money is not the point. The card number is the point, and so is the fact that you typed it voluntarily."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Scam Page Request",
+                            "bullets": [
+                                "Then the page asks for one pound ninety-nine."
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "push_up",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 11.2,
+                    "narration": {
+                        "text": "The last step happens days later: a phone call from your bank's fraud team, who already have half your details and need the code they just texted you."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "Fraud team phone call",
+                            "camera_move": "pan_right",
+                            "asset_request": {
+                                "description": "Phone showing an incoming call labeled as bank fraud team or suspicious call",
+                                "search_query": "phone call bank fraud",
+                                "guidance": "Close-up of a phone screen with an incoming call from a bank fraud team or suspicious caller.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "The whole thing is one shape. A small, plausible, urgent ask, and then a second contact that leans on the first."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Scam Structure",
+                            "bullets": [
+                                "Small urgent fee request",
+                                "Follow-up call for verification",
+                                "Second contact builds on first"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "stack_push",
+                    "relation": "continues",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "Here is why that particular sentence works: it arrives when many expect parcels, making the scam believable to just enough people."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Key Point",
+                            "bullets": [
+                                "Here is why that particular sentence works: it arrives when many expect parcels, making the scam believable to just enou"
+                            ],
+                            "reveal": "all_at_once"
+                        }
+                    },
+                    "transition": "zoom_out_in",
+                    "relation": "continues",
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_2: unknown layout_template \"text_block\" -> single_focus.",
+                "Scene scene_8: slot \"slot_stat\" not part of \"single_focus\" -> dropped.",
+                "Scene scene_8: slot \"slot_main\" missing -> safe default.",
+                "Scene scene_3: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_4: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_5: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_6: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_7: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_8: 'continues' relation -> signature transition 'stack_push'.",
+                "Scene scene_5: broke a run of 'stack_push' transitions -> 'push_up'.",
+                "Scene scene_8: broke a run of 'stack_push' transitions -> 'zoom_out_in'.",
+                "No peak card in the window starting at 47s (nothing safely upgradeable)."
+            ],
+            "plan_items": [],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "warn",
+                        "code": "static_hold",
+                        "scene_id": "scene_2",
+                        "message": "11.0s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "static_hold",
+                        "scene_id": "scene_5",
+                        "message": "12.0s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "static_hold",
+                        "scene_id": "scene_8",
+                        "message": "11.0s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "template_streak",
+                        "scene_id": "scene_8",
+                        "message": "\"single_focus\" runs 3+ scenes in a row — the rhythm flatlines."
+                    },
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card in the final stretch (from 47s)."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 4,
+                    "info": 1
+                },
+                "checked_at": "2026-09-01T10:24:28+00:00"
+            },
+            "id": "text-scam",
+            "pass": 3,
+            "seconds": 44.2,
+            "spend_usd": 0.0202,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 0.35,
+                    "variety": 0.15,
+                    "media": 0.85,
+                    "pacing": 0.6,
+                    "lint": 0.8,
+                    "flights": 0.5
+                },
+                "total": 58.3,
+                "findings": [
+                    {
+                        "severity": "error",
+                        "code": "missed_beat",
+                        "message": "no custom_card/labeled_diagram/myth_fact/common_mistake — the text message itself has to be on screen with its tells pointed at"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no custom_card — a chat exchange is the card doc's own example of what NOT to ask a phone_mockup for"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no step_flow/checklist_card/timeline_card — the two-contact shape is a sequence"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "streak",
+                        "message": "single_focus runs 3 scenes in a row"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "single_focus",
+                        "message": "5 of 8 scenes are single_focus (62%)"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "dominant_card",
+                        "message": "\"single_focus\" carries 62% of the video"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "model_ignored_variety",
+                        "message": "composer draft: streak 3, single_focus 4/8 — the variety rule is advisory and was not followed"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "brief_guidance",
+                        "message": "4 of 4 guidance lines never say what to AVOID (the prompt asks for it)"
+                    },
+                    {
+                        "severity": "error",
+                        "code": "runtime",
+                        "message": "92s against a 65s target (142%)"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:static_hold",
+                        "message": "scene_2: 11.0s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:static_hold",
+                        "message": "scene_5: 12.0s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:static_hold",
+                        "message": "scene_8: 11.0s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:template_streak",
+                        "message": "scene_8: \"single_focus\" runs 3+ scenes in a row — the rhythm flatlines."
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 8,
+                        "templates": [
+                            "stat_spotlight",
+                            "single_focus",
+                            "versus_card",
+                            "quote_card"
+                        ],
+                        "order": [
+                            "stat_spotlight",
+                            "single_focus",
+                            "versus_card",
+                            "single_focus",
+                            "quote_card",
+                            "single_focus",
+                            "single_focus",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 5,
+                            "stat_spotlight": 1,
+                            "versus_card": 1,
+                            "quote_card": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.625,
+                        "max_streak": 3,
+                        "streak_template": "single_focus",
+                        "media_scenes": 3,
+                        "media_share": 0.375,
+                        "total_seconds": 92.2,
+                        "min_seconds": 11,
+                        "max_seconds": 14,
+                        "spread": 3,
+                        "brief": {
+                            "slots": 4,
+                            "query_ok": 4,
+                            "kind_ok": 4,
+                            "guidance_with_avoid": 0,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 8,
+                        "templates": [
+                            "stat_spotlight",
+                            "text_block",
+                            "versus_card",
+                            "single_focus",
+                            "quote_card"
+                        ],
+                        "order": [
+                            "stat_spotlight",
+                            "text_block",
+                            "versus_card",
+                            "single_focus",
+                            "quote_card",
+                            "single_focus",
+                            "single_focus",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 4,
+                            "stat_spotlight": 1,
+                            "text_block": 1,
+                            "versus_card": 1,
+                            "quote_card": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.5,
+                        "max_streak": 3,
+                        "streak_template": "single_focus",
+                        "media_scenes": 3,
+                        "media_share": 0.375,
+                        "total_seconds": 88,
+                        "min_seconds": 11,
+                        "max_seconds": 11,
+                        "spread": 0,
+                        "brief": {
+                            "slots": 4,
+                            "query_ok": 4,
+                            "kind_ok": 4,
+                            "guidance_with_avoid": 0,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "argument",
+                    "phases": 8,
+                    "math_mode": false,
+                    "target_seconds": 65,
+                    "attempts": 1,
+                    "composed_by_tree": false,
+                    "validator_warnings": 12
+                }
+            }
+        },
+        {
+            "title": "Four cities, four front doors",
+            "shape": "generic",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Every city has a personality shown in its front doors"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Introduce front doors as reflections of city character"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Amsterdam doors lean forward with hoisting beams for furniture"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Marrakesh doors are heavy, studded, facing inward courtyards"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Kyoto doors use wooden lattice and sliding paper screens"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Reykjavik houses use colorful corrugated iron for scarce light"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "Vernacular architecture evolves through small, practical adaptations"
+                }
+            ],
+            "attempts": 1,
+            "composed_by_tree": true,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "layout_template": "quote_card",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "Every city has a personality, and you can read it off the front doors."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Every city has a personality, and you can read it off the front doors.",
+                            "bullets": [
+                                "—"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "layout_template": "full_bleed_with_side_panel",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Front doors reflect the character of a city. They reveal how people live, what challenges they face, and how they solve them through design."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "various city front doors showing different styles",
+                                "search_query": "city front doors architecture",
+                                "media_kind": "image",
+                                "guidance": "A variety of front doors from different cities showing distinct architectural styles, no people in frame."
+                            }
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Front doors reflect city character",
+                            "bullets": [
+                                "They show how people live",
+                                "Reveal local challenges",
+                                "Express practical design solutions"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "layout_template": "labeled_diagram",
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "In Amsterdam, houses lean forward over canals. Their narrow, tall doors have hoisting beams at the top because staircases are too tight to carry furniture up."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_diagram": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "Amsterdam house front door with hoisting beam",
+                                "search_query": "Amsterdam canal house door hoisting beam",
+                                "media_kind": "image",
+                                "guidance": "A clean, centered photo of an Amsterdam canal house front door with visible hoisting beam, no text."
+                            },
+                            "heading": "Amsterdam door anatomy",
+                            "callout_suggestions": [
+                                "Hoisting beam",
+                                "Narrow door",
+                                "Lean forward"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "layout_template": "split_side_by_side",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "In Marrakesh, the street front is almost blank. Heavy studded doors face inward onto courtyards, hiding everything the family cares about from outsiders."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "Marrakesh heavy studded front door",
+                                "search_query": "Marrakesh heavy door courtyard",
+                                "media_kind": "image",
+                                "guidance": "A detailed photo of a heavy, studded Marrakesh door with no windows, showing traditional craftsmanship."
+                            }
+                        },
+                        "slot_right": {
+                            "content_type": "text_block",
+                            "heading": "Marrakesh doors",
+                            "bullets": [
+                                "Heavy and studded",
+                                "No windows facing street",
+                                "Open onto private courtyards"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "layout_template": "split_side_by_side",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "Kyoto doors use wooden lattice screens at the front and sliding paper doors behind, allowing the boundary between street and room to open by a hand’s width."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "Kyoto wooden lattice and paper sliding door",
+                                "search_query": "Kyoto wooden lattice sliding door",
+                                "media_kind": "image",
+                                "guidance": "Photo showing a traditional Kyoto wooden lattice screen with a sliding paper door behind it."
+                            }
+                        },
+                        "slot_right": {
+                            "content_type": "text_block",
+                            "heading": "Kyoto doors",
+                            "bullets": [
+                                "Wooden lattice screen front",
+                                "Sliding paper door behind",
+                                "Boundary opens slightly"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "In Reykjavik, houses are wrapped in colorful corrugated iron—red, ochre, teal—to brighten the scarce light during long winters."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "Reykjavik house with colorful corrugated iron siding",
+                                "search_query": "Reykjavik colorful corrugated iron house",
+                                "media_kind": "image",
+                                "guidance": "A photo of a Reykjavik house clad in bright corrugated iron in red, ochre, and teal colors."
+                            },
+                            "camera_move": "slow_zoom_in"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "Vernacular architecture evolves through many small, practical adaptations made by those who live with what came before."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Vernacular architecture",
+                            "bullets": [
+                                "Built from many small adaptations",
+                                "Each solves a local problem",
+                                "Evolves over time"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 5.6,
+                    "narration": {
+                        "text": "Every city has a personality, and you can read it off the front doors."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Every city has a personality, and you can read it off the front doors.",
+                            "bullets": [
+                                "—"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Front doors reflect the character of a city. They reveal how people live, what challenges they face, and how they solve them through design."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "various city front doors showing different styles",
+                                "search_query": "city front doors architecture",
+                                "guidance": "A variety of front doors from different cities showing distinct architectural styles, no people in frame.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Front doors reflect city character",
+                            "bullets": [
+                                "They show how people live",
+                                "Reveal local challenges",
+                                "Express practical design solutions"
+                            ],
+                            "reveal": "sequential",
+                            "dock": "right",
+                            "width_pct": 33
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "In Amsterdam, houses lean forward over canals. Their narrow, tall doors have hoisting beams at the top because staircases are too tight to carry furniture up."
+                    },
+                    "layout_template": "labeled_diagram",
+                    "slots": {
+                        "slot_diagram": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "Amsterdam house front door with hoisting beam",
+                                "search_query": "amsterdam canal house door",
+                                "guidance": "A clean, centered photo of an Amsterdam canal house front door with visible hoisting beam, no text.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": [
+                                "Hoisting beam",
+                                "Narrow door",
+                                "Lean forward"
+                            ],
+                            "heading": "Amsterdam door anatomy"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "In Marrakesh, the street front is almost blank. Heavy studded doors face inward onto courtyards, hiding everything the family cares about from outsiders."
+                    },
+                    "layout_template": "split_side_by_side",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "Marrakesh heavy studded front door",
+                                "search_query": "marrakesh heavy door courtyard",
+                                "guidance": "A detailed photo of a heavy, studded Marrakesh door with no windows, showing traditional craftsmanship.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_right": {
+                            "content_type": "text_block",
+                            "heading": "Marrakesh doors",
+                            "bullets": [
+                                "Heavy and studded",
+                                "No windows facing street",
+                                "Open onto private courtyards"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "push_left",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 11.2,
+                    "narration": {
+                        "text": "Kyoto doors use wooden lattice screens at the front and sliding paper doors behind, allowing the boundary between street and room to open by a hand’s width."
+                    },
+                    "layout_template": "split_side_by_side",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "Kyoto wooden lattice and paper sliding door",
+                                "search_query": "kyoto wooden lattice sliding",
+                                "guidance": "Photo showing a traditional Kyoto wooden lattice screen with a sliding paper door behind it.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_right": {
+                            "content_type": "text_block",
+                            "heading": "Kyoto doors",
+                            "bullets": [
+                                "Wooden lattice screen front",
+                                "Sliding paper door behind",
+                                "Boundary opens slightly"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "In Reykjavik, houses are wrapped in colorful corrugated iron—red, ochre, teal—to brighten the scarce light during long winters."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "slow_zoom_in",
+                            "asset_request": {
+                                "description": "Reykjavik house with colorful corrugated iron siding",
+                                "search_query": "reykjavik colorful corrugated iron",
+                                "guidance": "A photo of a Reykjavik house clad in bright corrugated iron in red, ochre, and teal colors.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "Vernacular architecture evolves through many small, practical adaptations made by those who live with what came before."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Vernacular architecture",
+                            "bullets": [
+                                "Built from many small adaptations",
+                                "Each solves a local problem",
+                                "Evolves over time"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "mask_wipe_diagonal",
+                    "relation": null,
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_4: broke a run of 'fade' transitions -> 'push_left'.",
+                "Scene scene_7: broke a run of 'fade' transitions -> 'mask_wipe_diagonal'.",
+                "No peak card in the window starting at 0s (nothing safely upgradeable)."
+            ],
+            "plan_items": [],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card between 0s and 53s."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 0,
+                    "info": 1
+                },
+                "checked_at": "2026-09-01T10:24:42+00:00"
+            },
+            "id": "front-doors",
+            "pass": 1,
+            "seconds": 13.8,
+            "spend_usd": 0.0217,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 0.7999999999999999,
+                    "variety": 0.9999999999999999,
+                    "media": 0.94,
+                    "pacing": 1,
+                    "lint": 1,
+                    "flights": 0.5
+                },
+                "total": 91.6,
+                "findings": [
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no image_grid — the four-doors beat is the card's canonical case — the live check for iter 52 used this exact script"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no map_card — four cities on four continents"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "brief_guidance",
+                        "message": "2 of 5 guidance lines never say what to AVOID (the prompt asks for it)"
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 7,
+                        "templates": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "labeled_diagram",
+                            "split_side_by_side",
+                            "single_focus"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "labeled_diagram",
+                            "split_side_by_side",
+                            "split_side_by_side",
+                            "single_focus",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "split_side_by_side": 2,
+                            "single_focus": 2,
+                            "quote_card": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "labeled_diagram": 1
+                        },
+                        "top_template": "split_side_by_side",
+                        "top_share": 0.2857142857142857,
+                        "max_streak": 2,
+                        "streak_template": "split_side_by_side",
+                        "media_scenes": 5,
+                        "media_share": 0.7142857142857143,
+                        "total_seconds": 70.8,
+                        "min_seconds": 5.6,
+                        "max_seconds": 13,
+                        "spread": 7.4,
+                        "brief": {
+                            "slots": 5,
+                            "query_ok": 5,
+                            "kind_ok": 5,
+                            "guidance_with_avoid": 3,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 7,
+                        "templates": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "labeled_diagram",
+                            "split_side_by_side",
+                            "single_focus"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "labeled_diagram",
+                            "split_side_by_side",
+                            "split_side_by_side",
+                            "single_focus",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "split_side_by_side": 2,
+                            "single_focus": 2,
+                            "quote_card": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "labeled_diagram": 1
+                        },
+                        "top_template": "split_side_by_side",
+                        "top_share": 0.2857142857142857,
+                        "max_streak": 2,
+                        "streak_template": "split_side_by_side",
+                        "media_scenes": 5,
+                        "media_share": 0.7142857142857143,
+                        "total_seconds": 70,
+                        "min_seconds": 5,
+                        "max_seconds": 13,
+                        "spread": 8,
+                        "brief": {
+                            "slots": 5,
+                            "query_ok": 4,
+                            "kind_ok": 5,
+                            "guidance_with_avoid": 3,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "generic",
+                    "phases": 7,
+                    "math_mode": false,
+                    "target_seconds": 70,
+                    "attempts": 1,
+                    "composed_by_tree": true,
+                    "validator_warnings": 3
+                }
+            }
+        },
+        {
+            "title": "Four cities, four front doors",
+            "shape": "generic",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Every city has a personality shown in its front doors"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Introduce front doors as reflections of city character"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Amsterdam doors lean forward with hoisting beams for furniture"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Marrakesh doors are heavy, windowless, facing inward courtyards"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Kyoto doors use wooden lattice and sliding paper screens"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Reykjavik houses use colorful corrugated iron for scarce light"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "Vernacular architecture evolves through many small adaptations"
+                }
+            ],
+            "attempts": 2,
+            "composed_by_tree": true,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "layout_template": "quote_card",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "Every city has a personality, and you can read it off the front doors."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Every city has a personality, and you can read it off the front doors.",
+                            "bullets": [
+                                "— anonymous observation"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "layout_template": "full_bleed_with_side_panel",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Front doors reflect the character of a city. They tell stories about the people, culture, and environment, acting as a mirror to the city's soul."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "a row of diverse city front doors from different cultures",
+                                "search_query": "city front doors diverse",
+                                "media_kind": "image",
+                                "guidance": "A clear daylight photo showing a variety of front doors from different cities, highlighting their uniqueness."
+                            }
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Front Doors Reflect City Character",
+                            "bullets": [
+                                "They reveal culture and environment",
+                                "Each door tells a unique story",
+                                "More than just decoration"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "layout_template": "animated_chart",
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "In Amsterdam, houses lean forward over canals. The narrow, tall design includes hoisting beams to move furniture up tight staircases."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_chart": {
+                            "content_type": "chart",
+                            "chart_type": "bar",
+                            "values": [
+                                60,
+                                30,
+                                10
+                            ],
+                            "labels": [
+                                "Narrow width",
+                                "Tall height",
+                                "Hoisting beam"
+                            ],
+                            "unit": "%",
+                            "highlight_index": 2,
+                            "source": "Architectural studies of Amsterdam houses"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "layout_template": "icon_grid",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Marrakesh doors are heavy and studded, windowless, facing inward courtyards. This design protects privacy and security."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_icons": {
+                            "content_type": "icons",
+                            "items": [
+                                {
+                                    "icon": "lock",
+                                    "label": "Heavy & Secure"
+                                },
+                                {
+                                    "icon": "eye-off",
+                                    "label": "No Windows"
+                                },
+                                {
+                                    "icon": "home",
+                                    "label": "Inward Courtyard"
+                                }
+                            ],
+                            "heading": "Marrakesh Door Features"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "layout_template": "phone_mockup",
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "Kyoto doors use wooden lattice screens with sliding paper doors, creating a flexible boundary between street and room."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_screen": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "wooden lattice screen and sliding paper door in a traditional Kyoto house",
+                                "search_query": "Kyoto wooden lattice sliding door",
+                                "media_kind": "image",
+                                "guidance": "A close-up photo of a traditional Kyoto wooden lattice screen with a sliding paper door behind it, showing texture and detail."
+                            },
+                            "frame": "phone"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "layout_template": "labeled_diagram",
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "Reykjavik houses are wrapped in colorful corrugated iron to maximize scarce light during long winters, painted in reds, ochres, and teals."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_diagram": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "colorful corrugated iron house in Reykjavik on a snowy day",
+                                "search_query": "Reykjavik colorful corrugated iron house",
+                                "media_kind": "image",
+                                "guidance": "A clean, centered photo of a colorful corrugated iron house typical of Reykjavik in winter, with no text or distractions."
+                            },
+                            "heading": "Reykjavik House Features",
+                            "callout_suggestions": [
+                                "Corrugated Iron",
+                                "Bright Colors",
+                                "Winter Adaptation"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "layout_template": "practice_card",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Vernacular architecture evolves through many small adaptations. Think about a front door in your city. What problem does it solve?"
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_practice": {
+                            "content_type": "practice",
+                            "prompt": "Identify one practical feature of your city's front doors and explain its purpose.",
+                            "answer": "It solves a local environmental or cultural challenge.",
+                            "hint": "Consider climate, privacy, or space constraints.",
+                            "heading": "Reflect on Vernacular Architecture"
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 5.6,
+                    "narration": {
+                        "text": "Every city has a personality, and you can read it off the front doors."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Every city has a personality, and you can read it off the front doors.",
+                            "bullets": [
+                                "— anonymous observation"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Front doors reflect the character of a city. They tell stories about the people, culture, and environment, acting as a mirror to the city's soul."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "a row of diverse city front doors from different cultures",
+                                "search_query": "city front doors diverse",
+                                "guidance": "A clear daylight photo showing a variety of front doors from different cities, highlighting their uniqueness.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Front Doors Reflect City Character",
+                            "bullets": [
+                                "They reveal culture and environment",
+                                "Each door tells a unique story",
+                                "More than just decoration"
+                            ],
+                            "reveal": "sequential",
+                            "dock": "right",
+                            "width_pct": 33
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "In Amsterdam, houses lean forward over canals. The narrow, tall design includes hoisting beams to move furniture up tight staircases."
+                    },
+                    "layout_template": "animated_chart",
+                    "slots": {
+                        "slot_chart": {
+                            "content_type": "chart",
+                            "chart_type": "bar",
+                            "values": [
+                                60,
+                                30,
+                                10
+                            ],
+                            "labels": [
+                                "Narrow width",
+                                "Tall height",
+                                "Hoisting beam"
+                            ],
+                            "unit": "%",
+                            "caption": "",
+                            "highlight_index": 2,
+                            "source": "Architectural studies of Amsterdam houses"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Marrakesh doors are heavy and studded, windowless, facing inward courtyards. This design protects privacy and security."
+                    },
+                    "layout_template": "icon_grid",
+                    "slots": {
+                        "slot_icons": {
+                            "content_type": "icons",
+                            "items": [
+                                {
+                                    "icon": "lock",
+                                    "label": "Heavy & Secure"
+                                },
+                                {
+                                    "icon": "",
+                                    "label": "No Windows"
+                                },
+                                {
+                                    "icon": "home",
+                                    "label": "Inward Courtyard"
+                                }
+                            ],
+                            "heading": "Marrakesh Door Features"
+                        }
+                    },
+                    "transition": "push_left",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "Kyoto doors use wooden lattice screens with sliding paper doors, creating a flexible boundary between street and room."
+                    },
+                    "layout_template": "phone_mockup",
+                    "slots": {
+                        "slot_screen": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "wooden lattice screen and sliding paper door in a traditional Kyoto house",
+                                "search_query": "kyoto wooden lattice sliding",
+                                "guidance": "A close-up photo of a traditional Kyoto wooden lattice screen with a sliding paper door behind it, showing texture and detail.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": [],
+                            "frame": "phone"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "Reykjavik houses are wrapped in colorful corrugated iron to maximize scarce light during long winters, painted in reds, ochres, and teals."
+                    },
+                    "layout_template": "labeled_diagram",
+                    "slots": {
+                        "slot_diagram": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "colorful corrugated iron house in Reykjavik on a snowy day",
+                                "search_query": "reykjavik colorful corrugated iron",
+                                "guidance": "A clean, centered photo of a colorful corrugated iron house typical of Reykjavik in winter, with no text or distractions.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": [
+                                "Corrugated Iron",
+                                "Bright Colors",
+                                "Winter Adaptation"
+                            ],
+                            "heading": "Reykjavik House Features"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Vernacular architecture evolves through many small adaptations. Think about a front door in your city. What problem does it solve?"
+                    },
+                    "layout_template": "practice_card",
+                    "slots": {
+                        "slot_practice": {
+                            "content_type": "practice",
+                            "prompt": "Identify one practical feature of your city's front doors and explain its purpose.",
+                            "answer": "It solves a local environmental or cultu",
+                            "hint": "Consider climate, privacy, or space constraints.",
+                            "heading": "Reflect on Vernacular Architecture"
+                        }
+                    },
+                    "transition": "mask_wipe_diagonal",
+                    "relation": null,
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_4: broke a run of 'fade' transitions -> 'push_left'.",
+                "Scene scene_7: broke a run of 'fade' transitions -> 'mask_wipe_diagonal'."
+            ],
+            "plan_items": [],
+            "lint": {
+                "items": [],
+                "counts": {
+                    "error": 0,
+                    "warn": 0,
+                    "info": 0
+                },
+                "checked_at": "2026-09-01T10:25:08+00:00"
+            },
+            "id": "front-doors",
+            "pass": 2,
+            "seconds": 25.7,
+            "spend_usd": 0.0246,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 0.25,
+                    "variety": 0.9999999999999999,
+                    "media": 0.9,
+                    "pacing": 1,
+                    "lint": 1,
+                    "flights": 0.5
+                },
+                "total": 77.3,
+                "findings": [
+                    {
+                        "severity": "error",
+                        "code": "missed_beat",
+                        "message": "no image_grid/photo_stack/split_side_by_side/before_after — four named places compared side by side is the beat image_grid was built for"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no image_grid — the four-doors beat is the card's canonical case — the live check for iter 52 used this exact script"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no map_card — four cities on four continents"
+                    },
+                    {
+                        "severity": "error",
+                        "code": "wrong_card",
+                        "message": "animated_chart was cast — there is not a single number in this script"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "brief_guidance",
+                        "message": "2 of 3 guidance lines never say what to AVOID (the prompt asks for it)"
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 7,
+                        "templates": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "animated_chart",
+                            "icon_grid",
+                            "phone_mockup",
+                            "labeled_diagram",
+                            "practice_card"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "animated_chart",
+                            "icon_grid",
+                            "phone_mockup",
+                            "labeled_diagram",
+                            "practice_card"
+                        ],
+                        "counts": {
+                            "quote_card": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "animated_chart": 1,
+                            "icon_grid": 1,
+                            "phone_mockup": 1,
+                            "labeled_diagram": 1,
+                            "practice_card": 1
+                        },
+                        "top_template": "quote_card",
+                        "top_share": 0.14285714285714285,
+                        "max_streak": 1,
+                        "streak_template": "quote_card",
+                        "media_scenes": 3,
+                        "media_share": 0.42857142857142855,
+                        "total_seconds": 70.6,
+                        "min_seconds": 5.6,
+                        "max_seconds": 13,
+                        "spread": 7.4,
+                        "brief": {
+                            "slots": 3,
+                            "query_ok": 3,
+                            "kind_ok": 3,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 7,
+                        "templates": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "animated_chart",
+                            "icon_grid",
+                            "phone_mockup",
+                            "labeled_diagram",
+                            "practice_card"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "animated_chart",
+                            "icon_grid",
+                            "phone_mockup",
+                            "labeled_diagram",
+                            "practice_card"
+                        ],
+                        "counts": {
+                            "quote_card": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "animated_chart": 1,
+                            "icon_grid": 1,
+                            "phone_mockup": 1,
+                            "labeled_diagram": 1,
+                            "practice_card": 1
+                        },
+                        "top_template": "quote_card",
+                        "top_share": 0.14285714285714285,
+                        "max_streak": 1,
+                        "streak_template": "quote_card",
+                        "media_scenes": 3,
+                        "media_share": 0.42857142857142855,
+                        "total_seconds": 70,
+                        "min_seconds": 5,
+                        "max_seconds": 13,
+                        "spread": 8,
+                        "brief": {
+                            "slots": 3,
+                            "query_ok": 3,
+                            "kind_ok": 3,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "generic",
+                    "phases": 7,
+                    "math_mode": false,
+                    "target_seconds": 70,
+                    "attempts": 2,
+                    "composed_by_tree": true,
+                    "validator_warnings": 2
+                }
+            }
+        },
+        {
+            "title": "Four cities, four front doors",
+            "shape": "generic",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Every city has a personality shown in its front doors"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Introduce front doors as reflections of city character"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Amsterdam doors lean forward with hoisting beams for furniture"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Marrakesh doors are heavy, windowless, facing inward courtyards"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Kyoto doors use wooden lattice and sliding paper screens"
+                },
+                {
+                    "intent": "aspect",
+                    "brief": "Reykjavik houses use colorful corrugated iron for scarce light"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "Doors solve local problems, shaped by many small adaptations"
+                }
+            ],
+            "attempts": 1,
+            "composed_by_tree": true,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "layout_template": "quote_card",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "Every city has a personality, and you can read it off the front doors."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Every city has a personality, and you can read it off the front doors.",
+                            "bullets": [
+                                "— anonymous"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "layout_template": "full_bleed_with_side_panel",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Front doors reflect the character of a city. They reveal how people live, what matters to them, and how they solve everyday problems."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "a variety of city front doors from different cultures",
+                                "search_query": "city front doors",
+                                "media_kind": "image",
+                                "guidance": "A clear, colorful shot showing diverse front doors from different cities, no people in frame."
+                            }
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Front doors as reflections of city character",
+                            "bullets": [
+                                "They show local culture and needs",
+                                "Reveal practical solutions",
+                                "Express personality and history"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "layout_template": "labeled_diagram",
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "In Amsterdam, houses lean forward over canals. Their narrow, tall doors have hoisting beams at the top, used to lift furniture up tight staircases."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_diagram": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "an Amsterdam house front with a hoisting beam over the door",
+                                "search_query": "Amsterdam house hoisting beam",
+                                "media_kind": "image",
+                                "guidance": "A clean, centered photo of an Amsterdam canal house showing the hoisting beam clearly."
+                            },
+                            "heading": "Amsterdam doors with hoisting beams",
+                            "callout_suggestions": [
+                                "Hoisting beam",
+                                "Narrow tall door",
+                                "Leaning facade",
+                                "Tight staircases"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "layout_template": "split_side_by_side",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Marrakesh doors are heavy and studded, with no windows. They face inward courtyards, protecting the family’s private space from the street."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "a heavy studded front door in Marrakesh with no windows",
+                                "search_query": "Marrakesh heavy door",
+                                "media_kind": "image",
+                                "guidance": "A close-up of a traditional Marrakesh door showing studs and no windows."
+                            }
+                        },
+                        "slot_right": {
+                            "content_type": "text_block",
+                            "heading": "Marrakesh doors protect privacy",
+                            "bullets": [
+                                "Heavy, studded doors",
+                                "No windows on street side",
+                                "Open onto private courtyards"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "layout_template": "phone_mockup",
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "Kyoto doors use a wooden lattice screen in front, with sliding paper doors behind. This lets residents open the boundary to the street by just a hand’s width."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_screen": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "a Kyoto wooden lattice screen and sliding paper door",
+                                "search_query": "Kyoto wooden lattice door",
+                                "media_kind": "image",
+                                "guidance": "A detailed photo of a traditional Kyoto wooden lattice and paper sliding door."
+                            },
+                            "frame": "phone"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "In Reykjavik, houses are wrapped in colorful corrugated iron. The bright reds, ochres, and teals help bring light during the long, dark winters when sunlight is scarce."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "",
+                            "bullets": []
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Each city’s front doors solve local problems. Vernacular architecture is thousands of small adaptations, shaped by people living with what came before."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Doors shaped by local needs",
+                            "bullets": [
+                                "Solutions to climate, culture, and space",
+                                "Built over generations",
+                                "Reflect practical living"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 5.6,
+                    "narration": {
+                        "text": "Every city has a personality, and you can read it off the front doors."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Every city has a personality, and you can read it off the front doors.",
+                            "bullets": [
+                                "— anonymous"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Front doors reflect the character of a city. They reveal how people live, what matters to them, and how they solve everyday problems."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "a variety of city front doors from different cultures",
+                                "search_query": "city front doors",
+                                "guidance": "A clear, colorful shot showing diverse front doors from different cities, no people in frame.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Front doors as reflections of city character",
+                            "bullets": [
+                                "They show local culture and needs",
+                                "Reveal practical solutions",
+                                "Express personality and history"
+                            ],
+                            "reveal": "sequential",
+                            "dock": "right",
+                            "width_pct": 33
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 11,
+                    "narration": {
+                        "text": "In Amsterdam, houses lean forward over canals. Their narrow, tall doors have hoisting beams at the top, used to lift furniture up tight staircases."
+                    },
+                    "layout_template": "labeled_diagram",
+                    "slots": {
+                        "slot_diagram": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "an Amsterdam house front with a hoisting beam over the door",
+                                "search_query": "amsterdam house hoisting beam",
+                                "guidance": "A clean, centered photo of an Amsterdam canal house showing the hoisting beam clearly.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": [
+                                "Hoisting beam",
+                                "Narrow tall door",
+                                "Leaning facade",
+                                "Tight staircases"
+                            ],
+                            "heading": "Amsterdam doors with hoisting beams"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Marrakesh doors are heavy and studded, with no windows. They face inward courtyards, protecting the family’s private space from the street."
+                    },
+                    "layout_template": "split_side_by_side",
+                    "slots": {
+                        "slot_left": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "a heavy studded front door in Marrakesh with no windows",
+                                "search_query": "marrakesh heavy door",
+                                "guidance": "A close-up of a traditional Marrakesh door showing studs and no windows.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_right": {
+                            "content_type": "text_block",
+                            "heading": "Marrakesh doors protect privacy",
+                            "bullets": [
+                                "Heavy, studded doors",
+                                "No windows on street side",
+                                "Open onto private courtyards"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "push_left",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 11.6,
+                    "narration": {
+                        "text": "Kyoto doors use a wooden lattice screen in front, with sliding paper doors behind. This lets residents open the boundary to the street by just a hand’s width."
+                    },
+                    "layout_template": "phone_mockup",
+                    "slots": {
+                        "slot_screen": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "a Kyoto wooden lattice screen and sliding paper door",
+                                "search_query": "kyoto wooden lattice door",
+                                "guidance": "A detailed photo of a traditional Kyoto wooden lattice and paper sliding door.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": [],
+                            "frame": "phone"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "In Reykjavik, houses are wrapped in colorful corrugated iron. The bright reds, ochres, and teals help bring light during the long, dark winters when sunlight is scarce."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Key Point",
+                            "bullets": [
+                                "In Reykjavik, houses are wrapped in colorful corrugated iron."
+                            ],
+                            "reveal": "all_at_once"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Each city’s front doors solve local problems. Vernacular architecture is thousands of small adaptations, shaped by people living with what came before."
+                    },
+                    "layout_template": "single_focus",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Doors shaped by local needs",
+                            "bullets": [
+                                "Solutions to climate, culture, and space",
+                                "Built over generations",
+                                "Reflect practical living"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "mask_wipe_diagonal",
+                    "relation": null,
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_6/slot_main: text_block empty -> built from narration.",
+                "Scene scene_4: broke a run of 'fade' transitions -> 'push_left'.",
+                "Scene scene_7: broke a run of 'fade' transitions -> 'mask_wipe_diagonal'.",
+                "No peak card in the window starting at 0s (nothing safely upgradeable)."
+            ],
+            "plan_items": [],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "warn",
+                        "code": "static_hold",
+                        "scene_id": "scene_6",
+                        "message": "12.0s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card between 0s and 51s."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 1,
+                    "info": 1
+                },
+                "checked_at": "2026-09-01T10:25:23+00:00"
+            },
+            "id": "front-doors",
+            "pass": 3,
+            "seconds": 15,
+            "spend_usd": 0.0262,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 0.7999999999999999,
+                    "variety": 0.9999999999999999,
+                    "media": 0.9249999999999999,
+                    "pacing": 1,
+                    "lint": 1,
+                    "flights": 0.5
+                },
+                "total": 91.4,
+                "findings": [
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no image_grid — the four-doors beat is the card's canonical case — the live check for iter 52 used this exact script"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no map_card — four cities on four continents"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "brief_guidance",
+                        "message": "2 of 4 guidance lines never say what to AVOID (the prompt asks for it)"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:static_hold",
+                        "message": "scene_6: 12.0s hold with no progressive reveal — split the beat or add bullets."
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 7,
+                        "templates": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "labeled_diagram",
+                            "split_side_by_side",
+                            "phone_mockup",
+                            "single_focus"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "labeled_diagram",
+                            "split_side_by_side",
+                            "phone_mockup",
+                            "single_focus",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 2,
+                            "quote_card": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "labeled_diagram": 1,
+                            "split_side_by_side": 1,
+                            "phone_mockup": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.2857142857142857,
+                        "max_streak": 2,
+                        "streak_template": "single_focus",
+                        "media_scenes": 4,
+                        "media_share": 0.5714285714285714,
+                        "total_seconds": 73.2,
+                        "min_seconds": 5.6,
+                        "max_seconds": 13,
+                        "spread": 7.4,
+                        "brief": {
+                            "slots": 4,
+                            "query_ok": 4,
+                            "kind_ok": 4,
+                            "guidance_with_avoid": 2,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 7,
+                        "templates": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "labeled_diagram",
+                            "split_side_by_side",
+                            "phone_mockup",
+                            "single_focus"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "full_bleed_with_side_panel",
+                            "labeled_diagram",
+                            "split_side_by_side",
+                            "phone_mockup",
+                            "single_focus",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 2,
+                            "quote_card": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "labeled_diagram": 1,
+                            "split_side_by_side": 1,
+                            "phone_mockup": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.2857142857142857,
+                        "max_streak": 2,
+                        "streak_template": "single_focus",
+                        "media_scenes": 4,
+                        "media_share": 0.5714285714285714,
+                        "total_seconds": 70,
+                        "min_seconds": 5,
+                        "max_seconds": 13,
+                        "spread": 8,
+                        "brief": {
+                            "slots": 4,
+                            "query_ok": 4,
+                            "kind_ok": 4,
+                            "guidance_with_avoid": 2,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "generic",
+                    "phases": 7,
+                    "math_mode": false,
+                    "target_seconds": 70,
+                    "attempts": 1,
+                    "composed_by_tree": true,
+                    "validator_warnings": 4
+                }
+            }
+        }
+    ],
+    "finished_at": "2026-09-01T10:25:23+00:00",
+    "spend_usd": 0.0262,
+    "duration_seconds": 218.6
+}

@@ -50,7 +50,14 @@ class CardSuitability
         $patterns = [
             '/\b\d{3,4}s?\b/',                                   // 1969, 1990s, 800
             '/\b\d{1,4}\s*(bc|bce|ad|ce)\b/',                    // 44 BC, 1200 CE
-            '/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)/', // Mar 2024, January
+            // Months as WHOLE WORDS. The old pattern was an open prefix match
+            // with no closing boundary, so "sep" fired inside "separates" and
+            // "mar" inside "marketing" — which is how a script about the five
+            // layers of the atmosphere read as a chronology. Bare "may" is
+            // deliberately absent: as a modal verb it appears in half of all
+            // English prose, and a real May is almost always beside its year.
+            '/\b(january|february|march|april|june|july|august|september|october|november|december'
+            . '|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec)\b/',
             '/\bq[1-4]\b/',                                      // Q3
             '/\b(day|week|month|year|hour|minute|phase|stage|round|era|age)\s*\d+/', // Day 3
             '/\b\d{1,2}[\/\-.]\d{1,2}([\/\-.]\d{2,4})?\b/',      // 3/2024, 12-05
@@ -63,13 +70,9 @@ class CardSuitability
             }
         }
 
-        foreach (self::ERA_WORDS as $w) {
-            if (str_contains($t, $w)) {
-                return true;
-            }
-        }
-
-        return false;
+        // Whole words here too: str_contains found "now" inside "know" and
+        // "snow", and "present" inside "presentation".
+        return preg_match('/\b(' . implode('|', self::ERA_WORDS) . ')\b/', $t) === 1;
     }
 
     /**

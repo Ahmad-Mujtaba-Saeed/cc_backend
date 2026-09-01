@@ -100,6 +100,7 @@ class ShotListValidator
         $scenes = $this->enforceTemplateCaps($scenes);
         $scenes = $this->enforceStockCap($scenes);
         $scenes = $this->ensurePeakCards($scenes);
+        $scenes = $this->ensureMediaFloor($scenes);
         if (($options['outro_enabled'] ?? true) !== false) {
             $scenes = $this->appendOutro($scenes, $options);
         }
@@ -2385,6 +2386,133 @@ class ShotListValidator
         }
 
         return $scenes;
+    }
+
+    /**
+     * A video with no pictures in it is a slideshow.
+     *
+     * The composer's prompt asks for a third of the scenes to carry an image,
+     * and its critique() re-asks when they do not — and the bench still found
+     * SIX storyboards out of thirty with not a single image slot, three of
+     * them ordinary explainers (glass recycling, inflation, a boarding pass).
+     * A rule the model can decline twice is not a rule, so this is the
+     * guarantee behind it.
+     *
+     * The upgrade is deliberately CONSERVATIVE and lossless: a plain
+     * `single_focus` text card becomes `full_bleed_with_side_panel`, which
+     * keeps the exact same heading and bullets in its panel and adds a
+     * background picture behind them. Nothing is deleted, no card with real
+     * structure (a chart, a diagram, a comparison) is touched, and the text the
+     * narration is synced to survives word for word.
+     *
+     * NOT in math mode: a maths video draws its own figures and must never ask
+     * the viewer to upload a photograph — that is the whole point of the
+     * routing (see MathTopicService).
+     */
+    private function ensureMediaFloor(array $scenes): array
+    {
+        if ($this->mathMode || count($scenes) < 3) {
+            return $scenes;
+        }
+
+        $hasMedia = function (array $scene): bool {
+            foreach ((array) ($scene['slots'] ?? []) as $slot) {
+                if (is_array($slot) && in_array((string) ($slot['content_type'] ?? ''), ['image', 'video'], true)) {
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        $have = count(array_filter($scenes, $hasMedia));
+        $want = (int) ceil(count($scenes) / 3);
+        if ($have >= $want) {
+            return $scenes;
+        }
+
+        // Candidates, best first: a plain text single_focus whose narration
+        // actually describes something photographable. Longer beats first —
+        // a picture earns its place more on a 12-second explanation than on a
+        // 3-second punchline.
+        $candidates = [];
+        foreach ($scenes as $i => $scene) {
+            if (($scene['layout_template'] ?? '') !== 'single_focus') {
+                continue;
+            }
+            $slot = $scene['slots']['slot_main'] ?? null;
+            if (!is_array($slot) || ($slot['content_type'] ?? '') !== 'text_block') {
+                continue;
+            }
+            $narration = (string) ($scene['narration']['text'] ?? '');
+            if (str_word_count($narration) < 6) {
+                continue;   // nothing to build a shot out of
+            }
+            $candidates[$i] = (float) ($scene['duration_seconds'] ?? 0);
+        }
+        arsort($candidates);
+
+        foreach (array_keys($candidates) as $i) {
+            if ($have >= $want) {
+                break;
+            }
+            // Never create a run of identical cards while fixing a different
+            // problem — the variety pass has already been and gone.
+            $prev = $scenes[$i - 1]['layout_template'] ?? '';
+            $next = $scenes[$i + 1]['layout_template'] ?? '';
+            if ($prev === 'full_bleed_with_side_panel' || $next === 'full_bleed_with_side_panel') {
+                continue;
+            }
+
+            $scene = $scenes[$i];
+            $panel = $scene['slots']['slot_main'];
+            $narration = (string) ($scene['narration']['text'] ?? '');
+            $subject = $this->shotFromNarration($narration, (string) ($panel['heading'] ?? ''));
+
+            $scenes[$i]['layout_template'] = 'full_bleed_with_side_panel';
+            $scenes[$i]['slots'] = [
+                'slot_background' => [
+                    'content_type' => 'image',
+                    'label' => '',
+                    'camera_move' => $this->resolveCameraMove(null, $subject),
+                    'asset_request' => MediaBrief::build(['description' => $subject], 'image', $this->aspectRatio),
+                    'asset_ref' => null,
+                ],
+                'slot_panel' => $panel,
+            ];
+            $have++;
+            $this->changed = true;
+            $this->warn("Scene {$scene['scene_id']}: text-only video — added a picture behind the panel ({$subject}).");
+        }
+
+        if ($have === 0) {
+            $this->warn('No scene could safely carry a picture; this storyboard is text only.');
+        }
+
+        return $scenes;
+    }
+
+    /**
+     * A photographable subject for a beat that never asked for one.
+     *
+     * The narration is what the viewer is HEARING over this frame, so it is
+     * the only honest source — but a sentence is not a shot. This keeps the
+     * concrete nouns and drops the argument around them, and it refuses to
+     * echo an abstraction: with nothing concrete to point a camera at, the
+     * heading becomes a subject with the framing spelled out, which is at
+     * least something a person can search for or replace.
+     */
+    private function shotFromNarration(string $narration, string $heading): string
+    {
+        $subject = trim(MediaBrief::deriveQuery($this->firstSentence($narration) ?: $narration));
+        if ($subject === '' || str_word_count($subject) < 2) {
+            $subject = trim(MediaBrief::deriveQuery($heading));
+        }
+        if ($subject === '' ) {
+            $subject = 'the subject of this scene';
+        }
+
+        return 'A real photograph of ' . $subject . ', plain and documentary, no text or graphics in frame';
     }
 
     /**

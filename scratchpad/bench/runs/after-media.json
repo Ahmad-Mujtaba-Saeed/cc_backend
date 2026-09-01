@@ -1,0 +1,3647 @@
+{
+    "tag": "after-media",
+    "started_at": "2026-09-01T11:45:52+00:00",
+    "aspect": "16:9",
+    "model": "gpt-4.1-mini",
+    "explainer_model": "gpt-4.1-mini",
+    "math_model": "gpt-4.1-mini",
+    "director_model": "gpt-4.1-mini",
+    "role_models": [],
+    "with_director": true,
+    "repeat": 1,
+    "cases": [
+        {
+            "title": "Why airline seats got smaller",
+            "shape": "argument",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Seat spacing on planes has shrunk since 1990"
+                },
+                {
+                    "intent": "context",
+                    "brief": "No one intentionally made flying worse"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Ticket pricing breakdown explains seat pitch reduction"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Small airline margins drive adding more seats"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Row spacing reduced and seat backs thinned"
+                },
+                {
+                    "intent": "counter",
+                    "brief": "Airlines claim thinner seats compensate for less space"
+                },
+                {
+                    "intent": "resolution",
+                    "brief": "Measurements show passengers still lost space"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "You buy the cheapest ticket, seat size is leftover"
+                }
+            ],
+            "attempts": 2,
+            "composed_by_tree": true,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "layout_template": "stat_spotlight",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "The seat you sat in last summer is about four centimetres closer to the one in front than the same seat in 1990."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "4 cm closer",
+                            "bullets": [
+                                "Since 1990, plane seat spacing has shrunk"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "layout_template": "full_bleed_with_side_panel",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Nobody woke up and decided to make flying worse. The pitch shrank because of how a ticket is priced."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "passengers boarding an airplane at the gate",
+                                "search_query": "airport boarding plane",
+                                "media_kind": "image",
+                                "guidance": "A clear shot of passengers entering a plane at the gate, with no visible text or logos."
+                            }
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "No one intended to make flying worse",
+                            "bullets": [
+                                "Seat pitch shrank due to ticket pricing economics",
+                                "Changes happened gradually over time"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "layout_template": "receipt_card",
+                    "duration_seconds": 14,
+                    "narration": {
+                        "text": "Take a hundred dollar economy fare on a short flight. Roughly thirty dollars is fuel, twenty-five is the aircraft itself, twenty is crew and ground handling, fifteen is airport and air traffic fees, and what is left over is the margin the airline actually keeps."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_receipt": {
+                            "content_type": "receipt",
+                            "rows": [
+                                {
+                                    "label": "Fuel",
+                                    "value": 30
+                                },
+                                {
+                                    "label": "Aircraft costs",
+                                    "value": 25
+                                },
+                                {
+                                    "label": "Crew and ground handling",
+                                    "value": 20
+                                },
+                                {
+                                    "label": "Airport and air traffic fees",
+                                    "value": 15
+                                }
+                            ],
+                            "total_label": "Ticket price breakdown",
+                            "heading": "Ticket pricing breakdown",
+                            "caption": "Based on average short-haul economy fare costs"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "layout_template": "scale_comparison",
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "That margin is small enough that adding six more seats to a cabin changes the answer more than anything the airline can negotiate."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_scale": {
+                            "content_type": "scale",
+                            "scale_items": [
+                                {
+                                    "label": "Airline margin per ticket",
+                                    "value": 5,
+                                    "note": "Small profit margin"
+                                },
+                                {
+                                    "label": "Value of 6 extra seats",
+                                    "value": 15,
+                                    "note": "Significant revenue increase"
+                                }
+                            ],
+                            "unit": "$",
+                            "highlight_index": 1,
+                            "heading": "Small margins drive more seats",
+                            "caption": "Adding seats impacts profits more than cost cuts"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "So the row spacing came down from about thirty-four inches to thirty, and the seat back got thinner to give some of it back."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "",
+                            "bullets": []
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "layout_template": "myth_fact",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "Airlines will tell you the thinner seat means you did not really lose anything."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "Thinner seats mean passengers don’t lose space.",
+                            "fact": "Measurements show passengers still lost space, just less than pitch suggests.",
+                            "heading": "Thinner seats don’t fully make up for less space"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "layout_template": "animated_chart",
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "Measurements show passengers still lost space, just less than the pitch number suggests."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_chart": {
+                            "content_type": "chart",
+                            "chart_type": "bar",
+                            "values": [
+                                34,
+                                30,
+                                31
+                            ],
+                            "labels": [
+                                "1990 pitch (in)",
+                                "2024 pitch (in)",
+                                "Effective space (in)"
+                            ],
+                            "unit": "inches",
+                            "highlight_index": 2,
+                            "source": "Aircraft seat studies"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "You are not buying a seat. You are buying the cheapest ticket, and the seat is what is left after the price is set."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "The honest truth",
+                            "bullets": [
+                                "You buy the cheapest ticket available",
+                                "The seat size is leftover after pricing"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 8.8,
+                    "narration": {
+                        "text": "The seat you sat in last summer is about four centimetres closer to the one in front than the same seat in 1990."
+                    },
+                    "layout_template": "big_counter",
+                    "slots": {
+                        "slot_counter": {
+                            "content_type": "text_block",
+                            "heading": "4 cm closer",
+                            "bullets": [
+                                "Since 1990, plane seat spacing has shrunk"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Nobody woke up and decided to make flying worse. The pitch shrank because of how a ticket is priced."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "passengers boarding an airplane at the gate",
+                                "search_query": "airport boarding plane",
+                                "guidance": "A clear shot of passengers entering a plane at the gate, with no visible text or logos.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "No one intended to make flying worse",
+                            "bullets": [
+                                "Seat pitch shrank due to ticket pricing economics",
+                                "Changes happened gradually over time"
+                            ],
+                            "reveal": "sequential",
+                            "dock": "right",
+                            "width_pct": 33
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 14,
+                    "narration": {
+                        "text": "Take a hundred dollar economy fare on a short flight. Roughly thirty dollars is fuel, twenty-five is the aircraft itself, twenty is crew and ground handling, fifteen is airport and air traffic fees, and what is left over is the margin the airline actually keeps."
+                    },
+                    "layout_template": "receipt_card",
+                    "slots": {
+                        "slot_receipt": {
+                            "content_type": "receipt",
+                            "rows": [
+                                {
+                                    "label": "Fuel",
+                                    "value": 30
+                                },
+                                {
+                                    "label": "Aircraft costs",
+                                    "value": 25
+                                },
+                                {
+                                    "label": "Crew and ground handling",
+                                    "value": 20
+                                },
+                                {
+                                    "label": "Airport and air traffic fees",
+                                    "value": 15
+                                }
+                            ],
+                            "total": 90,
+                            "total_label": "Ticket price breakdo",
+                            "heading": "Ticket pricing breakdown",
+                            "caption": "Based on average short-haul economy fare costs"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 9.2,
+                    "narration": {
+                        "text": "That margin is small enough that adding six more seats to a cabin changes the answer more than anything the airline can negotiate."
+                    },
+                    "layout_template": "scale_comparison",
+                    "slots": {
+                        "slot_scale": {
+                            "content_type": "scale",
+                            "scale_items": [
+                                {
+                                    "label": "Airline margin per ticke",
+                                    "value": 5,
+                                    "note": "Small profit margin",
+                                    "scale": 0.33333,
+                                    "ratio": 3
+                                },
+                                {
+                                    "label": "Value of 6 extra seats",
+                                    "value": 15,
+                                    "note": "Significant revenue increase",
+                                    "scale": 1,
+                                    "ratio": 1
+                                }
+                            ],
+                            "to_scale": true,
+                            "shape": "square",
+                            "unit": "$",
+                            "highlight_index": 1,
+                            "heading": "Small margins drive more seats",
+                            "caption": "Adding seats impacts profits more than cost cuts"
+                        }
+                    },
+                    "transition": "push_left",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "So the row spacing came down from about thirty-four inches to thirty, and the seat back got thinner to give some of it back."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "A real photograph of row spacing came down, plain and documentary, no text or graphics in frame",
+                                "search_query": "real row spacing came",
+                                "guidance": "A single clear photo of A real photograph of row spacing came down, plain and documentary, no text or graphics in frame. Landscape, with the subject off-centre or with clear space around it. Avoid on-image text, logos and watermarks.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Key Point",
+                            "bullets": [
+                                "So the row spacing came down from about thirty-four inches to thirty, and the seat back got thinner to give some of it b"
+                            ],
+                            "reveal": "all_at_once"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "Airlines will tell you the thinner seat means you did not really lose anything."
+                    },
+                    "layout_template": "myth_fact",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "Thinner seats mean passengers don’t lose space.",
+                            "fact": "Measurements show passengers still lost space, just less than pitch suggests.",
+                            "heading": "Thinner seats don’t fully make up for less space"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "Measurements show passengers still lost space, just less than the pitch number suggests."
+                    },
+                    "layout_template": "animated_chart",
+                    "slots": {
+                        "slot_chart": {
+                            "content_type": "chart",
+                            "chart_type": "bar",
+                            "values": [
+                                34,
+                                30,
+                                31
+                            ],
+                            "labels": [
+                                "1990 pitch (in)",
+                                "2024 pitch (in)",
+                                "Effective space"
+                            ],
+                            "unit": "inches",
+                            "caption": "",
+                            "highlight_index": 2,
+                            "source": "Aircraft seat studies"
+                        }
+                    },
+                    "transition": "mask_wipe_diagonal",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "duration_seconds": 9.6,
+                    "narration": {
+                        "text": "You are not buying a seat. You are buying the cheapest ticket, and the seat is what is left after the price is set."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "A real photograph of you not buying seat, plain and documentary, no text or graphics in frame",
+                                "search_query": "real you not buying",
+                                "guidance": "A single clear photo of A real photograph of you not buying seat, plain and documentary, no text or graphics in frame. Landscape, with the subject off-centre or with clear space around it. Avoid on-image text, logos and watermarks.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "The honest truth",
+                            "bullets": [
+                                "You buy the cheapest ticket available",
+                                "The seat size is leftover after pricing"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_5/slot_main: text_block empty -> built from narration.",
+                "Scene scene_4: broke a run of 'fade' transitions -> 'push_left'.",
+                "Scene scene_7: broke a run of 'fade' transitions -> 'mask_wipe_diagonal'.",
+                "Scene scene_1: promoted stat_spotlight -> big_counter (peak beat for the 0s window).",
+                "Scene scene_5: text-only video — added a picture behind the panel (A real photograph of row spacing came down, plain and documentary, no text or graphics in frame).",
+                "Scene scene_8: text-only video — added a picture behind the panel (A real photograph of you not buying seat, plain and documentary, no text or graphics in frame)."
+            ],
+            "plan_items": [
+                {
+                    "scene_id": "scene_1",
+                    "treatment": "hero_open",
+                    "relation": "opening",
+                    "camera_move": "push_in"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "drift"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "treatment": "canvas_hop",
+                    "relation": "consequence",
+                    "camera_move": "settle_back"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "treatment": "canvas_hop",
+                    "relation": "contrast",
+                    "camera_move": "orbit"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "treatment": "zoom_nest",
+                    "relation": "elaborates",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "treatment": "same_frame",
+                    "relation": "consequence",
+                    "camera_move": "rise"
+                }
+            ],
+            "lint": {
+                "items": [],
+                "counts": {
+                    "error": 0,
+                    "warn": 0,
+                    "info": 0
+                },
+                "checked_at": "2026-09-01T11:46:38+00:00"
+            },
+            "id": "airline-seats",
+            "pass": 1,
+            "seconds": 44.7,
+            "spend_usd": 0.0037,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 1,
+                    "variety": 0.9999999999999999,
+                    "media": 1,
+                    "pacing": 1,
+                    "lint": 1,
+                    "flights": 1
+                },
+                "total": 100,
+                "findings": [],
+                "metrics": {
+                    "validated": {
+                        "count": 8,
+                        "templates": [
+                            "big_counter",
+                            "full_bleed_with_side_panel",
+                            "receipt_card",
+                            "scale_comparison",
+                            "myth_fact",
+                            "animated_chart"
+                        ],
+                        "order": [
+                            "big_counter",
+                            "full_bleed_with_side_panel",
+                            "receipt_card",
+                            "scale_comparison",
+                            "full_bleed_with_side_panel",
+                            "myth_fact",
+                            "animated_chart",
+                            "full_bleed_with_side_panel"
+                        ],
+                        "counts": {
+                            "full_bleed_with_side_panel": 3,
+                            "big_counter": 1,
+                            "receipt_card": 1,
+                            "scale_comparison": 1,
+                            "myth_fact": 1,
+                            "animated_chart": 1
+                        },
+                        "top_template": "full_bleed_with_side_panel",
+                        "top_share": 0.375,
+                        "max_streak": 1,
+                        "streak_template": "big_counter",
+                        "media_scenes": 3,
+                        "media_share": 0.375,
+                        "total_seconds": 82.6,
+                        "min_seconds": 6,
+                        "max_seconds": 14,
+                        "spread": 8,
+                        "brief": {
+                            "slots": 3,
+                            "query_ok": 3,
+                            "kind_ok": 3,
+                            "guidance_with_avoid": 3,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 8,
+                        "templates": [
+                            "stat_spotlight",
+                            "full_bleed_with_side_panel",
+                            "receipt_card",
+                            "scale_comparison",
+                            "single_focus",
+                            "myth_fact",
+                            "animated_chart"
+                        ],
+                        "order": [
+                            "stat_spotlight",
+                            "full_bleed_with_side_panel",
+                            "receipt_card",
+                            "scale_comparison",
+                            "single_focus",
+                            "myth_fact",
+                            "animated_chart",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 2,
+                            "stat_spotlight": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "receipt_card": 1,
+                            "scale_comparison": 1,
+                            "myth_fact": 1,
+                            "animated_chart": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.25,
+                        "max_streak": 1,
+                        "streak_template": "stat_spotlight",
+                        "media_scenes": 1,
+                        "media_share": 0.125,
+                        "total_seconds": 75,
+                        "min_seconds": 5,
+                        "max_seconds": 14,
+                        "spread": 9,
+                        "brief": {
+                            "slots": 1,
+                            "query_ok": 1,
+                            "kind_ok": 1,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "argument",
+                    "phases": 8,
+                    "math_mode": false,
+                    "target_seconds": 70,
+                    "attempts": 2,
+                    "composed_by_tree": true,
+                    "validator_warnings": 6
+                }
+            }
+        },
+        {
+            "title": "Why glass is endlessly recyclable and mostly is not recycled",
+            "shape": "argument",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Glass can be endlessly recycled without degrading"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Explain the glass recycling loop from bottle to new bottle"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Every step works except sorting, which breaks the loop"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Mixed-colour cullet downgrades the batch, causing issues"
+                },
+                {
+                    "intent": "point",
+                    "brief": "US recycles one-third of glass; Sweden recycles over ninety percent"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Difference is separate colour collection, not technology"
+                },
+                {
+                    "intent": "point",
+                    "brief": "More cullet reduces furnace energy use and carbon footprint"
+                },
+                {
+                    "intent": "resolution",
+                    "brief": "what it all adds up to"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "The problem is the bin, not the glass material itself"
+                }
+            ],
+            "attempts": 2,
+            "composed_by_tree": true,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "layout_template": "quote_card",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "Glass can be endlessly recycled without degrading."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "\"Glass is the one packaging material that can go round forever.\"",
+                            "bullets": [
+                                "— Explainer Video"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "layout_template": "cycle_diagram",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "The glass recycling loop is short: a bottle is collected, sorted by colour, crushed into cullet, melted with sand and soda ash at about fifteen hundred degrees, formed into a new bottle, filled, and sold again."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_cycle": {
+                            "content_type": "cycle",
+                            "items": [
+                                {
+                                    "label": "Collected"
+                                },
+                                {
+                                    "label": "Sorted by colour"
+                                },
+                                {
+                                    "label": "Crushed into cullet"
+                                },
+                                {
+                                    "label": "Melted with sand & soda ash"
+                                },
+                                {
+                                    "label": "Formed into new bottle"
+                                },
+                                {
+                                    "label": "Filled & sold"
+                                }
+                            ],
+                            "caption": "The glass bottle recycling process"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "layout_template": "myth_fact",
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "Every step in the recycling loop works except sorting, which breaks the loop."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "All steps in glass recycling work perfectly.",
+                            "fact": "Sorting is the step that breaks the recycling loop.",
+                            "heading": "Sorting breaks the loop"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "Mixed-colour cullet downgrades the batch because it can only become green glass or aggregate. A single broken brown bottle in a clear stream ruins the batch."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "",
+                            "bullets": []
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "layout_template": "animated_chart",
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "In the United States, about one-third of glass containers get recycled, while in Sweden it is over ninety percent."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_chart": {
+                            "content_type": "chart",
+                            "chart_type": "bar",
+                            "values": [
+                                33,
+                                90
+                            ],
+                            "labels": [
+                                "United States",
+                                "Sweden"
+                            ],
+                            "unit": "%",
+                            "highlight_index": 1,
+                            "source": "Recycling statistics"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "layout_template": "stat_spotlight",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "The difference is not technology, but separate colour collection instead of a commingled bin."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Separate colour collection matters",
+                            "bullets": [
+                                "Not advanced technology, but sorting method"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "layout_template": "stat_spotlight",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "Every ten percent of cullet in the mix cuts furnace energy by around three percent, reducing the carbon footprint."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "More cullet reduces energy use",
+                            "bullets": [
+                                "10% more cullet cuts furnace energy by 3%",
+                                "Furnace accounts for most carbon in a bottle"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "layout_template": "proportion_flow",
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "Fixing sorting and increasing cullet use could significantly reduce energy use and emissions in glass production."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_proportion": {
+                            "content_type": "proportion",
+                            "source_label": "Glass production energy",
+                            "branches": [
+                                {
+                                    "label": "Furnace energy",
+                                    "value": 70
+                                },
+                                {
+                                    "label": "Other energy",
+                                    "value": 30
+                                }
+                            ],
+                            "unit": "%",
+                            "highlight_index": 0,
+                            "heading": "Energy use in glass production",
+                            "caption": "Furnace energy dominates the carbon footprint"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_9",
+                    "order": 9,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "The problem is the bin, not the glass material itself."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "The problem is the bin",
+                            "bullets": [
+                                "Glass material is recyclable forever",
+                                "Sorting and collection bins cause issues"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "Glass can be endlessly recycled without degrading."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "\"Glass is the one packaging material that can go round forever.\"",
+                            "bullets": [
+                                "— Explainer Video"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 14,
+                    "narration": {
+                        "text": "The glass recycling loop is short: a bottle is collected, sorted by colour, crushed into cullet, melted with sand and soda ash at about fifteen hundred degrees, formed into a new bottle, filled, and sold again."
+                    },
+                    "layout_template": "cycle_diagram",
+                    "slots": {
+                        "slot_cycle": {
+                            "content_type": "cycle",
+                            "items": [
+                                {
+                                    "label": "Collected",
+                                    "icon": ""
+                                },
+                                {
+                                    "label": "Sorted by colour",
+                                    "icon": ""
+                                },
+                                {
+                                    "label": "Crushed into cullet",
+                                    "icon": ""
+                                },
+                                {
+                                    "label": "Melted with sand & soda as",
+                                    "icon": ""
+                                },
+                                {
+                                    "label": "Formed into new bottle",
+                                    "icon": ""
+                                },
+                                {
+                                    "label": "Filled & sold",
+                                    "icon": ""
+                                }
+                            ],
+                            "caption": "The glass bottle recycling process"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "Every step in the recycling loop works except sorting, which breaks the loop."
+                    },
+                    "layout_template": "myth_fact",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "All steps in glass recycling work perfectly.",
+                            "fact": "Sorting is the step that breaks the recycling loop.",
+                            "heading": "Sorting breaks the loop"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 10.4,
+                    "narration": {
+                        "text": "Mixed-colour cullet downgrades the batch because it can only become green glass or aggregate. A single broken brown bottle in a clear stream ruins the batch."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "A real photograph of mixed-colour cullet downgrades batch, plain and documentary, no text or graphics in frame",
+                                "search_query": "real mixed-colour cullet downgrades",
+                                "guidance": "A single clear photo of A real photograph of mixed-colour cullet downgrades batch, plain and documentary, no text or graphics in frame. Landscape, with the subject off-centre or with clear space around it. Avoid on-image text, logos and watermarks.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Key Point",
+                            "bullets": [
+                                "Mixed-colour cullet downgrades the batch because it can only become green glass or aggregate."
+                            ],
+                            "reveal": "all_at_once"
+                        }
+                    },
+                    "transition": "push_left",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 7.6,
+                    "narration": {
+                        "text": "In the United States, about one-third of glass containers get recycled, while in Sweden it is over ninety percent."
+                    },
+                    "layout_template": "animated_chart",
+                    "slots": {
+                        "slot_chart": {
+                            "content_type": "chart",
+                            "chart_type": "bar",
+                            "values": [
+                                33,
+                                90
+                            ],
+                            "labels": [
+                                "United States",
+                                "Sweden"
+                            ],
+                            "unit": "%",
+                            "caption": "",
+                            "highlight_index": 1,
+                            "source": "Recycling statistics"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 5.6,
+                    "narration": {
+                        "text": "The difference is not technology, but separate colour collection instead of a commingled bin."
+                    },
+                    "layout_template": "stat_spotlight",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Separate colour collection matters",
+                            "bullets": [
+                                "Not advanced technology, but sorting method"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 7.6,
+                    "narration": {
+                        "text": "Every ten percent of cullet in the mix cuts furnace energy by around three percent, reducing the carbon footprint."
+                    },
+                    "layout_template": "stat_spotlight",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "More cullet reduces energy use",
+                            "bullets": [
+                                "10% more cullet cuts furnace energy by 3%",
+                                "Furnace accounts for most carbon in a bottle"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "mask_wipe_diagonal",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "Fixing sorting and increasing cullet use could significantly reduce energy use and emissions in glass production."
+                    },
+                    "layout_template": "proportion_flow",
+                    "slots": {
+                        "slot_proportion": {
+                            "content_type": "proportion",
+                            "slices": [
+                                {
+                                    "label": "Furnace energy",
+                                    "value": 70,
+                                    "share": 0.7
+                                },
+                                {
+                                    "label": "Other energy",
+                                    "value": 30,
+                                    "share": 0.3
+                                }
+                            ],
+                            "total": 100,
+                            "source_label": "Glass production energy",
+                            "unit": "%",
+                            "highlight_index": 0,
+                            "heading": "Energy use in glass production",
+                            "caption": "Furnace energy dominates the carbon footprint"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_9",
+                    "order": 9,
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "The problem is the bin, not the glass material itself."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "A real photograph of problem bin, plain and documentary, no text or graphics in frame",
+                                "search_query": "real problem bin",
+                                "guidance": "A single clear photo of A real photograph of problem bin, plain and documentary, no text or graphics in frame. Landscape, with the subject off-centre or with clear space around it. Avoid on-image text, logos and watermarks.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "The problem is the bin",
+                            "bullets": [
+                                "Glass material is recyclable forever",
+                                "Sorting and collection bins cause issues"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_4/slot_main: text_block empty -> built from narration.",
+                "Scene scene_4: broke a run of 'fade' transitions -> 'push_left'.",
+                "Scene scene_7: broke a run of 'fade' transitions -> 'mask_wipe_diagonal'.",
+                "No peak card in the window starting at 45s (nothing safely upgradeable).",
+                "Scene scene_4: text-only video — added a picture behind the panel (A real photograph of mixed-colour cullet downgrades batch, plain and documentary, no text or graphics in frame).",
+                "Scene scene_9: text-only video — added a picture behind the panel (A real photograph of problem bin, plain and documentary, no text or graphics in frame)."
+            ],
+            "plan_items": [
+                {
+                    "scene_id": "scene_1",
+                    "treatment": "hero_open",
+                    "relation": "opening",
+                    "camera_move": "push_in"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "drift"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "treatment": "zoom_nest",
+                    "relation": "elaborates",
+                    "camera_move": "orbit"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "treatment": "pull_reveal",
+                    "relation": "new_chapter",
+                    "camera_move": "settle_back"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "treatment": "same_frame",
+                    "relation": "consequence",
+                    "camera_move": "rise"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "treatment": "same_frame",
+                    "relation": "consequence",
+                    "camera_move": "sway"
+                },
+                {
+                    "scene_id": "scene_9",
+                    "treatment": "pull_reveal",
+                    "relation": "contrast",
+                    "camera_move": "drift"
+                }
+            ],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card in the final stretch (from 45s)."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 0,
+                    "info": 1
+                },
+                "checked_at": "2026-09-01T11:47:16+00:00"
+            },
+            "id": "glass-recycling",
+            "pass": 1,
+            "seconds": 38,
+            "spend_usd": 0.0075,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 1,
+                    "variety": 0.9999999999999999,
+                    "media": 0.45000000000000007,
+                    "pacing": 1,
+                    "lint": 1,
+                    "flights": 1
+                },
+                "total": 91.8,
+                "findings": [
+                    {
+                        "severity": "warn",
+                        "code": "thin_visuals",
+                        "message": "2 of 9 scenes carry a picture (22%); this script wants 30%"
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 9,
+                        "templates": [
+                            "quote_card",
+                            "cycle_diagram",
+                            "myth_fact",
+                            "full_bleed_with_side_panel",
+                            "animated_chart",
+                            "stat_spotlight",
+                            "proportion_flow"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "cycle_diagram",
+                            "myth_fact",
+                            "full_bleed_with_side_panel",
+                            "animated_chart",
+                            "stat_spotlight",
+                            "stat_spotlight",
+                            "proportion_flow",
+                            "full_bleed_with_side_panel"
+                        ],
+                        "counts": {
+                            "full_bleed_with_side_panel": 2,
+                            "stat_spotlight": 2,
+                            "quote_card": 1,
+                            "cycle_diagram": 1,
+                            "myth_fact": 1,
+                            "animated_chart": 1,
+                            "proportion_flow": 1
+                        },
+                        "top_template": "full_bleed_with_side_panel",
+                        "top_share": 0.2222222222222222,
+                        "max_streak": 2,
+                        "streak_template": "stat_spotlight",
+                        "media_scenes": 2,
+                        "media_share": 0.2222222222222222,
+                        "total_seconds": 75.2,
+                        "min_seconds": 5,
+                        "max_seconds": 14,
+                        "spread": 9,
+                        "brief": {
+                            "slots": 2,
+                            "query_ok": 2,
+                            "kind_ok": 2,
+                            "guidance_with_avoid": 2,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 9,
+                        "templates": [
+                            "quote_card",
+                            "cycle_diagram",
+                            "myth_fact",
+                            "single_focus",
+                            "animated_chart",
+                            "stat_spotlight",
+                            "proportion_flow"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "cycle_diagram",
+                            "myth_fact",
+                            "single_focus",
+                            "animated_chart",
+                            "stat_spotlight",
+                            "stat_spotlight",
+                            "proportion_flow",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "single_focus": 2,
+                            "stat_spotlight": 2,
+                            "quote_card": 1,
+                            "cycle_diagram": 1,
+                            "myth_fact": 1,
+                            "animated_chart": 1,
+                            "proportion_flow": 1
+                        },
+                        "top_template": "single_focus",
+                        "top_share": 0.2222222222222222,
+                        "max_streak": 2,
+                        "streak_template": "stat_spotlight",
+                        "media_scenes": 0,
+                        "media_share": 0,
+                        "total_seconds": 70,
+                        "min_seconds": 5,
+                        "max_seconds": 13,
+                        "spread": 8,
+                        "brief": {
+                            "slots": 0,
+                            "query_ok": 0,
+                            "kind_ok": 0,
+                            "guidance_with_avoid": 0,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "argument",
+                    "phases": 9,
+                    "math_mode": false,
+                    "target_seconds": 75,
+                    "attempts": 2,
+                    "composed_by_tree": true,
+                    "validator_warnings": 6
+                }
+            }
+        },
+        {
+            "title": "What inflation actually measures",
+            "shape": "argument",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Inflation is not just prices going up"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Inflation measures money value against a fixed shopping basket"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Statistics agency selects and weights goods in the basket"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Housing, transport, and food have largest weights in basket"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Weighted changes affect inflation index differently than averages"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Personal inflation differs from headline due to individual spending"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Core inflation excludes volatile food and energy prices"
+                },
+                {
+                    "intent": "resolution",
+                    "brief": "Core inflation shows a narrower, more stable inflation signal"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "Inflation numbers are real but answer a narrower question"
+                }
+            ],
+            "attempts": 2,
+            "composed_by_tree": true,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "layout_template": "quote_card",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "Inflation is not the price of things going up. It is the value of money going down."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Inflation is not the price of things going up.",
+                            "bullets": [
+                                "— It is the value of money going down"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "layout_template": "term_card",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Inflation is measured against a fixed shopping basket. This basket contains a selection of goods and services whose prices are tracked over time to see how money's value changes."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_term": {
+                            "content_type": "term",
+                            "term": "Shopping Basket",
+                            "definition": "A fixed list of goods and services used to measure inflation by tracking price changes over time.",
+                            "phonetic": "ˈʃɒpɪŋ ˈbɑːskɪt",
+                            "part_of_speech": "noun",
+                            "caption": "Used by statistics agencies to measure inflation",
+                            "heading": "Shopping Basket"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "layout_template": "cycle_diagram",
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "A statistics agency selects a few hundred goods and services, weights them by actual spending, and prices the same list every month to calculate inflation."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_cycle": {
+                            "content_type": "cycle",
+                            "items": [
+                                {
+                                    "label": "Select goods"
+                                },
+                                {
+                                    "label": "Assign weights"
+                                },
+                                {
+                                    "label": "Price monthly"
+                                },
+                                {
+                                    "label": "Calculate inflation"
+                                }
+                            ],
+                            "heading": "How inflation is calculated",
+                            "caption": "A repeating process by the statistics agency"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "layout_template": "proportion_flow",
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "In a typical basket, housing is about a third of the weight, transport around fifteen percent, food thirteen, and everything else shares the remainder."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_proportion": {
+                            "content_type": "proportion",
+                            "source_label": "Total basket weight",
+                            "branches": [
+                                {
+                                    "label": "Housing",
+                                    "value": 33,
+                                    "note": "Largest share"
+                                },
+                                {
+                                    "label": "Transport",
+                                    "value": 15,
+                                    "note": "Second largest"
+                                },
+                                {
+                                    "label": "Food",
+                                    "value": 13
+                                },
+                                {
+                                    "label": "Other",
+                                    "value": 39
+                                }
+                            ],
+                            "unit": "%",
+                            "heading": "Weight distribution in the basket",
+                            "caption": "Housing, transport, and food have the largest weights"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "layout_template": "myth_fact",
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "Weighted changes affect the inflation index differently than simple averages. For example, a big rise in rent impacts inflation more than a fall in TV prices."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "Inflation is just the average price change of all goods.",
+                            "fact": "Weighted changes mean big categories like housing affect inflation more than smaller ones like TVs.",
+                            "heading": "Inflation weighting matters"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "layout_template": "myth_fact",
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "Your personal inflation may differ from the headline figure because you don't buy the average basket. If you rent and commute, your inflation might be higher."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "Headline inflation matches everyone’s experience.",
+                            "fact": "Personal spending patterns cause individual inflation to vary from the headline.",
+                            "heading": "Personal inflation differs"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "layout_template": "stat_spotlight",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "Core inflation excludes food and energy prices because they are volatile and can mask underlying trends."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Core inflation excludes food and energy",
+                            "bullets": [
+                                "These prices swing due to weather and war, hiding other signals"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "layout_template": "animated_chart",
+                    "duration_seconds": 14,
+                    "narration": {
+                        "text": "Core inflation provides a narrower, more stable signal by removing volatile food and energy prices, helping economists see underlying inflation trends more clearly."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_chart": {
+                            "content_type": "chart",
+                            "chart_type": "line",
+                            "values": [
+                                2.1,
+                                2.3,
+                                2.2,
+                                2.4,
+                                2.3,
+                                2.5,
+                                2.4
+                            ],
+                            "labels": [
+                                "Jan",
+                                "Feb",
+                                "Mar",
+                                "Apr",
+                                "May",
+                                "Jun",
+                                "Jul"
+                            ],
+                            "unit": "%",
+                            "highlight_index": 6,
+                            "source": "National Statistics Agency"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_9",
+                    "order": 9,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "Inflation numbers are real but answer a narrower question than most people think."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Inflation answers a narrower question",
+                            "bullets": [
+                                "It measures average price changes weighted by spending",
+                                "Not the exact experience of every individual"
+                            ]
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 6.8,
+                    "narration": {
+                        "text": "Inflation is not the price of things going up. It is the value of money going down."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "Inflation is not the price of things going up.",
+                            "bullets": [
+                                "— It is the value of money going down"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "Inflation is measured against a fixed shopping basket. This basket contains a selection of goods and services whose prices are tracked over time to see how money's value changes."
+                    },
+                    "layout_template": "term_card",
+                    "slots": {
+                        "slot_term": {
+                            "content_type": "term",
+                            "term": "Shopping Basket",
+                            "definition": "A fixed list of goods and services used to measure inflation by tracking price changes over time.",
+                            "phonetic": "ˈʃɒpɪŋ ˈbɑːskɪt",
+                            "part_of_speech": "noun",
+                            "caption": "Used by statistics agencies to measure inflation"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "A statistics agency selects a few hundred goods and services, weights them by actual spending, and prices the same list every month to calculate inflation."
+                    },
+                    "layout_template": "cycle_diagram",
+                    "slots": {
+                        "slot_cycle": {
+                            "content_type": "cycle",
+                            "items": [
+                                {
+                                    "label": "Select goods",
+                                    "icon": ""
+                                },
+                                {
+                                    "label": "Assign weights",
+                                    "icon": ""
+                                },
+                                {
+                                    "label": "Price monthly",
+                                    "icon": ""
+                                },
+                                {
+                                    "label": "Calculate inflation",
+                                    "icon": ""
+                                }
+                            ],
+                            "heading": "How inflation is calculated",
+                            "caption": "A repeating process by the statistics agency"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 9.6,
+                    "narration": {
+                        "text": "In a typical basket, housing is about a third of the weight, transport around fifteen percent, food thirteen, and everything else shares the remainder."
+                    },
+                    "layout_template": "proportion_flow",
+                    "slots": {
+                        "slot_proportion": {
+                            "content_type": "proportion",
+                            "slices": [
+                                {
+                                    "label": "Housing",
+                                    "value": 33,
+                                    "note": "Largest share",
+                                    "share": 0.33
+                                },
+                                {
+                                    "label": "Transport",
+                                    "value": 15,
+                                    "note": "Second largest",
+                                    "share": 0.15
+                                },
+                                {
+                                    "label": "Food",
+                                    "value": 13,
+                                    "share": 0.13
+                                },
+                                {
+                                    "label": "Other",
+                                    "value": 39,
+                                    "share": 0.39
+                                }
+                            ],
+                            "total": 100,
+                            "source_label": "Total basket weight",
+                            "unit": "%",
+                            "heading": "Weight distribution in the basket",
+                            "caption": "Housing, transport, and food have the largest weights"
+                        }
+                    },
+                    "transition": "push_left",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 10.4,
+                    "narration": {
+                        "text": "Weighted changes affect the inflation index differently than simple averages. For example, a big rise in rent impacts inflation more than a fall in TV prices."
+                    },
+                    "layout_template": "myth_fact",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "Inflation is just the average price change of all goods.",
+                            "fact": "Weighted changes mean big categories like housing affect inflation more than smaller ones like TVs.",
+                            "heading": "Inflation weighting matters"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 10.4,
+                    "narration": {
+                        "text": "Your personal inflation may differ from the headline figure because you don't buy the average basket. If you rent and commute, your inflation might be higher."
+                    },
+                    "layout_template": "myth_fact",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "Headline inflation matches everyone’s experience.",
+                            "fact": "Personal spending patterns cause individual inflation to vary from the headline.",
+                            "heading": "Personal inflation differs"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 6.4,
+                    "narration": {
+                        "text": "Core inflation excludes food and energy prices because they are volatile and can mask underlying trends."
+                    },
+                    "layout_template": "stat_spotlight",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Core inflation excludes food and energy",
+                            "bullets": [
+                                "These prices swing due to weather and war, hiding other signals"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "mask_wipe_diagonal",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "duration_seconds": 14,
+                    "narration": {
+                        "text": "Core inflation provides a narrower, more stable signal by removing volatile food and energy prices, helping economists see underlying inflation trends more clearly."
+                    },
+                    "layout_template": "animated_chart",
+                    "slots": {
+                        "slot_chart": {
+                            "content_type": "chart",
+                            "chart_type": "line",
+                            "values": [
+                                2.1,
+                                2.3,
+                                2.2,
+                                2.4,
+                                2.3,
+                                2.5,
+                                2.4
+                            ],
+                            "labels": [
+                                "Jan",
+                                "Feb",
+                                "Mar",
+                                "Apr",
+                                "May",
+                                "Jun",
+                                "Jul"
+                            ],
+                            "unit": "%",
+                            "caption": "",
+                            "highlight_index": 6,
+                            "source": "National Statistics Agency"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_9",
+                    "order": 9,
+                    "duration_seconds": 5.2,
+                    "narration": {
+                        "text": "Inflation numbers are real but answer a narrower question than most people think."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "A real photograph of inflation numbers real answer, plain and documentary, no text or graphics in frame",
+                                "search_query": "real inflation numbers answer",
+                                "guidance": "A single clear photo of A real photograph of inflation numbers real answer, plain and documentary, no text or graphics in frame. Landscape, with the subject off-centre or with clear space around it. Avoid on-image text, logos and watermarks.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Inflation answers a narrower question",
+                            "bullets": [
+                                "It measures average price changes weighted by spending",
+                                "Not the exact experience of every individual"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_4: broke a run of 'fade' transitions -> 'push_left'.",
+                "Scene scene_7: broke a run of 'fade' transitions -> 'mask_wipe_diagonal'.",
+                "No peak card in the window starting at 0s (nothing safely upgradeable).",
+                "Scene scene_9: text-only video — added a picture behind the panel (A real photograph of inflation numbers real answer, plain and documentary, no text or graphics in frame)."
+            ],
+            "plan_items": [
+                {
+                    "scene_id": "scene_1",
+                    "treatment": "hero_open",
+                    "relation": "opening",
+                    "camera_move": "push_in"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "drift"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "settle_back"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "rise"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "sway"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "treatment": "pull_reveal",
+                    "relation": "new_chapter",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "drift"
+                },
+                {
+                    "scene_id": "scene_9",
+                    "treatment": "canvas_hop",
+                    "relation": "consequence",
+                    "camera_move": "settle_back"
+                }
+            ],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card between 0s and 50s."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 0,
+                    "info": 1
+                },
+                "checked_at": "2026-09-01T11:47:58+00:00"
+            },
+            "id": "inflation",
+            "pass": 1,
+            "seconds": 42,
+            "spend_usd": 0.0112,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 1,
+                    "variety": 0.9999999999999999,
+                    "media": 0.45000000000000007,
+                    "pacing": 1,
+                    "lint": 1,
+                    "flights": 1
+                },
+                "total": 91.8,
+                "findings": [
+                    {
+                        "severity": "warn",
+                        "code": "thin_visuals",
+                        "message": "1 of 9 scenes carry a picture (11%); this script wants 25%"
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 9,
+                        "templates": [
+                            "quote_card",
+                            "term_card",
+                            "cycle_diagram",
+                            "proportion_flow",
+                            "myth_fact",
+                            "stat_spotlight",
+                            "animated_chart",
+                            "full_bleed_with_side_panel"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "term_card",
+                            "cycle_diagram",
+                            "proportion_flow",
+                            "myth_fact",
+                            "myth_fact",
+                            "stat_spotlight",
+                            "animated_chart",
+                            "full_bleed_with_side_panel"
+                        ],
+                        "counts": {
+                            "myth_fact": 2,
+                            "quote_card": 1,
+                            "term_card": 1,
+                            "cycle_diagram": 1,
+                            "proportion_flow": 1,
+                            "stat_spotlight": 1,
+                            "animated_chart": 1,
+                            "full_bleed_with_side_panel": 1
+                        },
+                        "top_template": "myth_fact",
+                        "top_share": 0.2222222222222222,
+                        "max_streak": 2,
+                        "streak_template": "myth_fact",
+                        "media_scenes": 1,
+                        "media_share": 0.1111111111111111,
+                        "total_seconds": 85.8,
+                        "min_seconds": 5.2,
+                        "max_seconds": 14,
+                        "spread": 8.8,
+                        "brief": {
+                            "slots": 1,
+                            "query_ok": 1,
+                            "kind_ok": 1,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 9,
+                        "templates": [
+                            "quote_card",
+                            "term_card",
+                            "cycle_diagram",
+                            "proportion_flow",
+                            "myth_fact",
+                            "stat_spotlight",
+                            "animated_chart",
+                            "single_focus"
+                        ],
+                        "order": [
+                            "quote_card",
+                            "term_card",
+                            "cycle_diagram",
+                            "proportion_flow",
+                            "myth_fact",
+                            "myth_fact",
+                            "stat_spotlight",
+                            "animated_chart",
+                            "single_focus"
+                        ],
+                        "counts": {
+                            "myth_fact": 2,
+                            "quote_card": 1,
+                            "term_card": 1,
+                            "cycle_diagram": 1,
+                            "proportion_flow": 1,
+                            "stat_spotlight": 1,
+                            "animated_chart": 1,
+                            "single_focus": 1
+                        },
+                        "top_template": "myth_fact",
+                        "top_share": 0.2222222222222222,
+                        "max_streak": 2,
+                        "streak_template": "myth_fact",
+                        "media_scenes": 0,
+                        "media_share": 0,
+                        "total_seconds": 75,
+                        "min_seconds": 5,
+                        "max_seconds": 14,
+                        "spread": 9,
+                        "brief": {
+                            "slots": 0,
+                            "query_ok": 0,
+                            "kind_ok": 0,
+                            "guidance_with_avoid": 0,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "argument",
+                    "phases": 9,
+                    "math_mode": false,
+                    "target_seconds": 75,
+                    "attempts": 2,
+                    "composed_by_tree": true,
+                    "validator_warnings": 4
+                }
+            }
+        },
+        {
+            "title": "Everything on your boarding pass",
+            "shape": "argument",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Boarding passes look like receipts but hide secret info"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Explain boarding pass fields are more than they seem"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Passenger name matches reservation exactly, middle initial matters"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Flight number encodes airline and direction with even/odd digits"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Seat letter shows boarding group, affecting bag handling"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Hidden screening codes reveal security checks before airport"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Barcode stores personal data unencrypted, risky to share"
+                },
+                {
+                    "intent": "resolution",
+                    "brief": "Each field added due to past problems"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "Understanding boarding pass reveals hidden travel details"
+                }
+            ],
+            "attempts": 2,
+            "composed_by_tree": true,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "layout_template": "stat_spotlight",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "A boarding pass looks like a receipt, but almost every field on it hides secret info you were never told about."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Boarding passes hide secret info",
+                            "bullets": [
+                                "Looks like a receipt, but much more"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "layout_template": "labeled_diagram",
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "Each field on a boarding pass is more than it seems. They encode details about your flight, your status, and security checks, all packed into a small card."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_diagram": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "boarding pass on plain background",
+                                "search_query": "boarding pass flat",
+                                "media_kind": "image",
+                                "guidance": "A clear, clean photo of a boarding pass on a plain background, no text overlays."
+                            },
+                            "heading": "Boarding pass anatomy",
+                            "callout_suggestions": [
+                                "Passenger Name",
+                                "Flight Number",
+                                "Seat & Boarding Group",
+                                "Screening Code",
+                                "Barcode"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "layout_template": "myth_fact",
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "The passenger name on your boarding pass must match your reservation exactly. Even a middle initial can matter at the gate."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "Your name on the boarding pass is just for show.",
+                            "fact": "It must match your reservation exactly, including middle initials.",
+                            "heading": "Passenger Name Accuracy"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "layout_template": "formula_anatomy",
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "Flight numbers encode the airline and direction. Even numbers usually mean eastbound or northbound flights, odd numbers the return leg."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_formula": {
+                            "content_type": "formula",
+                            "formula": "AA1234",
+                            "parts": [
+                                {
+                                    "match": "AA",
+                                    "label": "Airline code"
+                                },
+                                {
+                                    "match": "1234",
+                                    "label": "Flight number with direction info"
+                                }
+                            ],
+                            "heading": "Flight Number Explained"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "layout_template": "layer_stack",
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "The seat letter shows your boarding group, which is set by your fare class and status. This group determines how your bags are handled."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_layers": {
+                            "content_type": "layers",
+                            "layers": [
+                                {
+                                    "label": "Seat Number",
+                                    "caption": "Your assigned seat"
+                                },
+                                {
+                                    "label": "Boarding Group",
+                                    "caption": "Determines boarding order and bag handling"
+                                },
+                                {
+                                    "label": "Fare Class",
+                                    "caption": "Your ticket type and privileges"
+                                },
+                                {
+                                    "label": "Status",
+                                    "caption": "Frequent flyer or elite status"
+                                }
+                            ],
+                            "highlight_index": 1,
+                            "heading": "Seat Letter and Boarding Group"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "layout_template": "single_focus",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "A short code like S or SSSS in the corner signals security screenings done before you reach the airport."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_main": {
+                            "content_type": "text_block",
+                            "heading": "Hidden Screening Codes",
+                            "bullets": [
+                                "SSSS means secondary screening was selected early",
+                                "Most travelers never notice this code"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "layout_template": "quote_card",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "The barcode at the bottom is not encrypted. It carries your name, record locator, and frequent flyer number in plain text."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "\"Photographing your boarding pass is risky.\"",
+                            "bullets": [
+                                "Barcode data is unencrypted and visible to anyone",
+                                "Sharing it on social media can expose personal info"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "layout_template": "receipt_card",
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "Every field on the boarding pass was added because something went wrong once. These details prevent past problems from happening again."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_receipt": {
+                            "content_type": "receipt",
+                            "rows": [
+                                {
+                                    "label": "Name Accuracy",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Flight Number Encoding",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Boarding Group Info",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Security Screening Codes",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Unencrypted Barcode Data",
+                                    "value": 1
+                                }
+                            ],
+                            "heading": "Fields Added Due to Past Issues",
+                            "caption": "Each field solves a specific problem encountered before"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_9",
+                    "order": 9,
+                    "layout_template": "practice_card",
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "Now that you know, can you spot the hidden info on your boarding pass? Look closely at your next one and see what it reveals."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_practice": {
+                            "content_type": "practice",
+                            "prompt": "Identify three hidden pieces of information on your boarding pass.",
+                            "answer": "Passenger name accuracy, flight number direction, boarding group",
+                            "hint": "Look beyond the obvious seat and flight number",
+                            "heading": "Test Your Knowledge"
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 8.4,
+                    "narration": {
+                        "text": "A boarding pass looks like a receipt, but almost every field on it hides secret info you were never told about."
+                    },
+                    "layout_template": "stat_spotlight",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "Boarding passes hide secret info",
+                            "bullets": [
+                                "Looks like a receipt, but much more"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 12,
+                    "narration": {
+                        "text": "Each field on a boarding pass is more than it seems. They encode details about your flight, your status, and security checks, all packed into a small card."
+                    },
+                    "layout_template": "labeled_diagram",
+                    "slots": {
+                        "slot_diagram": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "boarding pass on plain background",
+                                "search_query": "boarding pass",
+                                "guidance": "A clear, clean photo of a boarding pass on a plain background, no text overlays.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": [
+                                "Passenger Name",
+                                "Flight Number",
+                                "Seat & Boarding Group",
+                                "Screening Code"
+                            ],
+                            "heading": "Boarding pass anatomy"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 8.4,
+                    "narration": {
+                        "text": "The passenger name on your boarding pass must match your reservation exactly. Even a middle initial can matter at the gate."
+                    },
+                    "layout_template": "myth_fact",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "Your name on the boarding pass is just for show.",
+                            "fact": "It must match your reservation exactly, including middle initials.",
+                            "heading": "Passenger Name Accuracy"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "Flight numbers encode the airline and direction. Even numbers usually mean eastbound or northbound flights, odd numbers the return leg."
+                    },
+                    "layout_template": "formula_anatomy",
+                    "slots": {
+                        "slot_formula": {
+                            "content_type": "formula",
+                            "formula": "AA1234",
+                            "parts": [
+                                {
+                                    "match": "AA",
+                                    "label": "Airline code"
+                                },
+                                {
+                                    "match": "1234",
+                                    "label": "Flight number with direction info"
+                                }
+                            ],
+                            "heading": "Flight Number Explained"
+                        }
+                    },
+                    "transition": "push_left",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 9.6,
+                    "narration": {
+                        "text": "The seat letter shows your boarding group, which is set by your fare class and status. This group determines how your bags are handled."
+                    },
+                    "layout_template": "layer_stack",
+                    "slots": {
+                        "slot_layers": {
+                            "content_type": "layers",
+                            "layers": [
+                                {
+                                    "label": "Seat Number",
+                                    "caption": "Your assigned seat"
+                                },
+                                {
+                                    "label": "Boarding Group",
+                                    "caption": "Determines boarding order and bag handling"
+                                },
+                                {
+                                    "label": "Fare Class",
+                                    "caption": "Your ticket type and privileges"
+                                },
+                                {
+                                    "label": "Status",
+                                    "caption": "Frequent flyer or elite status"
+                                }
+                            ],
+                            "highlight_index": 1,
+                            "heading": "Seat Letter and Boarding Group"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 7.6,
+                    "narration": {
+                        "text": "A short code like S or SSSS in the corner signals security screenings done before you reach the airport."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "A real photograph of short code like ssss, plain and documentary, no text or graphics in frame",
+                                "search_query": "real short code like",
+                                "guidance": "A single clear photo of A real photograph of short code like ssss, plain and documentary, no text or graphics in frame. Landscape, with the subject off-centre or with clear space around it. Avoid on-image text, logos and watermarks.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Hidden Screening Codes",
+                            "bullets": [
+                                "SSSS means secondary screening was selected early",
+                                "Most travelers never notice this code"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 8.4,
+                    "narration": {
+                        "text": "The barcode at the bottom is not encrypted. It carries your name, record locator, and frequent flyer number in plain text."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "\"Photographing your boarding pass is risky.\"",
+                            "bullets": [
+                                "Barcode data is unencrypted and visible to anyone",
+                                "Sharing it on social media can expose personal info"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "mask_wipe_diagonal",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "duration_seconds": 9,
+                    "narration": {
+                        "text": "Every field on the boarding pass was added because something went wrong once. These details prevent past problems from happening again."
+                    },
+                    "layout_template": "receipt_card",
+                    "slots": {
+                        "slot_receipt": {
+                            "content_type": "receipt",
+                            "rows": [
+                                {
+                                    "label": "Name Accuracy",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Flight Number Encoding",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Boarding Group Info",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Security Screening Codes",
+                                    "value": 1
+                                },
+                                {
+                                    "label": "Unencrypted Barcode Data",
+                                    "value": 1
+                                }
+                            ],
+                            "total": 5,
+                            "heading": "Fields Added Due to Past Issues",
+                            "caption": "Each field solves a specific problem encountered before"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_9",
+                    "order": 9,
+                    "duration_seconds": 10,
+                    "narration": {
+                        "text": "Now that you know, can you spot the hidden info on your boarding pass? Look closely at your next one and see what it reveals."
+                    },
+                    "layout_template": "practice_card",
+                    "slots": {
+                        "slot_practice": {
+                            "content_type": "practice",
+                            "prompt": "Identify three hidden pieces of information on your boarding pass.",
+                            "answer": "Passenger name accuracy, flight number d",
+                            "hint": "Look beyond the obvious seat and flight number",
+                            "heading": "Test Your Knowledge"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_4: broke a run of 'fade' transitions -> 'push_left'.",
+                "Scene scene_7: broke a run of 'fade' transitions -> 'mask_wipe_diagonal'.",
+                "No peak card in the window starting at 0s (nothing safely upgradeable).",
+                "No peak card in the window starting at 46s (nothing safely upgradeable).",
+                "Scene scene_6: text-only video — added a picture behind the panel (A real photograph of short code like ssss, plain and documentary, no text or graphics in frame)."
+            ],
+            "plan_items": [
+                {
+                    "scene_id": "scene_1",
+                    "treatment": "hero_open",
+                    "relation": "opening",
+                    "camera_move": "push_in"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "drift"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "sway"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "drift"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "treatment": "canvas_hop",
+                    "relation": "consequence",
+                    "camera_move": "settle_back"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "drift"
+                },
+                {
+                    "scene_id": "scene_9",
+                    "treatment": "pull_reveal",
+                    "relation": "new_chapter",
+                    "camera_move": "orbit"
+                }
+            ],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "warn",
+                        "code": "static_hold",
+                        "scene_id": "scene_1",
+                        "message": "8.4s hold with no progressive reveal — split the beat or add bullets."
+                    },
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card between 0s and 46s."
+                    },
+                    {
+                        "severity": "info",
+                        "code": "no_peak_card",
+                        "scene_id": null,
+                        "message": "No high-energy data card in the final stretch (from 46s)."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 1,
+                    "info": 2
+                },
+                "checked_at": "2026-09-01T11:48:39+00:00"
+            },
+            "id": "boarding-pass",
+            "pass": 1,
+            "seconds": 40.8,
+            "spend_usd": 0.0151,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 0.8999999999999999,
+                    "variety": 0.9999999999999999,
+                    "media": 1,
+                    "pacing": 1,
+                    "lint": 1,
+                    "flights": 1
+                },
+                "total": 97.5,
+                "findings": [
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no custom_card — the card doc names a boarding pass as its example — if it is not cast here it will not be cast anywhere"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:static_hold",
+                        "message": "scene_1: 8.4s hold with no progressive reveal — split the beat or add bullets."
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 9,
+                        "templates": [
+                            "stat_spotlight",
+                            "labeled_diagram",
+                            "myth_fact",
+                            "formula_anatomy",
+                            "layer_stack",
+                            "full_bleed_with_side_panel",
+                            "quote_card",
+                            "receipt_card",
+                            "practice_card"
+                        ],
+                        "order": [
+                            "stat_spotlight",
+                            "labeled_diagram",
+                            "myth_fact",
+                            "formula_anatomy",
+                            "layer_stack",
+                            "full_bleed_with_side_panel",
+                            "quote_card",
+                            "receipt_card",
+                            "practice_card"
+                        ],
+                        "counts": {
+                            "stat_spotlight": 1,
+                            "labeled_diagram": 1,
+                            "myth_fact": 1,
+                            "formula_anatomy": 1,
+                            "layer_stack": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "quote_card": 1,
+                            "receipt_card": 1,
+                            "practice_card": 1
+                        },
+                        "top_template": "stat_spotlight",
+                        "top_share": 0.1111111111111111,
+                        "max_streak": 1,
+                        "streak_template": "stat_spotlight",
+                        "media_scenes": 2,
+                        "media_share": 0.2222222222222222,
+                        "total_seconds": 81.4,
+                        "min_seconds": 7.6,
+                        "max_seconds": 12,
+                        "spread": 4.4,
+                        "brief": {
+                            "slots": 2,
+                            "query_ok": 2,
+                            "kind_ok": 2,
+                            "guidance_with_avoid": 2,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 9,
+                        "templates": [
+                            "stat_spotlight",
+                            "labeled_diagram",
+                            "myth_fact",
+                            "formula_anatomy",
+                            "layer_stack",
+                            "single_focus",
+                            "quote_card",
+                            "receipt_card",
+                            "practice_card"
+                        ],
+                        "order": [
+                            "stat_spotlight",
+                            "labeled_diagram",
+                            "myth_fact",
+                            "formula_anatomy",
+                            "layer_stack",
+                            "single_focus",
+                            "quote_card",
+                            "receipt_card",
+                            "practice_card"
+                        ],
+                        "counts": {
+                            "stat_spotlight": 1,
+                            "labeled_diagram": 1,
+                            "myth_fact": 1,
+                            "formula_anatomy": 1,
+                            "layer_stack": 1,
+                            "single_focus": 1,
+                            "quote_card": 1,
+                            "receipt_card": 1,
+                            "practice_card": 1
+                        },
+                        "top_template": "stat_spotlight",
+                        "top_share": 0.1111111111111111,
+                        "max_streak": 1,
+                        "streak_template": "stat_spotlight",
+                        "media_scenes": 1,
+                        "media_share": 0.1111111111111111,
+                        "total_seconds": 70,
+                        "min_seconds": 5,
+                        "max_seconds": 12,
+                        "spread": 7,
+                        "brief": {
+                            "slots": 1,
+                            "query_ok": 1,
+                            "kind_ok": 1,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "argument",
+                    "phases": 9,
+                    "math_mode": false,
+                    "target_seconds": 70,
+                    "attempts": 2,
+                    "composed_by_tree": true,
+                    "validator_warnings": 5
+                }
+            }
+        },
+        {
+            "title": "How a delivery text scam works",
+            "shape": "argument",
+            "math_mode": false,
+            "math_topic": [],
+            "skeleton": [
+                {
+                    "intent": "hook",
+                    "brief": "Introduce the scam message about undelivered parcel and fee"
+                },
+                {
+                    "intent": "context",
+                    "brief": "Explain timing targets people expecting parcels on Tuesday afternoons"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Sender uses mobile number, not official courier short code"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Link mimics courier domain but is controlled by scammer"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Page requests small fee; real goal is card details and voluntary input"
+                },
+                {
+                    "intent": "point",
+                    "brief": "Follow-up call from bank fraud team to get authentication code"
+                },
+                {
+                    "intent": "resolution",
+                    "brief": "Scam’s structure: plausible ask then urgent second contact"
+                },
+                {
+                    "intent": "payoff",
+                    "brief": "Understanding scam’s shape helps recognize and avoid it"
+                }
+            ],
+            "attempts": 2,
+            "composed_by_tree": true,
+            "raw_scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "layout_template": "phone_mockup",
+                    "duration_seconds": 5,
+                    "narration": {
+                        "text": "You get a message saying your parcel couldn't be delivered and asks for a small fee."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_screen": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "a mobile phone showing a scam text message about undelivered parcel and fee",
+                                "search_query": "phone scam message parcel",
+                                "media_kind": "image",
+                                "guidance": "A clear close-up of a phone screen with a scam text about a parcel and fee, no personal info visible."
+                            },
+                            "frame": "phone"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "layout_template": "full_bleed_with_side_panel",
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "The message arrives on a Tuesday afternoon, a time when many people expect parcels. The scam only needs to fool those who actually have a delivery due, not everyone."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "asset_request": {
+                                "description": "a busy residential street with parcel deliveries on a Tuesday afternoon",
+                                "search_query": "parcel delivery Tuesday afternoon",
+                                "media_kind": "image",
+                                "guidance": "A residential street with parcels being delivered, showing typical Tuesday afternoon activity."
+                            }
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Timing targets parcel expectations",
+                            "bullets": [
+                                "Many expect deliveries on Tuesday afternoons",
+                                "Scam exploits this timing",
+                                "Only needs to fool those expecting a parcel"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "layout_template": "myth_fact",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "The sender uses a mobile number, not an official courier short code. That's the first sign it's a scam."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "Scam messages come from official courier numbers.",
+                            "fact": "Real couriers use registered short codes, not mobile numbers.",
+                            "heading": "Sender identity"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "layout_template": "quote_card",
+                    "duration_seconds": 6,
+                    "narration": {
+                        "text": "The link looks like the courier's domain but with an extra word in front. The scammer controls the part before the first slash."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "\"The link mimics the courier's domain but is controlled by scammers.\"",
+                            "bullets": [
+                                "— Cybersecurity expert"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "layout_template": "stat_spotlight",
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "The page asks for a small fee — just one pound ninety-nine. But the real goal is to get your card details and that you enter them willingly."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_stat": {
+                            "content_type": "text_block",
+                            "heading": "£1.99",
+                            "bullets": [
+                                "Small fee hides the real scam: card details theft"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "layout_template": "receipt_card",
+                    "duration_seconds": 7,
+                    "narration": {
+                        "text": "Days later, a call from the bank's fraud team asks for the authentication code they just sent you. They already have half your details."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_receipt": {
+                            "content_type": "receipt",
+                            "rows": [
+                                {
+                                    "label": "Card details stolen",
+                                    "value": 50
+                                },
+                                {
+                                    "label": "Authentication code requested",
+                                    "value": 50
+                                }
+                            ],
+                            "heading": "Fraud team call",
+                            "caption": "Scammers use info from earlier steps to convince you"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "layout_template": "proportion_flow",
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "The scam’s structure is clear: a small, plausible, urgent ask first, then a second contact that builds on it."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_proportion": {
+                            "content_type": "proportion",
+                            "source_label": "Scam steps",
+                            "branches": [
+                                {
+                                    "label": "Initial small fee request",
+                                    "value": 1,
+                                    "note": "Plausible and urgent"
+                                },
+                                {
+                                    "label": "Follow-up fraud call",
+                                    "value": 1,
+                                    "note": "Leans on first contact"
+                                }
+                            ],
+                            "heading": "Scam structure",
+                            "caption": "Two-step approach to trick victims"
+                        }
+                    }
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "layout_template": "checklist_card",
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "Knowing the scam’s shape helps you spot it and avoid falling victim. Watch for unexpected fees and follow-up calls."
+                    },
+                    "mood": "neutral",
+                    "slots": {
+                        "slot_checklist": {
+                            "content_type": "proscons",
+                            "pros": [
+                                "Recognize timing tricks",
+                                "Identify fake sender numbers",
+                                "Spot suspicious links",
+                                "Beware small fee requests"
+                            ],
+                            "cons": [
+                                "Scammers use urgency",
+                                "Follow-up calls seem official"
+                            ],
+                            "heading": "How to recognize this scam"
+                        }
+                    }
+                }
+            ],
+            "scenes": [
+                {
+                    "scene_id": "scene_1",
+                    "order": 1,
+                    "duration_seconds": 6.4,
+                    "narration": {
+                        "text": "You get a message saying your parcel couldn't be delivered and asks for a small fee."
+                    },
+                    "layout_template": "phone_mockup",
+                    "slots": {
+                        "slot_screen": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "a mobile phone showing a scam text message about undelivered parcel and fee",
+                                "search_query": "phone scam message parcel",
+                                "guidance": "A clear close-up of a phone screen with a scam text about a parcel and fee, no personal info visible.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": [],
+                            "frame": "phone"
+                        }
+                    },
+                    "transition": "none",
+                    "relation": "opening",
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "order": 2,
+                    "duration_seconds": 13,
+                    "narration": {
+                        "text": "The message arrives on a Tuesday afternoon, a time when many people expect parcels. The scam only needs to fool those who actually have a delivery due, not everyone."
+                    },
+                    "layout_template": "full_bleed_with_side_panel",
+                    "slots": {
+                        "slot_background": {
+                            "content_type": "image",
+                            "label": "",
+                            "camera_move": "ken_burns",
+                            "asset_request": {
+                                "description": "a busy residential street with parcel deliveries on a Tuesday afternoon",
+                                "search_query": "parcel delivery tuesday afternoon",
+                                "guidance": "A residential street with parcels being delivered, showing typical Tuesday afternoon activity.",
+                                "media_kind": "image"
+                            },
+                            "asset_ref": null,
+                            "callouts": [],
+                            "callout_suggestions": []
+                        },
+                        "slot_panel": {
+                            "content_type": "text_block",
+                            "heading": "Timing targets parcel expectations",
+                            "bullets": [
+                                "Many expect deliveries on Tuesday afternoons",
+                                "Scam exploits this timing",
+                                "Only needs to fool those expecting a parcel"
+                            ],
+                            "reveal": "sequential",
+                            "dock": "right",
+                            "width_pct": 33
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "order": 3,
+                    "duration_seconds": 7.6,
+                    "narration": {
+                        "text": "The sender uses a mobile number, not an official courier short code. That's the first sign it's a scam."
+                    },
+                    "layout_template": "myth_fact",
+                    "slots": {
+                        "slot_myth_fact": {
+                            "content_type": "myth_fact",
+                            "myth": "Scam messages come from official courier numbers.",
+                            "fact": "Real couriers use registered short codes, not mobile numbers.",
+                            "heading": "Sender identity"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "order": 4,
+                    "duration_seconds": 9.2,
+                    "narration": {
+                        "text": "The link looks like the courier's domain but with an extra word in front. The scammer controls the part before the first slash."
+                    },
+                    "layout_template": "quote_card",
+                    "slots": {
+                        "slot_quote": {
+                            "content_type": "text_block",
+                            "heading": "\"The link mimics the courier's domain but is controlled by scammers.\"",
+                            "bullets": [
+                                "— Cybersecurity expert"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "push_left",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "order": 5,
+                    "duration_seconds": 10.8,
+                    "narration": {
+                        "text": "The page asks for a small fee — just one pound ninety-nine. But the real goal is to get your card details and that you enter them willingly."
+                    },
+                    "layout_template": "big_counter",
+                    "slots": {
+                        "slot_counter": {
+                            "content_type": "text_block",
+                            "heading": "£1.99",
+                            "bullets": [
+                                "Small fee hides the real scam: card details theft"
+                            ],
+                            "reveal": "sequential"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "order": 6,
+                    "duration_seconds": 9.6,
+                    "narration": {
+                        "text": "Days later, a call from the bank's fraud team asks for the authentication code they just sent you. They already have half your details."
+                    },
+                    "layout_template": "receipt_card",
+                    "slots": {
+                        "slot_receipt": {
+                            "content_type": "receipt",
+                            "rows": [
+                                {
+                                    "label": "Card details stolen",
+                                    "value": 50
+                                },
+                                {
+                                    "label": "Authentication code requeste",
+                                    "value": 50
+                                }
+                            ],
+                            "total": 100,
+                            "heading": "Fraud team call",
+                            "caption": "Scammers use info from earlier steps to convince you"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "order": 7,
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "The scam’s structure is clear: a small, plausible, urgent ask first, then a second contact that builds on it."
+                    },
+                    "layout_template": "proportion_flow",
+                    "slots": {
+                        "slot_proportion": {
+                            "content_type": "proportion",
+                            "slices": [
+                                {
+                                    "label": "Initial small fee reques",
+                                    "value": 1,
+                                    "note": "Plausible and urgent",
+                                    "share": 0.5
+                                },
+                                {
+                                    "label": "Follow-up fraud call",
+                                    "value": 1,
+                                    "note": "Leans on first contact",
+                                    "share": 0.5
+                                }
+                            ],
+                            "total": 2,
+                            "source_label": "Scam steps",
+                            "heading": "Scam structure",
+                            "caption": "Two-step approach to trick victims"
+                        }
+                    },
+                    "transition": "mask_wipe_diagonal",
+                    "relation": null,
+                    "mood": "neutral"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "order": 8,
+                    "duration_seconds": 8,
+                    "narration": {
+                        "text": "Knowing the scam’s shape helps you spot it and avoid falling victim. Watch for unexpected fees and follow-up calls."
+                    },
+                    "layout_template": "checklist_card",
+                    "slots": {
+                        "slot_checklist": {
+                            "content_type": "proscons",
+                            "pros": [
+                                "Recognize timing tricks",
+                                "Identify fake sender numbers",
+                                "Spot suspicious links",
+                                "Beware small fee requests"
+                            ],
+                            "cons": [
+                                "Scammers use urgency",
+                                "Follow-up calls seem official"
+                            ],
+                            "heading": "How to recognize this scam"
+                        }
+                    },
+                    "transition": "fade",
+                    "relation": null,
+                    "mood": "neutral"
+                }
+            ],
+            "validator_warnings": [
+                "Scene scene_4: broke a run of 'fade' transitions -> 'push_left'.",
+                "Scene scene_7: broke a run of 'fade' transitions -> 'mask_wipe_diagonal'.",
+                "Scene scene_5: promoted stat_spotlight -> big_counter (peak beat for the 0s window)."
+            ],
+            "plan_items": [
+                {
+                    "scene_id": "scene_1",
+                    "treatment": "hero_open",
+                    "relation": "opening",
+                    "camera_move": "push_in"
+                },
+                {
+                    "scene_id": "scene_2",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_3",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "drift"
+                },
+                {
+                    "scene_id": "scene_4",
+                    "treatment": "zoom_nest",
+                    "relation": "elaborates",
+                    "camera_move": "breathe"
+                },
+                {
+                    "scene_id": "scene_5",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "rise"
+                },
+                {
+                    "scene_id": "scene_6",
+                    "treatment": "canvas_hop",
+                    "relation": "consequence",
+                    "camera_move": "sway"
+                },
+                {
+                    "scene_id": "scene_7",
+                    "treatment": "same_frame",
+                    "relation": "continues",
+                    "camera_move": "settle_back"
+                },
+                {
+                    "scene_id": "scene_8",
+                    "treatment": "pull_reveal",
+                    "relation": "new_chapter",
+                    "camera_move": "orbit"
+                }
+            ],
+            "lint": {
+                "items": [
+                    {
+                        "severity": "warn",
+                        "code": "static_hold",
+                        "scene_id": "scene_4",
+                        "message": "9.2s hold with no progressive reveal — split the beat or add bullets."
+                    }
+                ],
+                "counts": {
+                    "error": 0,
+                    "warn": 1,
+                    "info": 0
+                },
+                "checked_at": "2026-09-01T11:49:20+00:00"
+            },
+            "id": "text-scam",
+            "pass": 1,
+            "seconds": 40.7,
+            "spend_usd": 0.0187,
+            "score": {
+                "scores": {
+                    "structure": 1,
+                    "casting": 0.8999999999999999,
+                    "variety": 0.9999999999999999,
+                    "media": 0.9249999999999999,
+                    "pacing": 1,
+                    "lint": 1,
+                    "flights": 1
+                },
+                "total": 96.4,
+                "findings": [
+                    {
+                        "severity": "info",
+                        "code": "missed_upgrade",
+                        "message": "no custom_card — a chat exchange is the card doc's own example of what NOT to ask a phone_mockup for"
+                    },
+                    {
+                        "severity": "info",
+                        "code": "brief_guidance",
+                        "message": "1 of 2 guidance lines never say what to AVOID (the prompt asks for it)"
+                    },
+                    {
+                        "severity": "warn",
+                        "code": "lint:static_hold",
+                        "message": "scene_4: 9.2s hold with no progressive reveal — split the beat or add bullets."
+                    }
+                ],
+                "metrics": {
+                    "validated": {
+                        "count": 8,
+                        "templates": [
+                            "phone_mockup",
+                            "full_bleed_with_side_panel",
+                            "myth_fact",
+                            "quote_card",
+                            "big_counter",
+                            "receipt_card",
+                            "proportion_flow",
+                            "checklist_card"
+                        ],
+                        "order": [
+                            "phone_mockup",
+                            "full_bleed_with_side_panel",
+                            "myth_fact",
+                            "quote_card",
+                            "big_counter",
+                            "receipt_card",
+                            "proportion_flow",
+                            "checklist_card"
+                        ],
+                        "counts": {
+                            "phone_mockup": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "myth_fact": 1,
+                            "quote_card": 1,
+                            "big_counter": 1,
+                            "receipt_card": 1,
+                            "proportion_flow": 1,
+                            "checklist_card": 1
+                        },
+                        "top_template": "phone_mockup",
+                        "top_share": 0.125,
+                        "max_streak": 1,
+                        "streak_template": "phone_mockup",
+                        "media_scenes": 2,
+                        "media_share": 0.25,
+                        "total_seconds": 72.6,
+                        "min_seconds": 6.4,
+                        "max_seconds": 13,
+                        "spread": 6.6,
+                        "brief": {
+                            "slots": 2,
+                            "query_ok": 2,
+                            "kind_ok": 2,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "composer": {
+                        "count": 8,
+                        "templates": [
+                            "phone_mockup",
+                            "full_bleed_with_side_panel",
+                            "myth_fact",
+                            "quote_card",
+                            "stat_spotlight",
+                            "receipt_card",
+                            "proportion_flow",
+                            "checklist_card"
+                        ],
+                        "order": [
+                            "phone_mockup",
+                            "full_bleed_with_side_panel",
+                            "myth_fact",
+                            "quote_card",
+                            "stat_spotlight",
+                            "receipt_card",
+                            "proportion_flow",
+                            "checklist_card"
+                        ],
+                        "counts": {
+                            "phone_mockup": 1,
+                            "full_bleed_with_side_panel": 1,
+                            "myth_fact": 1,
+                            "quote_card": 1,
+                            "stat_spotlight": 1,
+                            "receipt_card": 1,
+                            "proportion_flow": 1,
+                            "checklist_card": 1
+                        },
+                        "top_template": "phone_mockup",
+                        "top_share": 0.125,
+                        "max_streak": 1,
+                        "streak_template": "phone_mockup",
+                        "media_scenes": 2,
+                        "media_share": 0.25,
+                        "total_seconds": 60,
+                        "min_seconds": 5,
+                        "max_seconds": 13,
+                        "spread": 8,
+                        "brief": {
+                            "slots": 2,
+                            "query_ok": 2,
+                            "kind_ok": 2,
+                            "guidance_with_avoid": 1,
+                            "video": 0,
+                            "video_share": 0
+                        }
+                    },
+                    "shape": "argument",
+                    "phases": 8,
+                    "math_mode": false,
+                    "target_seconds": 65,
+                    "attempts": 2,
+                    "composed_by_tree": true,
+                    "validator_warnings": 3
+                }
+            }
+        }
+    ],
+    "finished_at": "2026-09-01T11:49:20+00:00",
+    "spend_usd": 0.0187,
+    "duration_seconds": 206.6
+}

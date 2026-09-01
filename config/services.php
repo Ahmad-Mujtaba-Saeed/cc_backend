@@ -51,6 +51,14 @@ return [
         // differences are absorbed by LlmModels::tune() at these call
         // sites. Set to "" to fall back to the explainer model.
         'explainer_model_math' => env('OPENAI_EXPLAINER_MODEL_MATH', 'gpt-5-nano'),
+
+        /*
+         * The L1 act planner (ScriptSkeletonService). Split from the explainer
+         * model on the iter-55 bench's evidence: a stronger model writes better
+         * scenes and picks worse story shapes. Unset = same as the explainer
+         * model, which is exactly the behaviour before the split.
+         */
+        'planner_model' => env('OPENAI_PLANNER_MODEL'),
         // The storyboard text-review pass (iter 6) is pure verbatim-quote
         // nomination behind hard guards — reasoning-model precision at a
         // third of the input price. Same tune() shim applies.
