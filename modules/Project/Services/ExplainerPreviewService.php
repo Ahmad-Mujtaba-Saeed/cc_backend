@@ -180,6 +180,123 @@ class ExplainerPreviewService
     }
 
     /**
+     * The whole shot list, ready for @remotion/player to PLAY in the browser.
+     *
+     * The frozen still above answers "what does this look like"; this answers
+     * "how does it move" — the storyboard's play tab runs the real
+     * `ExplainerVideo` component on this payload, so timing, transitions,
+     * reveals and camera are the renderer's own, not an approximation.
+     *
+     * It is the same {@see RemotionRenderService::buildRenderPayload} the MP4
+     * uses, with exactly two deliberate differences:
+     *
+     *  - `output_path` goes: it is a filesystem path on the render host and has
+     *    no business being sent to a browser.
+     *  - `narration_audio_url` goes on every scene: the preview is silent of
+     *    voice by design (music and SFX still play). That also means the music
+     *    bed does not duck, because the renderer derives its duck windows from
+     *    the presence of narration audio — a preview plays its music a little
+     *    louder than the export does.
+     *
+     * `narration_words` is deliberately KEPT: word-synced reveals and captions
+     * then run on the same clock as the export.
+     *
+     * TIMING HONESTY. Narration is synthesised at render time, and the
+     * processor rewrites every scene's duration to fit the wav it got back. So
+     * before a project's first render these durations are the planner's
+     * estimates and the preview's clock is approximate; afterwards it is the
+     * exported clock exactly. `timing` says which, so the UI can, too.
+     *
+     * @return array{
+     *   success: bool, error?: string, payload?: array<string, mixed>,
+     *   timing?: string, duration_seconds?: float, scenes?: array<int, array<string, mixed>>
+     * }
+     */
+    public function playerPayload(Project $project): array
+    {
+        $settings = $project->settings ?? [];
+        $autoVisuals = (bool) ($settings['auto_visuals'] ?? $settings['auto_visuals_auto'] ?? false);
+        $assembled = ExplainerSceneAssembler::assemble($project, $autoVisuals);
+        $scenes = $assembled['scenes'];
+
+        if (empty($scenes)) {
+            return ['success' => false, 'error' => 'No storyboard scenes to play yet.'];
+        }
+
+        $aspect = $project->aspect_ratio ?? '16:9';
+        [$width, $height] = RemotionRenderService::dimensionsForAspect($aspect);
+
+        // The output path is required by the signature and dropped below; the
+        // payload builder never touches the filesystem.
+        $payload = (new RemotionRenderService())
+            ->buildRenderPayload($project, $scenes, '', $aspect, $width, $height);
+        unset($payload['output_path']);
+
+        $voiced = 0;
+        $speaking = 0;
+        foreach ($payload['shot_list']['scenes'] as $i => $scene) {
+            // A scene with nothing to say is not evidence of a missing render,
+            // so only scenes that CARRY narration count toward the verdict.
+            if (trim((string) ($scene['narration']['text'] ?? '')) !== '') {
+                $speaking++;
+            }
+            if (!empty($scene['narration_audio_url'])) {
+                $voiced++;
+                unset($payload['shot_list']['scenes'][$i]['narration_audio_url']);
+            }
+        }
+        $payload['shot_list']['scenes'] = array_values($payload['shot_list']['scenes']);
+
+        // Every speaking scene having audio means a render has already paced
+        // this storyboard against real speech, so the clock is the export's.
+        $timing = ($speaking > 0 && $voiced >= $speaking) ? 'exact' : 'estimated';
+
+        return [
+            'success' => true,
+            'payload' => $this->rebaseForBrowser($payload),
+            'timing' => $timing,
+            'duration_seconds' => round(array_sum(array_map(
+                fn ($s) => (float) ($s['duration_seconds'] ?? 0),
+                $scenes
+            )), 2),
+            // The scene ruler under the player: what to label each marker and
+            // where it sits. Overlapping transitions are the renderer's
+            // business, so these are cumulative scene lengths, not frames.
+            'scenes' => array_map(fn ($s) => [
+                'scene_id' => (string) ($s['scene_id'] ?? ''),
+                'duration_seconds' => (float) ($s['duration_seconds'] ?? 0),
+            ], $scenes),
+        ];
+    }
+
+    /**
+     * Media URLs are built for the RENDER SERVICE, which may reach Laravel on
+     * an internal hostname (services.remotion.asset_base_url). A browser
+     * cannot. Where the two bases differ, rewrite to the public one — the
+     * alternative is a preview of broken images on exactly the deployments
+     * that bothered to configure a private render network.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function rebaseForBrowser(array $payload): array
+    {
+        $public = rtrim((string) config('app.url'), '/');
+        $node = rtrim((string) (config('services.remotion.asset_base_url') ?: config('app.url')), '/');
+        if ($node === '' || $public === '' || $node === $public) {
+            return $payload;
+        }
+
+        array_walk_recursive($payload, function (&$value) use ($node, $public) {
+            if (is_string($value) && str_starts_with($value, $node . '/storage/')) {
+                $value = $public . substr($value, strlen($node));
+            }
+        });
+
+        return $payload;
+    }
+
+    /**
      * Which scene to freeze. Caller's pick wins when it exists; otherwise the
      * first scene that actually shows the design off — a content scene with
      * slots, skipping a bare title/hook card when there's something richer.

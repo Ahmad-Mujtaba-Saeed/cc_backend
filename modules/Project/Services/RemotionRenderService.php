@@ -1146,6 +1146,18 @@ class RemotionRenderService
 
     private function dimensionsFor(string $aspectRatio): array
     {
+        return self::dimensionsForAspect($aspectRatio);
+    }
+
+    /**
+     * The render size for an aspect ratio. Public because the browser preview
+     * player has to build the SAME composition size the MP4 uses — a player
+     * sized differently from the export is a player showing a different video.
+     *
+     * @return array{0: int, 1: int} [width, height]
+     */
+    public static function dimensionsForAspect(string $aspectRatio): array
+    {
         return match ($aspectRatio) {
             '9:16' => [1080, 1920],
             '1:1' => [1080, 1080],

@@ -1485,6 +1485,32 @@ class ExplainerController extends Controller
     }
 
     /**
+     * The shot list the browser can PLAY (storyboard → play tab).
+     *
+     * Read-only and free: no render, no credits, no queue. The dashboard runs
+     * the real Remotion composition on this payload with @remotion/player, so
+     * what plays is the renderer itself rather than a mock-up of it — minus
+     * the AI voice, which the service strips (see playerPayload()).
+     */
+    public function playerPayload(Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $result = (new \Modules\Project\Services\ExplainerPreviewService())->playerPayload($project);
+
+        if (!($result['success'] ?? false)) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['error'] ?? 'Nothing to play yet',
+            ], 422);
+        }
+
+        return response()->json(['success' => true, 'data' => $result]);
+    }
+
+    /**
      * Edit one scene by hand: its spoken narration, its transition, its
      * duration, its mood.
      *

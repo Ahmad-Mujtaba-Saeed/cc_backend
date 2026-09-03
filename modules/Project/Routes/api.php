@@ -79,6 +79,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/explainer/projects/{project}/board-style', [ExplainerController::class, 'setBoardStyle']);
     Route::post('/explainer/projects/{project}/smooth-motion', [ExplainerController::class, 'setSmoothMotion']);
     Route::post('/explainer/projects/{project}/preview', [ExplainerController::class, 'preview']);
+    // The same shot list the MP4 is rendered from, for the browser player.
+    Route::get('/explainer/projects/{project}/player-payload', [ExplainerController::class, 'playerPayload']);
     Route::post('/explainer/projects/{project}/composition-mode', [ExplainerController::class, 'setCompositionMode']);
     Route::post('/explainer/projects/{project}/chapter-chip', [ExplainerController::class, 'toggleChapterChip']);
     Route::post('/explainer/projects/{project}/accent-shift', [ExplainerController::class, 'toggleAccentShift']);
