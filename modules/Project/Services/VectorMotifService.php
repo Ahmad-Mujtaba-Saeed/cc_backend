@@ -3,6 +3,7 @@
 namespace Modules\Project\Services;
 
 use Modules\Project\Support\ExplainerRegistry;
+use Modules\Project\Support\MediaBrief;
 use Modules\Project\Support\LlmModels;
 use Modules\Project\Support\VectorMotif;
 use Illuminate\Support\Facades\Http;
@@ -129,6 +130,239 @@ class VectorMotifService
     }
 
     /**
+     * Draw the NEXT beat as a change to the drawing already on screen.
+     *
+     * Two adjacent beats about the same thing should not cut between two
+     * unrelated pictures — that is the difference between a slideshow and a
+     * piece. Given the previous motif, the model is asked for the SAME drawing
+     * changed: shapes that persist keep their ids and positions, shapes that
+     * are done are dropped, and what the new beat adds arrives on its own cue.
+     *
+     * Shared ids are what the caller then uses to decide the two scenes deserve
+     * a match cut, so keeping them is not cosmetic.
+     *
+     * Falls back to `draw()` on failure: an unrelated drawing is much better
+     * than none, and the caller cannot tell the difference except that the cut
+     * will not be a match.
+     *
+     * @param  array<int,array<string,mixed>> $previous The drawing on screen.
+     * @return array{shapes: array<int,array<string,mixed>>, caption: string}|null
+     */
+    public function evolve(
+        array $previous,
+        string $subject,
+        string $narration = '',
+        string $topic = ''
+    ): ?array {
+        $subject = trim($subject);
+        if (!$this->available() || $subject === '' || $previous === []) {
+            return null;
+        }
+
+        // Only the authored fields go back to the model: sending the clamped
+        // defaults for every shape triples the prompt and teaches it to write
+        // them out, which wastes its output budget on things it need not say.
+        $trimmed = array_map(static function (array $shape): array {
+            $keep = array_intersect_key($shape, array_flip([
+                'id', 'kind', 'cx', 'cy', 'r', 'x', 'y', 'w', 'h', 'round',
+                'x1', 'y1', 'x2', 'y2', 'd', 'name', 'text', 'size', 'anchor',
+                'stroke', 'fill',
+            ]));
+
+            return $keep;
+        }, $previous);
+
+        $messages = [
+            ['role' => 'system', 'content' => $this->systemPrompt()],
+            ['role' => 'user', 'content' => trim(
+                "VIDEO: " . mb_substr($topic, 0, 160) . "\n\n"
+                . "THE DRAWING ALREADY ON SCREEN:\n"
+                . json_encode($trimmed, JSON_UNESCAPED_SLASHES) . "\n\n"
+                . "THE NEXT BEAT SAYS: " . mb_substr($narration, 0, 500) . "\n"
+                . "DRAW: " . mb_substr($subject, 0, 200) . "\n\n"
+                . "This is the SAME picture, one beat later. Return the whole drawing again, but: "
+                . "keep the id AND roughly the position of every shape that is still part of it, "
+                . "drop the ones that are not, and add what this beat needs with its own \"at\" or "
+                . "\"word\" cue. Move persisting shapes with \"then\" rather than teleporting them. "
+                . "Return ONLY the JSON."
+            )],
+        ];
+
+        $icons = array_flip(ExplainerRegistry::iconNames());
+        $exists = static fn (string $name) => isset($icons[$name]);
+
+        $response = Http::withToken($this->apiKey)
+            ->timeout(60)
+            ->post('https://api.openai.com/v1/chat/completions', LlmModels::tune([
+                'model' => $this->model,
+                'messages' => $messages,
+                'temperature' => 0.3,
+                'max_tokens' => 1400,
+                'response_format' => ['type' => 'json_object'],
+            ], 'low'));
+
+        if (!$response->successful()) {
+            Log::info('VectorMotifService: evolve request failed', ['status' => $response->status()]);
+            return null;
+        }
+
+        CostTracker::recordChat($this->model, $response->json('usage'), 'vector_motif_evolve');
+
+        $candidate = json_decode((string) $response->json('choices.0.message.content'), true);
+        if (!is_array($candidate)) {
+            return null;
+        }
+
+        $result = VectorMotif::sanitize($candidate, $exists);
+        if (!$result['ok']) {
+            Log::info('VectorMotifService: evolved motif did not survive sanitising');
+            return null;
+        }
+
+        return ['shapes' => $result['shapes'], 'caption' => $result['caption']];
+    }
+
+    /**
+     * Draw every `vector_motif` slot a storyboard asked for (iter 62).
+     *
+     * This lives here, and is called from the JOB, because the storyboard has
+     * two producers — the tree composer and the giant-call fallback — and the
+     * first version of this pass sat inside the fallback, where it never ran.
+     * Four demo storyboards came back with a motif slot and no shapes before
+     * that was noticed. Anything that must happen to EVERY storyboard belongs
+     * where the two paths converge.
+     *
+     * A motif arrives as a `subject` and no shapes. This fills in the shapes,
+     * up to the registry's per-video cap — each one is a focused LLM call, and
+     * a video whose every beat is a little diagram is as monotonous as one
+     * whose every beat is a bullet list.
+     *
+     * Failure is never fatal and never leaves a hole. A request past the cap,
+     * or one the drawing pass could not satisfy, is turned into an ordinary
+     * IMAGE slot carrying the same subject as its description and search
+     * query, so the beat still gets a picture through the routes that already
+     * exist — stock, AI or an upload. That degrade matters more than the
+     * feature: the alternative is a slot that renders as empty space.
+     */
+    public function drawAll(array $parsed, string $topic = ''): array
+    {
+        $scenes = array_values((array) ($parsed['scenes'] ?? []));
+        if ($scenes === []) {
+            return $parsed;
+        }
+
+        // Find the pending requests first, so the cap applies to the video and
+        // not to whichever scenes happen to come first in an inner loop.
+        $pending = [];
+        foreach ($scenes as $si => $scene) {
+            foreach ((array) (is_array($scene) ? ($scene['slots'] ?? []) : []) as $key => $slot) {
+                if (!is_array($slot) || ($slot['content_type'] ?? '') !== 'vector_motif') {
+                    continue;
+                }
+                if (is_array($slot['shapes'] ?? null) && $slot['shapes'] !== []) {
+                    continue;
+                }
+                if (trim((string) ($slot['subject'] ?? '')) === '') {
+                    continue;
+                }
+                $pending[] = [$si, $key];
+            }
+        }
+
+        if ($pending === []) {
+            return $parsed;
+        }
+
+        $cap = ExplainerRegistry::maxVectorMotifs();
+        $drawn = 0;
+        // The drawing on screen in the PREVIOUS scene, if it was a motif. Two
+        // adjacent beats about the same thing should not cut between two
+        // unrelated pictures (iter 63) — the second is drawn as a change to
+        // the first, which is what makes a match cut possible.
+        $previous = null;
+        $previousScene = null;
+
+        foreach ($pending as [$si, $key]) {
+            $slot = $scenes[$si]['slots'][$key];
+            $subject = (string) $slot['subject'];
+            $narration = (string) ($scenes[$si]['narration']['text'] ?? '');
+            $result = null;
+
+            if ($drawn < $cap) {
+                try {
+                    // Evolve only from the scene IMMEDIATELY before: a drawing
+                    // two beats back is not "already on screen", and asking the
+                    // model to continue a picture the viewer has forgotten
+                    // produces a drawing that serves neither beat.
+                    if ($previous !== null && $previousScene === $si - 1) {
+                        $result = $this->evolve($previous, $subject, $narration, $topic);
+                    }
+                    $result ??= $this->draw($subject, $narration, $topic);
+                } catch (\Throwable $e) {
+                    Log::info('VectorMotifService: motif drawing unavailable', ['error' => $e->getMessage()]);
+                    $result = null;
+                }
+            }
+
+            if ($result !== null) {
+                $slot['shapes'] = $result['shapes'];
+                if ($result['caption'] !== '') {
+                    $slot['caption'] = $result['caption'];
+                }
+                $scenes[$si]['slots'][$key] = $slot;
+                $drawn++;
+
+                // A MATCH CUT between two drawings that share shapes: the ids
+                // that survived the evolution are the evidence that the second
+                // picture continues the first, so the edit between them stops
+                // being an ordinary cut and becomes a dissolve the eye reads as
+                // one continuous object. Only ever set on a scene whose
+                // predecessor really is the drawing it grew from.
+                if ($previous !== null && $previousScene === $si - 1) {
+                    $shared = array_intersect(
+                        array_column($previous, 'id'),
+                        array_column($result['shapes'], 'id')
+                    );
+                    if (count($shared) >= 2) {
+                        $scenes[$si]['transition'] = 'match_dissolve';
+                        Log::info('VectorMotifService: match cut between drawings', [
+                            'scene' => $si,
+                            'shared_shapes' => count($shared),
+                        ]);
+                    }
+                }
+
+                $previous = $result['shapes'];
+                $previousScene = $si;
+                continue;
+            }
+
+            $previous = null;
+            $previousScene = null;
+
+            // Degrade to a picture request rather than to nothing.
+            $scenes[$si]['slots'][$key] = [
+                'content_type' => 'image',
+                'asset_request' => [
+                    'description' => $subject,
+                    'search_query' => MediaBrief::deriveQuery($subject),
+                    'media_kind' => 'image',
+                    'guidance' => 'A clear, simple shot of ' . rtrim($subject, '.') . '.',
+                ],
+            ];
+            Log::info('VectorMotifService: motif request degraded to an image slot', [
+                'scene' => $si,
+                'reason' => $drawn >= $cap ? 'per-video cap' : 'drawing failed',
+            ]);
+        }
+
+        $parsed['scenes'] = array_values($scenes);
+        Log::info('VectorMotifService: motifs drawn', ['drawn' => $drawn, 'requested' => count($pending)]);
+
+        return $parsed;
+    }
+
+    /**
      * The system prompt.
      *
      * Written as a drawing brief, not a schema dump: the spec is short enough
@@ -169,8 +403,19 @@ EVERY shape also takes:
   "at":     0-0.85     when it arrives, as a fraction of the beat
   "word":   "<a word from the narration>"             arrives when the narrator says it
   "life":   float | sway | orbit | pulse | breathe    optional endless motion once settled
+  "then":   [ {"at":0.6, "cx":70, "cy":30}, ... ]     where it MOVES TO later (max 3 steps)
+
+MOVEMENT IS THE POINT
+"then" is what separates a diagram from a still. A step names a later cue ("at" or
+"word") and only the fields that CHANGE — position, size, opacity, colour — and the
+shape travels there smoothly. The electron leaves the panel. The packet advances to the
+next router. The bar grows. The arrow's tip reaches the target. Give at least one shape
+a "then" whenever the beat describes something HAPPENING rather than something existing.
 
 RULES THAT MAKE IT READ
+0. NAME EVERY SHAPE. The "id" says what the thing IS ("wall", "water", "turbine"), never
+   what kind it is ("rect1", "circle2"). A later beat may continue this drawing, and the
+   ids are how a shape is recognised as the SAME object across the cut.
 1. FEWER, BIGGER shapes. 5-10 is a diagram; 16 is a mess. Nothing smaller than about 6 units.
 2. Draw the THING, not a flowchart of the thing. Boxes with words in them are what every
    other card already does — if your drawing is three rectangles and three labels, it has
@@ -184,21 +429,25 @@ RULES THAT MAKE IT READ
 6. Sequence it. Give shapes different "at" values (or "word" cues from the narration) so the
    drawing BUILDS as the narrator speaks. Use "draw" for lines, paths and arrows; "pop" or
    "rise" for solid shapes.
-7. No gradients, shadows, glows or 3D — none exist here. Flat outlines and solid fills only.
+7. WHEN SEVERAL SHAPES MOVE, THEY MUST NOT END UP IN THE SAME PLACE. Five electrons
+   that all travel to one point land as a single smudge. Space their destinations, or
+   move one and let the others stay.
+8. No gradients, shadows, glows or 3D — none exist here. Flat outlines and solid fills only.
 
 ICON LIBRARY (the only legal "name" values): {$icons}
 
 WORKED EXAMPLE
 DRAW: a glass bottle melted down and re-formed as a jar
 {"shapes":[
- {"kind":"path","d":"M 26 28 L 26 20 L 34 20 L 34 28 C 34 34 39 36 39 44 L 39 68 L 21 68 L 21 44 C 21 36 26 34 26 28 Z","stroke":"ink","fill":"none","width":1.6,"anim":"draw","at":0},
- {"kind":"rect","x":25,"y":16,"w":10,"h":4,"round":1,"stroke":"none","fill":"muted","anim":"pop","at":0.12},
- {"kind":"label","text":"old bottle","x":30,"y":78,"size":5.5,"fill":"muted","anim":"fade","at":0.18},
- {"kind":"icon","name":"flame","x":50,"y":40,"size":16,"stroke":"accent","width":1.5,"anim":"draw","at":0.34,"life":"pulse"},
- {"kind":"arrow","x1":42,"y1":56,"x2":60,"y2":56,"stroke":"accent","width":1.8,"anim":"draw","at":0.42},
- {"kind":"rect","x":65,"y":40,"w":22,"h":28,"round":3,"stroke":"ink","fill":"none","width":1.6,"anim":"draw","at":0.6},
- {"kind":"rect","x":63,"y":34,"w":26,"h":6,"round":2,"stroke":"none","fill":"accent","anim":"rise","at":0.7},
- {"kind":"label","text":"new jar","x":76,"y":78,"size":5.5,"fill":"ink","anim":"fade","at":0.76}
+ {"id":"bottle","kind":"path","d":"M 26 28 L 26 20 L 34 20 L 34 28 C 34 34 39 36 39 44 L 39 68 L 21 68 L 21 44 C 21 36 26 34 26 28 Z","stroke":"ink","fill":"none","width":1.6,"anim":"draw","at":0},
+ {"id":"cap","kind":"rect","x":25,"y":16,"w":10,"h":4,"round":1,"stroke":"none","fill":"muted","anim":"pop","at":0.12},
+ {"id":"old-label","kind":"label","text":"old bottle","x":30,"y":78,"size":5.5,"fill":"muted","anim":"fade","at":0.18},
+ {"id":"furnace","kind":"icon","name":"flame","x":50,"y":40,"size":16,"stroke":"accent","width":1.5,"anim":"draw","at":0.34,"life":"pulse"},
+ {"id":"flow","kind":"arrow","x1":42,"y1":56,"x2":60,"y2":56,"stroke":"accent","width":1.8,"anim":"draw","at":0.42},
+ {"id":"melt","kind":"circle","cx":30,"cy":50,"r":3,"stroke":"none","fill":"accent","anim":"pop","at":0.3,"then":[{"at":0.55,"cx":50,"cy":46},{"at":0.72,"cx":76,"cy":52}]},
+ {"id":"jar","kind":"rect","x":65,"y":40,"w":22,"h":28,"round":3,"stroke":"ink","fill":"none","width":1.6,"anim":"draw","at":0.6},
+ {"id":"lid","kind":"rect","x":63,"y":34,"w":26,"h":6,"round":2,"stroke":"none","fill":"accent","anim":"rise","at":0.7},
+ {"id":"new-label","kind":"label","text":"new jar","x":76,"y":78,"size":5.5,"fill":"ink","anim":"fade","at":0.76}
 ],"caption":"one bottle, endlessly"}
 PROMPT;
     }

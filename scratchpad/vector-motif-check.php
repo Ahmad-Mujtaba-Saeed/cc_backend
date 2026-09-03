@@ -339,6 +339,85 @@ check(
 );
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Keyframes (iter 63): a shape that MOVES during the beat.
+// ---------------------------------------------------------------------------
+$r = $sane(['shapes' => [
+    ['kind' => 'rect', 'x' => 10, 'y' => 40, 'w' => 40, 'h' => 20, 'stroke' => 'ink'],
+    ['kind' => 'circle', 'cx' => 20, 'cy' => 50, 'r' => 4, 'fill' => 'accent', 'stroke' => 'none', 'at' => 0.1,
+     'then' => [['at' => 0.5, 'cx' => 60], ['at' => 0.8, 'cx' => 90, 'r' => 7]]],
+]]);
+$steps = $r['shapes'][1]['then'] ?? [];
+check('keyframes survive', count($steps) === 2);
+check('a step keeps only the fields it changes', !isset($steps[0]['cy']) && isset($steps[0]['cx']));
+check('steps are ordered', $steps[0]['at'] < $steps[1]['at']);
+
+// Out of order, before the arrival, past the end, too many, and fields the
+// shape does not have.
+$r = $sane(['shapes' => [
+    ['kind' => 'rect', 'x' => 10, 'y' => 40, 'w' => 40, 'h' => 20, 'stroke' => 'ink'],
+    ['kind' => 'circle', 'cx' => 20, 'cy' => 50, 'r' => 4, 'stroke' => 'ink', 'at' => 0.5,
+     'then' => [
+         ['at' => 0.9, 'cx' => 80],
+         ['at' => 0.2, 'cx' => 40],
+         ['at' => 3.0, 'cx' => 900],
+         ['at' => 0.7, 'cx' => 60],
+         ['at' => 0.75, 'w' => 40, 'text' => 'nope'],
+     ]],
+]]);
+$steps = $r['shapes'][1]['then'] ?? [];
+check('keyframes are capped', count($steps) <= VectorMotif::MAX_STEPS);
+check('a keyframe never lands before its shape arrives', ($steps[0]['at'] ?? 1) > 0.5);
+check('keyframes stay strictly ordered after repair', count($steps) < 2 || $steps[1]['at'] > $steps[0]['at']);
+check('a keyframe past the end is pulled back', ($steps[count($steps) - 1]['at'] ?? 0) <= 0.95);
+$fields = array_keys($steps[count($steps) - 1] ?? []);
+check(
+    'a keyframe cannot change a field the shape does not have',
+    !in_array('w', $fields, true) && !in_array('text', $fields, true)
+);
+
+// A step naming nothing changeable is not a step.
+$r = $sane(['shapes' => [
+    ['kind' => 'rect', 'x' => 10, 'y' => 40, 'w' => 40, 'h' => 20, 'stroke' => 'ink'],
+    ['kind' => 'circle', 'cx' => 20, 'cy' => 50, 'r' => 4, 'stroke' => 'ink', 'then' => [['at' => 0.6]]],
+]]);
+check('an empty keyframe is dropped', !isset($r['shapes'][1]['then']));
+
+// A colour swap is allowed and lands discretely.
+$r = $sane(['shapes' => [
+    ['kind' => 'rect', 'x' => 10, 'y' => 40, 'w' => 40, 'h' => 20, 'stroke' => 'ink'],
+    ['kind' => 'circle', 'cx' => 20, 'cy' => 50, 'r' => 4, 'stroke' => 'muted',
+     'then' => [['at' => 0.6, 'stroke' => 'accent']]],
+]]);
+check('a keyframe may swap a semantic colour', ($r['shapes'][1]['then'][0]['stroke'] ?? '') === 'accent');
+$r = $sane(['shapes' => [
+    ['kind' => 'rect', 'x' => 10, 'y' => 40, 'w' => 40, 'h' => 20, 'stroke' => 'ink'],
+    ['kind' => 'circle', 'cx' => 20, 'cy' => 50, 'r' => 4, 'stroke' => 'muted',
+     'then' => [['at' => 0.6, 'stroke' => '#ff0000']]],
+]]);
+check('a keyframe cannot introduce a literal colour', ($r['shapes'][1]['then'][0]['stroke'] ?? '') === 'muted');
+
+// The service knows how to continue a drawing.
+$evolve = new ReflectionMethod(Modules\Project\Services\VectorMotifService::class, 'evolve');
+check('the service can evolve a previous drawing', $evolve->isPublic());
+check(
+    'the drawing pass match-cuts two drawings that share shapes',
+    str_contains(
+        file_get_contents(__DIR__ . '/../modules/Project/Services/VectorMotifService.php'),
+        "'transition'] = 'match_dissolve'"
+    )
+);
+// The pass must hang off the point where BOTH storyboard producers converge.
+// Living inside the giant-call fallback is how it managed to never run at all.
+check(
+    'the drawing pass runs on every storyboard, not just the fallback path',
+    str_contains(
+        file_get_contents(__DIR__ . '/../modules/Project/Jobs/AnalyzeExplainerScriptJob.php'),
+        '->drawAll('
+    )
+);
+
+
 // The render-time guarantee: a motif that never got drawn must never reach the
 // renderer as an empty box. The assembler is the last stop before the payload,
 // which is why the guard lives there and not only in the analyze pass.

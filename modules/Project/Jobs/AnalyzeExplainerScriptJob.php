@@ -207,6 +207,25 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                 $settings['analysis_attempts'] = $analysis->attempts();
             }
 
+            // Drawn motifs (iter 62): the composer names what it wants drawn in
+            // one sentence; a focused pass draws it. Placed HERE, beside the
+            // geometry synthesis and for the identical reason — the storyboard
+            // has two producers and anything that must happen to every
+            // storyboard belongs where they converge. The first version of this
+            // pass lived inside the giant-call fallback, which is not the path
+            // most videos take, so it silently never ran.
+            if (is_array($raw) && !empty($raw['scenes'])) {
+                try {
+                    $raw = (new \Modules\Project\Services\VectorMotifService())
+                        ->drawAll($raw, (string) $this->project->title);
+                } catch (Throwable $e) {
+                    Log::info('AnalyzeExplainerScriptJob: motif drawing unavailable', [
+                        'project_id' => $this->project->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // Geometry figure synthesis (iter 40): rebuild any geometry_diagram
             // whose slot came back thin — a bare shape name that would draw as
             // an unlabelled default while the narration describes a labelled

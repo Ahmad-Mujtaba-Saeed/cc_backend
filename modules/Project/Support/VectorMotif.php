@@ -42,6 +42,13 @@ namespace Modules\Project\Support;
  * says that word), plus an `anim`. It may also carry `life` — one of iter 61's
  * sustained loops — so a settled drawing keeps moving.
  *
+ * A shape may also carry `then`: up to three KEYFRAMES it moves, resizes or
+ * recolours to later in the beat (iter 63). Without them a motif can only
+ * accumulate — every shape arrives and then stands still, which is the "card
+ * animating" problem one level down. With them the electron leaves the panel
+ * and the packet advances to the next router while the narrator is still
+ * talking.
+ *
  * ## Why the repair is deterministic
  *
  * Every number is clamped into the view, every enum falls back to a safe
@@ -82,6 +89,18 @@ class VectorMotif
 
     /** Sustained loops (iter 61, motion/sustain.ts) a settled shape may ride. */
     public const LIVES = ['none', 'breathe', 'float', 'sway', 'orbit', 'pulse'];
+
+    /**
+     * Keyframes per shape (iter 63). Three is a move, a resize and a recolour —
+     * past that a drawing is trying to be a whole video by itself.
+     */
+    public const MAX_STEPS = 3;
+
+    /** Fields a `then` step may change. Geometry and presence only: a shape
+     *  that could change KIND mid-beat is two shapes. */
+    public const STEP_FIELDS = [
+        'cx', 'cy', 'r', 'x', 'y', 'w', 'h', 'x1', 'y1', 'x2', 'y2', 'size', 'opacity',
+    ];
 
     /** SVG path commands a motif may use: geometry only. */
     private const PATH_RE = '/^[MmLlHhVvCcQqAaZz0-9eE ,.+-]+$/';
@@ -283,7 +302,99 @@ class VectorMotif
             $shape['life'] = $life;
         }
 
+        $steps = self::steps($kind, $item, $shape);
+        if ($steps !== []) {
+            $shape['then'] = $steps;
+        }
+
         return $shape;
+    }
+
+    /**
+     * The `then` keyframes of one shape: where it MOVES to later in the beat.
+     *
+     * Without these a motif can only accumulate — every shape arrives and then
+     * stands still, which is the "card animating" problem one level down. With
+     * them the drawing keeps changing while the narrator talks: the electron
+     * leaves the panel, the packet advances to the next router, the bar grows.
+     *
+     * A step may only change the geometry fields that the shape's own kind
+     * actually has, so a circle cannot grow a width and a label cannot acquire
+     * a radius. Steps are sorted, capped, and forced strictly later than the
+     * shape's own arrival — a keyframe before the shape exists is not a
+     * keyframe, it is a contradiction.
+     *
+     * @param  array<string,mixed> $item  The raw shape.
+     * @param  array<string,mixed> $shape The clamped shape, for its own fields.
+     * @return array<int,array<string,mixed>>
+     */
+    private static function steps(string $kind, array $item, array $shape): array
+    {
+        $raw = $item['then'] ?? null;
+        if (!is_array($raw) || $raw === []) {
+            return [];
+        }
+
+        $after = (float) ($shape['at'] ?? 0);
+        $out = [];
+
+        foreach ($raw as $entry) {
+            if (!is_array($entry) || count($out) >= self::MAX_STEPS) {
+                continue;
+            }
+
+            $step = [];
+            foreach (self::STEP_FIELDS as $field) {
+                if (!array_key_exists($field, $entry) || !array_key_exists($field, $shape)) {
+                    continue;
+                }
+                $step[$field] = $field === 'opacity'
+                    ? self::num($entry[$field], (float) $shape[$field], 0, 1)
+                    : ($field === 'r' || $field === 'size' || $field === 'w' || $field === 'h'
+                        ? self::num($entry[$field], (float) $shape[$field], 1, self::VIEW)
+                        : self::coord($entry[$field], (float) $shape[$field]));
+            }
+
+            // A colour swap is the cheapest way to say "this is the part that
+            // matters now", so it is allowed — discretely, never interpolated.
+            foreach (['stroke', 'fill'] as $field) {
+                if (array_key_exists($field, $entry)) {
+                    $step[$field] = self::color($entry[$field], (string) $shape[$field]);
+                }
+            }
+
+            if ($step === []) {
+                continue;
+            }
+
+            $at = isset($entry['at']) && is_numeric($entry['at'])
+                ? self::num($entry['at'], $after + 0.2, 0, 0.95)
+                : $after + 0.2;
+            $word = trim((string) ($entry['word'] ?? ''));
+
+            $step['at'] = $at;
+            if ($word !== '') {
+                $step['word'] = mb_substr(preg_replace('/[^\p{L}\p{N}\- ]/u', '', $word) ?? '', 0, 30);
+            }
+
+            $out[] = $step;
+        }
+
+        if ($out === []) {
+            return [];
+        }
+
+        usort($out, static fn ($a, $b) => $a['at'] <=> $b['at']);
+
+        // Force each step strictly after the last, and after the arrival.
+        $last = $after;
+        foreach ($out as $i => $step) {
+            $at = max($step['at'], $last + 0.08);
+            $out[$i]['at'] = round(min(0.95, $at), 2);
+            $last = $out[$i]['at'];
+        }
+
+        return $out;
     }
 
     /**

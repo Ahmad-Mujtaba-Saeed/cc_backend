@@ -100,6 +100,70 @@ foreach ($cases as $case) {
     $order++;
 }
 
+// ---------------------------------------------------------------------------
+// The evolution pair (iter 63): one drawing continued into the next beat. The
+// shapes that keep their ids are what earns the match cut between them.
+// ---------------------------------------------------------------------------
+$first = $service->draw(
+    'a full water reservoir behind a dam wall',
+    'The reservoir is full, and the water behind the wall is pure stored energy.',
+    'How a hydroelectric dam makes power'
+);
+
+if ($first !== null) {
+    $second = $service->evolve(
+        $first['shapes'],
+        'the same dam with a gate open, water falling through and spinning a turbine',
+        'Open the gate and that stored energy becomes motion: falling water spins the turbine.',
+        'How a hydroelectric dam makes power'
+    );
+
+    if ($second === null) {
+        echo "\nEVOLVE FAILED — the second drawing did not survive.\n";
+    } else {
+        $shared = array_intersect(
+            array_column($first['shapes'], 'id'),
+            array_column($second['shapes'], 'id')
+        );
+        $moved = count(array_filter($second['shapes'], fn ($sh) => !empty($sh['then'])));
+        echo "\nEVOLVED  " . count($first['shapes']) . ' shapes -> ' . count($second['shapes'])
+            . ' shapes, ' . count($shared) . ' kept their id'
+            . ($shared ? ' (' . implode(', ', array_slice($shared, 0, 6)) . ')' : '')
+            . ", {$moved} carry a keyframe\n";
+        echo '         match cut earned: ' . (count($shared) >= 2 ? 'YES' : 'no') . "\n";
+
+        foreach ([['before', $first, 'a full reservoir behind a dam wall'],
+                  ['after', $second, 'the gate open, water spinning a turbine']] as $k => [$label, $motif, $subject]) {
+            $scenes[] = [
+                'scene_id' => 'evolve_' . $k,
+                'order' => $order,
+                'duration_seconds' => 9,
+                'layout_template' => 'split_side_by_side',
+                // The second scene takes the match cut the pipeline would give
+                // it, so the rendered file shows the real edit.
+                'transition' => $k === 1 && count($shared) >= 2 ? 'match_dissolve' : 'fade',
+                'narration' => ['text' => $subject],
+                'slots' => [
+                    'slot_left' => array_filter([
+                        'content_type' => 'vector_motif',
+                        'subject' => $subject,
+                        'shapes' => $motif['shapes'],
+                        'caption' => $motif['caption'] ?: null,
+                    ]),
+                    'slot_right' => [
+                        'content_type' => 'text_block',
+                        'heading' => 'How a dam makes power',
+                        'bullets' => [ucfirst($subject)],
+                        'reveal' => 'sequential',
+                    ],
+                ],
+                'style' => ['variant' => 'editorial', 'kicker' => strtoupper($label)],
+            ];
+            $order++;
+        }
+    }
+}
+
 $out = [
     'project_id' => 'motif-live',
     'aspect_ratio' => '16:9',
