@@ -1697,6 +1697,11 @@ class ExplainerController extends Controller
             'theme' => ExplainerRegistry::colorScheme($schemeName),
             'camera_moves' => ExplainerRegistry::cameraMoves(),
             'transitions' => ExplainerRegistry::transitions(),
+            // The §3.1 editorial meanings, so the storyboard's transition
+            // picker can say what a cut is FOR next to the clip showing what
+            // it looks like. Only the signature cuts are described here; the
+            // picker carries its own plain-mechanics line for the rest.
+            'transition_meanings' => ExplainerRegistry::transitionMeanings(),
             'moods' => ExplainerRegistry::moods(),
             'color_schemes' => ExplainerRegistry::colorSchemes(),
             'narration_enabled' => $project->settings['narration_enabled'] ?? true,
