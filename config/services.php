@@ -41,6 +41,24 @@ return [
         // apply whenever that switch is left on "auto".
         // Model used by the explainer script-analysis "brain".
         'explainer_model' => env('OPENAI_EXPLAINER_MODEL', 'gpt-4o-mini'),
+        /*
+         * Mechanical work: punchline extraction, YouTube packaging, the motif
+         * prompt, the chapter grouping. All of these read something we already
+         * have and reshape it, and all of them have a deterministic fallback
+         * if the model says nothing useful — so they get the cheapest capable
+         * model and, unlike the other roles, the global admin switch can only
+         * make them cheaper (LlmModels::LIGHT_ALLOWED), never dearer.
+         */
+        'light_model' => env('OPENAI_LIGHT_MODEL', 'gpt-4o-mini'),
+        /*
+         * Thumbnail hero cut-out (BiRefNet, via fal). One call per finished
+         * render, cached on disk by source image, and the single biggest
+         * visual difference between a thumbnail and a card with a photo on
+         * it — the subject can overlap the type and break the frame instead
+         * of sitting in a box. EXPLAINER_THUMB_CUTOUT=false falls back to the
+         * framed treatment and spends nothing.
+         */
+        'explainer_thumb_cutout' => env('EXPLAINER_THUMB_CUTOUT', true),
         // Escalation valve for maths videos (roadmap 3a): classified maths
         // analysis, skeleton planning, the tree composers and the visual
         // synthesis calls run on this while ordinary explainers stay on the

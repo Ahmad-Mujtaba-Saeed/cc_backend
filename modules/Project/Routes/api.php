@@ -63,11 +63,26 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/explainer/projects/{project}/storyboard', [ExplainerController::class, 'storyboard']);
     Route::get('/explainer/projects/{project}/status', [ExplainerController::class, 'status']);
     Route::post('/explainer/projects/{project}/reanalyze', [ExplainerController::class, 'reanalyze']);
+    // Rename the project — the storyboard heading, the thumbnail copy and the
+    // YouTube packaging all read from this title.
+    Route::post('/explainer/projects/{project}/title', [ExplainerController::class, 'setTitle']);
+    // Add one AI-written scene at a chosen place on the board. Runs through
+    // the revision pipeline's insert op, so every other card keeps its
+    // uploads and its cached voiceover.
+    Route::post('/explainer/projects/{project}/scenes', [ExplainerController::class, 'addScene'])
+        ->middleware('throttle:20,1');
     // Targeted AI edit of the storyboard: the user's note, applied to the
     // cards it is about and nothing else.
     Route::post('/explainer/projects/{project}/revise', [ExplainerController::class, 'revise'])->middleware('throttle:20,1');
     Route::post('/explainer/projects/{project}/render', [ExplainerController::class, 'render']);
     Route::post('/explainer/projects/{project}/shuffle-theme', [ExplainerController::class, 'shuffleTheme']);
+    // Pick the palette outright, instead of shuffling until one turns up.
+    Route::post('/explainer/projects/{project}/color-scheme', [ExplainerController::class, 'setColorScheme']);
+    // A user's OWN palettes: listed with the built-ins, created and deleted
+    // here, and private to whoever made them.
+    Route::get('/explainer/color-schemes', [ExplainerController::class, 'colorSchemes']);
+    Route::post('/explainer/color-schemes', [ExplainerController::class, 'storeColorScheme']);
+    Route::delete('/explainer/color-schemes/{name}', [ExplainerController::class, 'destroyColorScheme']);
     Route::post('/explainer/projects/{project}/narration', [ExplainerController::class, 'toggleNarration']);
     Route::post('/explainer/projects/{project}/music', [ExplainerController::class, 'toggleMusic']);
     Route::post('/explainer/projects/{project}/captions', [ExplainerController::class, 'toggleCaptions']);

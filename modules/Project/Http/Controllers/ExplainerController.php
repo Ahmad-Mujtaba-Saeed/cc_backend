@@ -14,6 +14,7 @@ use Modules\Project\Jobs\ProcessVideoJob;
 use Modules\Project\Jobs\ReviseExplainerStoryboardJob;
 use Modules\Project\Models\ExplainerAsset;
 use Modules\Project\Models\Project;
+use Modules\Project\Models\UserColorScheme;
 use Modules\Project\Services\CanvasDirectorService;
 use Modules\Project\Services\CompositionDirectorService;
 use Modules\Project\Services\ExplainerScriptWriterService;
@@ -488,7 +489,7 @@ class ExplainerController extends Controller
 
         $built = \Modules\Project\Support\ExplainerImagePrompt::forSlot(
             $slot,
-            ExplainerRegistry::colorScheme($project->settings['color_scheme'] ?? null)
+            ExplainerRegistry::themeFor($project->settings ?? [])
         );
 
         \Modules\Project\Services\CostTracker::setContext($project);
@@ -846,6 +847,10 @@ class ExplainerController extends Controller
         $next = $candidates[array_rand($candidates)] ?? ExplainerRegistry::randomColorSchemeName();
 
         $settings['color_scheme'] = $next;
+        // A shuffle picks from the registry, so any frozen custom palette has
+        // to go with it — otherwise themeFor() keeps returning the old one and
+        // the button looks broken.
+        unset($settings['theme_override']);
         $project->update(['settings' => $settings]);
 
         return response()->json([
@@ -1306,6 +1311,260 @@ class ExplainerController extends Controller
      * Render-time rule (RemotionRenderService): an explicit pick wins,
      * "auto" falls through to settings['board_style_auto'].
      */
+    /**
+     * Rename the project.
+     *
+     * The title is not decoration: it is the <h1> of the storyboard, the
+     * kicker the packaging service writes the YouTube description around, and
+     * the copy the designed thumbnail is built from. It was fixed at creation
+     * time with no way back — so a typo, or a better angle thought of halfway
+     * through, meant starting the project again.
+     */
+    public function setTitle(Request $request, Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $validated = $request->validate([
+            'title' => 'required|string|min:2|max:120',
+        ]);
+
+        // Collapse whitespace: the title is rendered as one line in the
+        // thumbnail and the dashboard, where a stray newline is a layout bug.
+        $title = trim(preg_replace('/\s+/u', ' ', $validated['title']) ?? '');
+        if ($title === '') {
+            return response()->json(['success' => false, 'message' => 'Give the video a title.'], 422);
+        }
+
+        $project->update(['title' => $title]);
+
+        return response()->json(['success' => true, 'data' => ['title' => $title]]);
+    }
+
+    /**
+     * Add one new scene, written by the AI, at a chosen place on the board.
+     *
+     * There is no "blank card" here on purpose. A scene is not an empty box:
+     * it needs narration, a layout template, filled slots and a duration that
+     * fits the beat around it, and the planner is what knows how to produce
+     * all four in this video's voice. So the user says WHERE and WHAT, and
+     * this hands both to the same revision pipeline that already inserts
+     * cards ({"op":"insert","after":…}) — which means the new scene arrives
+     * with every existing guard intact: other scenes keep their uploads and
+     * their cached voiceover, and the result is validated like any revision.
+     */
+    public function addScene(Request $request, Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $validated = $request->validate([
+            'description' => 'required|string|min:3|max:600',
+            // The scene the new card should follow. 'start' puts it first;
+            // omitted means "at the end".
+            'after_scene_id' => 'sometimes|nullable|string|max:80',
+        ]);
+
+        if (!in_array($project->status, ['storyboard_ready', 'completed', 'failed'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wait for the current job to finish before adding a scene.',
+            ], 409);
+        }
+        $scenes = $project->explainerScenes()->orderBy('order')->get();
+        if ($scenes->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'There is no storyboard to add a scene to yet.',
+            ], 422);
+        }
+        if ($this->revisionRunning($project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A revision is already being applied — give it a moment.',
+            ], 409);
+        }
+
+        $after = trim((string) ($validated['after_scene_id'] ?? ''));
+        if ($after !== '' && $after !== 'start' && !$scenes->contains('scene_id', $after)) {
+            return response()->json(['success' => false, 'message' => 'Unknown scene to place after.'], 422);
+        }
+        if ($after === '') {
+            $after = (string) $scenes->last()->scene_id;
+        }
+
+        // Say it in the planner's own vocabulary so the note cannot be read
+        // as "rewrite the neighbouring card" — the failure mode of asking for
+        // a new scene in free text.
+        $where = $after === 'start'
+            ? 'at the very START of the video, before every existing card'
+            : 'immediately AFTER the card "' . $after . '"'
+                . ' (scene ' . ($scenes->firstWhere('scene_id', $after)?->order ?? '?') . ')';
+
+        $note = "Insert exactly ONE new card {$where}. Do not rewrite, move or delete any existing card.
+"
+            . "The new card must cover: " . trim($validated['description']);
+
+        $settings = $project->settings ?? [];
+        $settings['revision'] = array_merge(
+            is_array($settings['revision'] ?? null) ? $settings['revision'] : [],
+            ['state' => 'running', 'started_at' => now()->toIso8601String(), 'request' => mb_substr($note, 0, 1000)]
+        );
+        $project->update(['settings' => $settings]);
+
+        ReviseExplainerStoryboardJob::dispatch($project->fresh(), $note);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Writing the new scene…',
+        ]);
+    }
+
+    /**
+     * Every palette this user may choose from: the registry's fourteen, then
+     * their own. Custom ones carry `custom: true` so the picker can offer a
+     * delete on exactly the rows the user owns.
+     */
+    private static function schemesFor(?int $userId): array
+    {
+        $schemes = ExplainerRegistry::colorSchemes();
+        if (!$userId) {
+            return $schemes;
+        }
+
+        $custom = UserColorScheme::where('user_id', $userId)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (UserColorScheme $row) => $row->toTheme())
+            ->all();
+
+        return array_merge($schemes, $custom);
+    }
+
+    /**
+     * Choose the video's palette.
+     *
+     * Until now the only way to change it was Shuffle, which is fine for
+     * "show me something else" and useless for "I want that one". A name is
+     * resolved against the registry FIRST and this user's own schemes second;
+     * a custom pick is frozen into settings (see ExplainerRegistry::themeFor)
+     * so the queued render needs no session to resolve it, and deleting the
+     * palette later cannot repaint a video already made with it.
+     */
+    public function setColorScheme(Request $request, Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $name = (string) $request->input('scheme', '');
+        $settings = $project->settings ?? [];
+
+        if (in_array($name, ExplainerRegistry::colorSchemeNames(), true)) {
+            $settings['color_scheme'] = $name;
+            unset($settings['theme_override']);
+        } else {
+            $custom = UserColorScheme::where('user_id', auth()->id())->where('name', $name)->first();
+            if (!$custom) {
+                return response()->json(['success' => false, 'message' => 'Unknown colour scheme'], 422);
+            }
+            $settings['color_scheme'] = $name;
+            $settings['theme_override'] = $custom->toTheme();
+        }
+
+        $project->update(['settings' => $settings]);
+
+        return response()->json([
+            'success' => true,
+            'data' => ['color_scheme' => $name, 'theme' => ExplainerRegistry::themeFor($settings)],
+        ]);
+    }
+
+    /** This user's own palettes, alongside the built-in ones. */
+    public function colorSchemes(): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'data' => ['color_schemes' => self::schemesFor(auth()->id())],
+        ]);
+    }
+
+    /**
+     * Mix a new palette, kept for this user and offered on every project they
+     * make from now on.
+     *
+     * The seven colours are the registry's own fields, so a saved row is
+     * interchangeable with a built-in scheme everywhere downstream. The UI
+     * asks for two (paper and accent) and derives the rest, but each arrives
+     * and is validated independently — a hex from a client is never pasted
+     * into a stylesheet unchecked.
+     */
+    public function storeColorScheme(Request $request): JsonResponse
+    {
+        $rules = ['label' => 'required|string|min:2|max:40'];
+        foreach (UserColorScheme::COLOR_FIELDS as $field) {
+            $rules[$field] = 'required|string|regex:/^#[0-9a-fA-F]{6}$/';
+        }
+        $validated = $request->validate($rules);
+
+        $userId = auth()->id();
+        if (UserColorScheme::where('user_id', $userId)->count() >= 30) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You have 30 saved colour schemes — delete one to make room.',
+            ], 422);
+        }
+
+        $label = trim(preg_replace('/\s+/u', ' ', $validated['label']) ?? '');
+        $name = $this->uniqueSchemeName($userId, $label);
+
+        $row = new UserColorScheme(['user_id' => $userId, 'name' => $name, 'label' => $label]);
+        foreach (UserColorScheme::COLOR_FIELDS as $field) {
+            $row->{$field} = strtoupper($validated[$field]);
+        }
+        $row->save();
+
+        return response()->json(['success' => true, 'data' => ['scheme' => $row->toTheme()]], 201);
+    }
+
+    /**
+     * Delete one of this user's palettes. Projects already using it keep their
+     * colours — those were frozen into settings when the scheme was chosen.
+     */
+    public function destroyColorScheme(string $name): JsonResponse
+    {
+        $deleted = UserColorScheme::where('user_id', auth()->id())->where('name', $name)->delete();
+        if ($deleted === 0) {
+            return response()->json(['success' => false, 'message' => 'Unknown colour scheme'], 404);
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * A slug that cannot collide with a registry name or with one this user
+     * already has — the project's stored `color_scheme` has to resolve to
+     * exactly one palette.
+     */
+    private function uniqueSchemeName(?int $userId, string $label): string
+    {
+        $base = trim(preg_replace('/[^a-z0-9]+/', '-', mb_strtolower($label)) ?? '', '-');
+        $base = $base !== '' ? mb_substr($base, 0, 40) : 'scheme';
+        $taken = fn (string $n) => in_array($n, ExplainerRegistry::colorSchemeNames(), true)
+            || UserColorScheme::where('user_id', $userId)->where('name', $n)->exists();
+
+        $name = 'my-' . $base;
+        $i = 2;
+        while ($taken($name)) {
+            $name = 'my-' . $base . '-' . $i;
+            $i++;
+        }
+
+        return $name;
+    }
+
     public function setBoardStyle(Request $request, Project $project): JsonResponse
     {
         if ($denied = $this->guard($project)) {
@@ -1720,7 +1979,7 @@ class ExplainerController extends Controller
             'ready_to_render' => empty($missing) && !empty($scenes),
             'templates' => ExplainerRegistry::templates(),
             'color_scheme' => $schemeName,
-            'theme' => ExplainerRegistry::colorScheme($schemeName),
+            'theme' => ExplainerRegistry::themeFor($project->settings ?? []),
             'camera_moves' => ExplainerRegistry::cameraMoves(),
             'transitions' => ExplainerRegistry::transitions(),
             // The §3.1 editorial meanings, so the storyboard's transition
@@ -1729,7 +1988,7 @@ class ExplainerController extends Controller
             // picker carries its own plain-mechanics line for the rest.
             'transition_meanings' => ExplainerRegistry::transitionMeanings(),
             'moods' => ExplainerRegistry::moods(),
-            'color_schemes' => ExplainerRegistry::colorSchemes(),
+            'color_schemes' => self::schemesFor($project->user_id),
             'narration_enabled' => $project->settings['narration_enabled'] ?? true,
             'music_enabled' => $project->settings['music_enabled'] ?? true,
             // Background music, editable from the storyboard. 'auto' lets the

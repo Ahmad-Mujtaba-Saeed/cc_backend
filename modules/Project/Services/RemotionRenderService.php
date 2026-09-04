@@ -281,7 +281,7 @@ class RemotionRenderService
      */
     public function resolveTheme(array $settings): array
     {
-        $theme = ExplainerRegistry::colorScheme($settings['color_scheme'] ?? null);
+        $theme = ExplainerRegistry::themeFor($settings);
         if (self::brandColorApplied($settings, $theme)) {
             $theme['accent'] = strtoupper((string) $settings['brand']['color']);
         }
@@ -296,7 +296,7 @@ class RemotionRenderService
         if (!preg_match('/^#[0-9a-f]{6}$/i', $color)) {
             return false;
         }
-        $theme = $theme ?? ExplainerRegistry::colorScheme($settings['color_scheme'] ?? null);
+        $theme = $theme ?? ExplainerRegistry::themeFor($settings);
 
         return \Modules\Project\Support\SceneBudgetLinter::contrastRatio($color, (string) ($theme['bg_from'] ?? '#000000')) >= 4.5
             && \Modules\Project\Support\SceneBudgetLinter::contrastRatio($color, (string) ($theme['text'] ?? '#FFFFFF')) >= 4.5;
@@ -310,7 +310,14 @@ class RemotionRenderService
      *
      * @return array{landscape: string, portrait: string}|null
      */
-    public function renderThumbnail(Project $project, ?string $heroRelativePath, string $outputRelativeMp4, ?string $equation = null): ?array
+    public function renderThumbnail(
+        Project $project,
+        ?string $heroRelativePath,
+        string $outputRelativeMp4,
+        ?string $equation = null,
+        array $concept = [],
+        bool $heroIsCutout = false
+    ): ?array
     {
         $settings = $project->settings ?? [];
         $base = preg_replace('/\.mp4$/i', '', $outputRelativeMp4) ?: $outputRelativeMp4;
@@ -319,11 +326,22 @@ class RemotionRenderService
             'portrait' => ['path' => "{$base}_thumb_portrait.png", 'w' => 1080, 'h' => 1920],
         ];
 
+        // `title` is the HOOK, not the project title: ThumbnailConceptService
+        // writes a few clickable words and names the one to blow up. It always
+        // returns something (its fallback is the trimmed title), so the empty
+        // default here only covers a caller that skipped the concept entirely.
         $props = [
-            'title' => (string) $project->title,
+            'title' => (string) ($concept['hook'] ?? $project->title),
+            'emphasis' => (string) ($concept['emphasis'] ?? ''),
+            'badge' => (string) ($concept['badge'] ?? ''),
+            'stat' => $concept['stat'] ?? null,
+            'layout' => (string) ($concept['layout'] ?? 'subject_right'),
+            'vs_left' => $concept['vs_left'] ?? null,
+            'vs_right' => $concept['vs_right'] ?? null,
             'kicker' => '',
             'theme' => $this->resolveTheme($settings),
             'hero_url' => $heroRelativePath ? $this->publicUrl($heroRelativePath) : null,
+            'hero_cutout' => $heroIsCutout,
             'equation' => $equation ?: null,
             'font_pack' => $this->resolveFontPack($settings),
         ];

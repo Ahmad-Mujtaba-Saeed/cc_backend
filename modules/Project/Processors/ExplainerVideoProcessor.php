@@ -9,6 +9,7 @@ use Modules\Project\Services\ImageGenerationService;
 use Modules\Project\Services\PropsLibraryService;
 use Modules\Project\Services\PunchlineService;
 use Modules\Project\Services\RemotionRenderService;
+use Modules\Project\Services\ThumbnailConceptService;
 use Modules\Project\Services\SceneStyleService;
 use Modules\Project\Services\TTSGenerationService;
 use Modules\Project\Services\VlmLabelPlacementService;
@@ -282,7 +283,7 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
             }
 
             $settings['lint_report'] = \Modules\Project\Support\SceneBudgetLinter::lint($scenes, [
-                'theme' => ExplainerRegistry::colorScheme($settings['color_scheme'] ?? null),
+                'theme' => ExplainerRegistry::themeFor($settings),
                 'hook_enabled' => $settings['hook_enabled'] ?? true,
                 'outro_enabled' => $settings['outro_enabled'] ?? true,
             ]);
@@ -813,7 +814,7 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
     {
         return \Modules\Project\Support\ExplainerImagePrompt::flatVector(
             $topic,
-            ExplainerRegistry::colorScheme(($this->project->settings ?? [])['color_scheme'] ?? null)
+            ExplainerRegistry::themeFor($this->project->settings ?? [])
         );
     }
 
@@ -868,7 +869,7 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
                     // composition nudge — which also changes the prompt hash.
                     $built = \Modules\Project\Support\ExplainerImagePrompt::forSlot(
                         $slot,
-                        ExplainerRegistry::colorScheme(($this->project->settings ?? [])['color_scheme'] ?? null),
+                        ExplainerRegistry::themeFor($this->project->settings ?? []),
                         !empty(($this->project->settings['vlm_retry_suffix'] ?? [])[(string) $scene->scene_id])
                     );
                     $prompt = $built['prompt'];
@@ -1619,8 +1620,45 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
                     ->first()
             );
 
+            // What the thumbnail should SAY. One cheap call on the light
+            // model; its own fallback is the trimmed title, so this never
+            // leaves the renderer without copy.
+            $concept = (new ThumbnailConceptService())->concept(
+                $this->project,
+                $this->project->explainerScenes()->orderBy('order')->get()
+                    ->map(fn ($sc) => ['narration' => (string) $sc->narration, 'slots' => $sc->slots ?? []])
+                    ->all()
+            );
+
+            // Cut the hero out of its background so it can overlap the type and
+            // break the frame — the difference between a thumbnail and a card
+            // with a photo on it. Cached on disk by source path, so a re-render
+            // of the same project never pays for it twice; any failure just
+            // means the picture is framed instead of floated.
+            $heroPath = $hero?->path;
+            $heroIsCutout = false;
+            if ($heroPath !== null && config('services.openai.explainer_thumb_cutout', true)) {
+                try {
+                    $absolute = Storage::disk('public')->path($heroPath);
+                    $alpha = (new \App\Services\PythonAIService())->removeBackground($absolute);
+                    if ($alpha) {
+                        $heroPath = $this->toRelativeStoragePath($alpha);
+                        $heroIsCutout = true;
+                    }
+                } catch (\Throwable $e) {
+                    Log::info('ExplainerVideoProcessor: thumbnail cutout skipped — ' . $e->getMessage());
+                }
+            }
+
             $rel = $this->project->output_path ?: $this->outputPath;
-            $thumbs = (new RemotionRenderService())->renderThumbnail($this->project, $hero?->path, $rel, $equation);
+            $thumbs = (new RemotionRenderService())->renderThumbnail(
+                $this->project,
+                $heroPath,
+                $rel,
+                $equation,
+                $concept,
+                $heroIsCutout
+            );
 
             if ($thumbs === null) {
                 $this->generateThumbnail('00:00:01', $this->outputPath);

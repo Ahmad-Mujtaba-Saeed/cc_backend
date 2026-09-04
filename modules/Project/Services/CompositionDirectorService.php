@@ -37,7 +37,12 @@ class CompositionDirectorService
         if (empty($this->apiKey)) {
             throw new \Exception('OPENAI_API_KEY is not set');
         }
-        $this->model = LlmModels::for('director');
+        // 'light', not 'director': this pass picks a mode per chapter from a
+        // fixed menu and its output is clamped by ChapterPlanValidator, so it
+        // has none of the spatial-reasoning appetite that keeps the CANVAS
+        // director on a stronger model. Sharing that role meant every chapter
+        // grouping was billed at gpt-4o rates for a menu pick.
+        $this->model = LlmModels::for('light');
     }
 
     /**

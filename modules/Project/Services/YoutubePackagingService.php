@@ -36,7 +36,9 @@ class YoutubePackagingService
     public function __construct()
     {
         $this->apiKey = config('services.openai.api_key') ?: env('OPENAI_API_KEY');
-        $this->model = LlmModels::for('explainer');
+        // A description and a hashtag line, with a deterministic fallback
+        // that already ships when the call says nothing useful.
+        $this->model = LlmModels::for('light');
     }
 
     /**

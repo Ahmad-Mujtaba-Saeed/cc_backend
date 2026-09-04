@@ -42,7 +42,9 @@ class VectorMotifService
         $this->apiKey = config('services.openai.api_key') ?: env('OPENAI_API_KEY');
         // A composition task, not a correctness-critical one: this rides the
         // ordinary explainer model rather than the math valve.
-        $this->model = LlmModels::for('explainer');
+        // Prompt writing for a single illustration — small, bounded, and
+        // fully guarded downstream.
+        $this->model = LlmModels::for('light');
     }
 
     public function available(): bool

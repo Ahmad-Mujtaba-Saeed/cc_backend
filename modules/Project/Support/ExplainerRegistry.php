@@ -620,6 +620,29 @@ class ExplainerRegistry
     }
 
     /**
+     * The theme a project actually paints with.
+     *
+     * A user's own scheme (§ user_color_schemes) cannot be looked up by name
+     * here — this class is stateless and runs inside queued jobs with no
+     * session — so choosing one FREEZES its colours into the project's
+     * settings under `theme_override`, and this is the single place that
+     * prefers them. Freezing is also the right semantics: deleting a palette
+     * from your library must not repaint videos already made with it.
+     *
+     * Everything else (the validator, the renderer, the thumbnail) reads the
+     * result and cannot tell a custom scheme from a built-in one.
+     */
+    public static function themeFor(array $settings): array
+    {
+        $override = $settings['theme_override'] ?? null;
+        if (is_array($override) && !empty($override['name']) && !empty($override['accent'])) {
+            return $override;
+        }
+
+        return self::colorScheme($settings['color_scheme'] ?? null);
+    }
+
+    /**
      * Pick a random colour scheme name (used to randomise each video's look).
      */
     public static function randomColorSchemeName(): string

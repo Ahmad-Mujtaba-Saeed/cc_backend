@@ -31,7 +31,9 @@ class PunchlineService
     public function __construct()
     {
         $this->apiKey = config('services.openai.api_key') ?: env('OPENAI_API_KEY');
-        $this->model = LlmModels::for('explainer');
+        // Verbatim extraction with a hard verbatim check behind it — the
+        // cheapest capable model, whatever the global switch is set to.
+        $this->model = LlmModels::for('light');
     }
 
     /**

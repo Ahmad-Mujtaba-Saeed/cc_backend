@@ -45,6 +45,23 @@ class LlmModels
     public const VISION_CAPABLE = ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini', 'gpt-4.1'];
 
     /**
+     * Models cheap enough to serve the `light` role.
+     *
+     * The global switch exists so an admin can try a stronger brain on the
+     * work that benefits from one. It was also dragging along the work that
+     * does not: picking verbatim phrases out of narration, writing a YouTube
+     * description, grouping scenes into chapters from a fixed menu. Those are
+     * extraction and formatting jobs with deterministic fallbacks behind them,
+     * and gpt-4.1-mini costs 2.7x gpt-4o-mini on input to do them no better.
+     *
+     * So `light` accepts an override only when it is at least as cheap as its
+     * own default; anything dearer is ignored and the role stays on 4o-mini.
+     * Making the switch STRONGER never makes these calls dearer; making it
+     * cheaper still works, which is the direction worth allowing.
+     */
+    public const LIGHT_ALLOWED = ['gpt-4o-mini', 'gpt-5-nano'];
+
+    /**
      * Per-role fallbacks, used whenever the override is 'auto' (or invalid).
      * These mirror the constructors that used to read config() directly.
      */
@@ -55,6 +72,8 @@ class LlmModels
         // Non-explainer templates (clip selection, script generation). These
         // were hardcoded to gpt-4o-mini and had no env knob of their own.
         'general' => ['services.openai.general_model', 'gpt-4o-mini'],
+        // Mechanical work — see LIGHT_ALLOWED.
+        'light' => ['services.openai.light_model', 'gpt-4o-mini'],
     ];
 
     /**
@@ -130,8 +149,11 @@ class LlmModels
         $override = self::selected();
 
         if ($override !== self::AUTO) {
-            // A text-only pick must not reach the vision services.
-            if ($role !== 'vlm' || in_array($override, self::VISION_CAPABLE, true)) {
+            // A text-only pick must not reach the vision services, and a
+            // dearer pick must not reach the mechanical ones.
+            $blocked = ($role === 'vlm' && !in_array($override, self::VISION_CAPABLE, true))
+                || ($role === 'light' && !in_array($override, self::LIGHT_ALLOWED, true));
+            if (!$blocked) {
                 return $override;
             }
         }
@@ -176,12 +198,14 @@ class LlmModels
             'model' => self::selected(),
             'options' => self::MODELS,
             'vision_capable' => self::VISION_CAPABLE,
+            'light_allowed' => self::LIGHT_ALLOWED,
             'effective' => [
                 'explainer' => self::for('explainer'),
                 'math' => self::for('math'),
                 'director' => self::for('director'),
                 'vlm' => self::for('vlm'),
                 'general' => self::for('general'),
+                'light' => self::for('light'),
             ],
         ];
     }

@@ -264,7 +264,7 @@ class ReviseExplainerStoryboardJob implements ShouldQueue
             }
 
             $settings['lint_report'] = SceneBudgetLinter::lint($scenes, [
-                'theme' => ExplainerRegistry::colorScheme($settings['color_scheme'] ?? null),
+                'theme' => ExplainerRegistry::themeFor($settings),
                 'hook_enabled' => $settings['hook_enabled'] ?? true,
                 'outro_enabled' => $settings['outro_enabled'] ?? true,
                 'math_mode' => $mathMode,

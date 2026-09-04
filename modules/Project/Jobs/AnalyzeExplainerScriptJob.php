@@ -491,7 +491,7 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
             // auto-fixable was already fixed by the validator, so surviving
             // findings become the storyboard's lint report.
             $settings['lint_report'] = \Modules\Project\Support\SceneBudgetLinter::lint($scenes, [
-                'theme' => ExplainerRegistry::colorScheme($settings['color_scheme'] ?? null),
+                'theme' => ExplainerRegistry::themeFor($settings),
                 'hook_enabled' => $settings['hook_enabled'] ?? true,
                 'outro_enabled' => $settings['outro_enabled'] ?? true,
                 'math_mode' => $mathTopic !== [],
