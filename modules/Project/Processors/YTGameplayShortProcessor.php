@@ -21,16 +21,22 @@ use Modules\Project\Services\YoutubeDownloaderFactory;
  * YTGameplayShortProcessor
  *
  * Converts a YouTube video or uploaded video into MULTIPLE 9:16 short-form
- * vertical videos (user-selectable count, default 4) by intelligently
- * selecting the best non-overlapping clips, editing the silence/dead air out
- * of each one, and compositing them with optional gameplay footage.
+ * vertical videos by intelligently selecting the best non-overlapping clips,
+ * editing the silence/dead air out of each one, and compositing them with
+ * optional gameplay footage.
+ *
+ * HOW MANY SHORTS: not a user setting. The source length sets a ceiling of
+ * 2-12 and the clips' own viral scores decide how many of those actually ship
+ * (ranked best-first, cut where the scores fall off). Every short also gets
+ * its OWN gameplay segment, from its own random point in the footage.
  *
  * Workflow:
  * 1. Validate input
  * 2. Download/prepare source video
  * 3. Transcribe (RapidAPI for YouTube; local Faster-Whisper fallback for uploads)
- * 4. Select the N best clips (multi-pass GPT, sentence-snapped, non-overlapping)
- * 5. Prepare gameplay video (only when the gameplay panel is enabled)
+ * 4. Select the best clips (multi-pass GPT, sentence-snapped, non-overlapping,
+ *    head-to-head ranked, then gated on score)
+ * 5. Prepare the gameplay pool (only when the gameplay panel is enabled)
  * 6. Render each clip:
  *    - build an edit plan that skips the empty parts (silence/dead air)
  *    - cut the clip from the kept ranges (multi-segment concat)
@@ -38,15 +44,31 @@ use Modules\Project\Services\YoutubeDownloaderFactory;
  *      karaoke captions from those exact timings (they are already on the
  *      edited timeline, so captions are perfectly in sync); falls back to
  *      remapping the source transcript if per-clip transcription fails
+ *    - loop this short's OWN gameplay segment from its own random offset
  *    - compose (main + gameplay split, or full-frame main when disabled)
  *    - generate a per-clip thumbnail
  * 7. Cleanup temp files
  */
 class YTGameplayShortProcessor extends AbstractVideoProcessor
 {
-    private const MIN_CLIPS = 1;
-    private const MAX_CLIPS = 6;
-    private const DEFAULT_CLIPS = 4;
+    /**
+     * How many shorts a run produces. The user no longer picks this: the
+     * source length sets a ceiling, and the clips' own scores decide how many
+     * of them are actually worth shipping (best first, dropping down until the
+     * quality floor is hit). Always at least MIN_CLIPS when the material
+     * allows it, never more than MAX_CLIPS.
+     */
+    private const MIN_CLIPS = 2;
+    private const MAX_CLIPS = 12;
+
+    /** One short per this many seconds of source, before the score gate. */
+    private const SECONDS_PER_CLIP = 360.0;
+
+    /** A short must score at least this to ship at all. */
+    private const SCORE_FLOOR = 50;
+
+    /** ...and at least this fraction of the best short's score. */
+    private const SCORE_RELATIVE_FLOOR = 0.65;
 
     private YoutubeDownloaderInterface $downloadService;
     private VideoTranscriptionService $transcriptionService;
@@ -89,7 +111,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
             Log::info('YTGameplayShortProcessor starting', [
                 'project_id' => $this->project->id,
                 'input_mode' => $this->settings['input_mode'] ?? 'unknown',
-                'clip_count' => $this->clipCount(),
+                'clip_count' => 'auto (' . self::MIN_CLIPS . '-' . self::MAX_CLIPS . ')',
                 'gameplay_enabled' => $this->gameplayEnabled(),
             ]);
 
@@ -241,14 +263,67 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     }
 
     /**
-     * Number of shorts to produce, from settings (default 4, clamped 1–6).
+     * How many clips to ASK the selector for, from the source length alone.
+     *
+     * This is a ceiling, not a promise: a 90-minute video is allowed 12 shorts
+     * but only gets them if 12 candidates clear the score gate in
+     * shipworthyClips(). A short source simply cannot hide 12 distinct
+     * moments, so asking for them would only force weak, overlapping picks.
      */
-    private function clipCount(): int
+    private function targetClipCount(float $sourceDurationSeconds): int
     {
-        $raw = $this->settings['clip_count'] ?? self::DEFAULT_CLIPS;
-        $count = is_numeric($raw) ? (int) $raw : self::DEFAULT_CLIPS;
+        if ($sourceDurationSeconds <= 0) {
+            return self::MIN_CLIPS;
+        }
+
+        $count = (int) ceil($sourceDurationSeconds / self::SECONDS_PER_CLIP);
 
         return max(self::MIN_CLIPS, min(self::MAX_CLIPS, $count));
+    }
+
+    /**
+     * Keep the clips worth shipping, best score first.
+     *
+     * The list arrives ranked. We walk down it and stop at the first clip that
+     * is either weak in absolute terms or far behind the leader — the tail of
+     * a ranked list is where filler shorts come from. MIN_CLIPS survives the
+     * gate regardless, so a run never returns a single lonely short when a
+     * second one exists.
+     *
+     * @param array<int, array> $clips ranked best-first
+     * @return array<int, array>
+     */
+    private function shipworthyClips(array $clips): array
+    {
+        $clips = array_values($clips);
+        if (count($clips) <= self::MIN_CLIPS) {
+            return $clips;
+        }
+
+        usort($clips, fn ($a, $b) => ($b['final_score'] ?? 0) <=> ($a['final_score'] ?? 0));
+
+        $best = (float) ($clips[0]['final_score'] ?? 0);
+        $floor = max(self::SCORE_FLOOR, $best * self::SCORE_RELATIVE_FLOOR);
+
+        $kept = [];
+        foreach ($clips as $i => $clip) {
+            if ($i >= self::MIN_CLIPS && (float) ($clip['final_score'] ?? 0) < $floor) {
+                break;
+            }
+            $kept[] = $clip;
+        }
+
+        if (count($kept) < count($clips)) {
+            Log::info('[YT_GAMEPLAY] Dropped low-ranked clips below the quality gate', [
+                'project_id' => $this->project->id,
+                'kept' => count($kept),
+                'dropped' => count($clips) - count($kept),
+                'best_score' => $best,
+                'floor' => round($floor, 1),
+            ]);
+        }
+
+        return $kept;
     }
 
     /**
@@ -285,12 +360,6 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
             }
         } else {
             throw new \Exception('Invalid input mode: ' . $inputMode);
-        }
-
-        // Validate clip count
-        $rawCount = $this->settings['clip_count'] ?? self::DEFAULT_CLIPS;
-        if (!is_numeric($rawCount) || (int) $rawCount < self::MIN_CLIPS || (int) $rawCount > self::MAX_CLIPS) {
-            throw new \Exception('Number of videos must be between ' . self::MIN_CLIPS . ' and ' . self::MAX_CLIPS);
         }
 
         // Validate gameplay settings (only relevant when the panel is on)
@@ -584,7 +653,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                 throw new \Exception('No transcript segments available for clip selection');
             }
 
-            $requested = $this->clipCount();
+            $requested = $this->targetClipCount((float) $totalDuration);
             $clips = $this->clipSelectionService->findBestClips($segments, $totalDuration, $requested);
 
             if (empty($clips)) {
@@ -592,12 +661,25 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
             }
 
             if (count($clips) < $requested) {
-                Log::warning('[YT_GAMEPLAY] Fewer strong clips than requested', [
+                Log::info('[YT_GAMEPLAY] Fewer strong clips than the source-length ceiling allowed', [
                     'project_id' => $this->project->id,
-                    'requested' => $requested,
+                    'ceiling' => $requested,
                     'found' => count($clips),
                 ]);
             }
+
+            // Rank gate: ship the top scorers, drop the tail that would only
+            // dilute the batch. Ordering is score-descending from here on, so
+            // output_1 is always the strongest short.
+            $clips = $this->shipworthyClips($clips);
+
+            Log::info('[YT_GAMEPLAY] Shorts to build', [
+                'project_id' => $this->project->id,
+                'source_minutes' => round($totalDuration / 60, 1),
+                'ceiling' => $requested,
+                'shipping' => count($clips),
+                'scores' => array_map(fn ($c) => (int) ($c['final_score'] ?? 0), $clips),
+            ]);
 
             // Persist a lightweight summary only (subtitles can be long).
             $state = $this->project->processing_state ?? [];
@@ -625,22 +707,32 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     protected function prepareGameplay(): bool
     {
         $gameplaySource = $this->settings['gameplay_source'] ?? 'backend_library';
+        $state = $this->project->processing_state ?? [];
+        $clipCount = max(1, count($state['selected_clips'] ?? []));
 
         try {
             if ($gameplaySource === 'backend_library') {
-                $gameplayPath = $this->gameplayService->getRandomFromLibrary();
+                // One entry per short, so a batch spreads across the library
+                // instead of replaying one file from 0:00 every time.
+                $pool = $this->gameplayService->getPoolFromLibrary($clipCount);
             } else {
-                // Custom upload
+                // Custom upload: a single file, varied by start offset later.
                 $gameplayFile = $this->settings['gameplay_file'] ?? null;
-                $gameplayPath = Storage::disk('public')->path($gameplayFile);
+                $pool = [Storage::disk('public')->path($gameplayFile)];
             }
 
-            if (!file_exists($gameplayPath) || filesize($gameplayPath) === 0) {
+            $pool = array_values(array_unique(array_filter(
+                $pool,
+                fn ($p) => $p && file_exists($p) && filesize($p) > 0
+            )));
+
+            if (empty($pool)) {
                 throw new \Exception('Gameplay video file not found or is empty');
             }
 
-            $state = $this->project->processing_state ?? [];
-            $state['gameplay_source_path'] = $gameplayPath;
+            $state['gameplay_source_pool'] = $pool;
+            // Kept for anything that still reads the single-path key.
+            $state['gameplay_source_path'] = $pool[0];
             $this->project->update(['processing_state' => $state]);
 
             return true;
@@ -676,11 +768,11 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         $tmpDir = Storage::disk('public')->path("projects/{$this->project->id}/tmp");
         @mkdir($tmpDir, 0755, true);
 
-        // Progress bookkeeping: each clip counts twice (cut + compose), the
-        // shared gameplay loop once.
+        // Progress bookkeeping: each clip counts twice (cut + compose). The
+        // gameplay panel is now built inside the compose half, per clip.
         $progressBase = (float) $this->project->progress;
         $progressSpan = max(0, 95 - $progressBase);
-        $unitsTotal = $clipTotal * 2 + ($gameplayEnabled ? 1 : 0);
+        $unitsTotal = $clipTotal * 2;
         $unitsDone = 0;
         $tick = function (string $message) use (&$unitsDone, $unitsTotal, $progressBase, $progressSpan) {
             $unitsDone++;
@@ -744,23 +836,50 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         // Source video no longer needed — it can be 200-800MB, free it now.
         $this->deleteSourceVideoEarly($sourceVideoPath);
 
-        // ── Shared gameplay loop, sized to the longest edited clip.
-        // vstack stops at the shorter input, so one loop serves every clip. ──
-        $gameplayLoopPath = null;
+        // ── Gameplay: one segment PER SHORT, each from its own random point.
+        // A single shared loop meant every short in the batch opened on the
+        // same gameplay frame; the plan below hands each short a different
+        // file (when the library has several) at a different offset. ──
+        $gameplayPlan = [];
         if ($gameplayEnabled) {
-            $maxDuration = max(array_map(fn($c) => (float) $c['duration'], $cuts));
-            // Comfortably longer than the longest clip: the stack now ends on
-            // the shortest input, so a loop that came up even a frame short
-            // would clip the end off a short.
-            $gameplayLoopPath = $this->loopGameplay($maxDuration + 2.0);
-            $tick('Gameplay loop ready');
+            try {
+                $gameplayPlan = $this->planGameplaySegments($cuts);
+            } catch (\Exception $e) {
+                // Losing the panel is survivable; losing the shorts is not.
+                Log::warning('[YT_GAMEPLAY] Could not plan gameplay segments — shorts will be full-frame', [
+                    'project_id' => $this->project->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
 
         // ── Phase B: captions + compose + thumbnail per clip ──
         $outputs = [];
-        foreach ($cuts as $cut) {
+        foreach ($cuts as $cutIndex => $cut) {
             $n = $cut['index'];
             try {
+                $gameplayLoopPath = null;
+                if ($gameplayEnabled && isset($gameplayPlan[$cutIndex])) {
+                    try {
+                        // Sized to THIS clip plus slack: vstack ends on the
+                        // shortest input, so a loop even a frame short would
+                        // clip the end off the short.
+                        $gameplayLoopPath = $this->loopGameplay(
+                            $gameplayPlan[$cutIndex]['source'],
+                            (float) $gameplayPlan[$cutIndex]['start'],
+                            (float) $cut['duration'] + 2.0,
+                            $n
+                        );
+                    } catch (\Exception $e) {
+                        // One bad panel should cost the panel, not the short.
+                        Log::warning('[YT_GAMEPLAY] Gameplay panel failed — composing this short full-frame', [
+                            'project_id' => $this->project->id,
+                            'clip' => "{$n}/{$clipTotal}",
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
+
                 $captionsAss = $this->buildClipCaptions($segments, $cut['clip'], $cut['plan'], $n, $cut['path'], $cut['duration']);
 
                 $outputRelative = "projects/{$this->project->id}/output_{$n}.mp4";
@@ -795,6 +914,10 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                     'source_start' => round((float) $cut['clip']['final_start_seconds'], 2),
                     'source_end' => round((float) $cut['clip']['final_end_seconds'], 2),
                     'removed_silence_seconds' => (float) $cut['plan']['removed_seconds'],
+                    'gameplay' => $gameplayLoopPath !== null,
+                    'gameplay_start' => $gameplayLoopPath !== null
+                        ? (float) ($gameplayPlan[$cutIndex]['start'] ?? 0.0)
+                        : null,
                 ];
             } catch (\Exception $e) {
                 Log::error('[YT_GAMEPLAY] Clip composition failed — skipping this clip', [
@@ -988,29 +1111,106 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     }
 
     /**
-     * Loop gameplay video to the target duration (shared across clips).
+     * Decide which gameplay file each short uses and where inside it to start.
+     *
+     * Sources are dealt round-robin from the prepared pool. For every source,
+     * the usable span (its duration minus the longest short that will play
+     * over it) is cut into as many bands as there are shorts on that file, the
+     * bands are shuffled, and each short gets a random point inside its own
+     * band. That guarantees two shorts sharing one gameplay file never open on
+     * the same footage — a plain rand() can hand out near-identical offsets.
+     *
+     * @param array<int, array> $cuts
+     * @return array<int, array{source: string, start: float}> keyed by cut position
      */
-    protected function loopGameplay(float $targetDurationSeconds): string
+    protected function planGameplaySegments(array $cuts): array
     {
         $state = $this->project->processing_state ?? [];
-        $gameplaySourcePath = $state['gameplay_source_path'] ?? null;
+        $pool = $state['gameplay_source_pool'] ?? array_filter([$state['gameplay_source_path'] ?? null]);
+        $pool = array_values(array_filter($pool, fn ($p) => $p && file_exists($p)));
 
-        if (!$gameplaySourcePath || !file_exists($gameplaySourcePath)) {
+        if (empty($pool)) {
+            throw new \Exception('Gameplay source not found');
+        }
+
+        // Deal sources to shorts, then invert into "which shorts use file X".
+        $positionsBySource = [];
+        foreach (array_keys(array_values($cuts)) as $i) {
+            $positionsBySource[$pool[$i % count($pool)]][] = $i;
+        }
+
+        $plan = [];
+        foreach ($positionsBySource as $source => $positions) {
+            $sourceDuration = (float) ($this->probeDuration($source) ?? 0.0);
+            $slots = count($positions);
+
+            // Every short on this file must fit from its offset onwards, so
+            // the band grid is sized by the longest of them.
+            $longestClip = 0.0;
+            foreach ($positions as $i) {
+                $longestClip = max($longestClip, (float) $cuts[$i]['duration']);
+            }
+
+            $usable = $sourceDuration - $longestClip - 0.5;
+
+            if ($sourceDuration <= 0 || $usable <= 1.0) {
+                // Short (or unreadable) gameplay file: it has to loop anyway,
+                // so every offset shows the same thing. Start at 0.
+                foreach ($positions as $i) {
+                    $plan[$i] = ['source' => $source, 'start' => 0.0];
+                }
+                continue;
+            }
+
+            $bands = range(0, $slots - 1);
+            shuffle($bands);
+            $bandWidth = $usable / $slots;
+
+            foreach (array_values($positions) as $k => $i) {
+                // Inset inside the band (middle 80%), so two shorts landing in
+                // ADJACENT bands still keep a fifth of a band between them
+                // rather than meeting at the shared edge.
+                $withinBand = (0.1 + 0.8 * (mt_rand(0, 1000) / 1000)) * $bandWidth;
+                $offset = $bands[$k] * $bandWidth + $withinBand;
+                $plan[$i] = [
+                    'source' => $source,
+                    'start' => round(min($usable, max(0.0, $offset)), 2),
+                ];
+            }
+        }
+
+        Log::info('[YT_GAMEPLAY] Gameplay segments planned', [
+            'project_id' => $this->project->id,
+            'sources' => count($positionsBySource),
+            'starts' => array_map(fn ($p) => $p['start'], $plan),
+        ]);
+
+        return $plan;
+    }
+
+    /**
+     * Build one short's gameplay panel: $sourcePath from $startSeconds,
+     * looped/trimmed to $targetDurationSeconds and scaled to the panel size.
+     */
+    protected function loopGameplay(string $sourcePath, float $startSeconds, float $targetDurationSeconds, int $clipIndex): string
+    {
+        if (!file_exists($sourcePath)) {
             throw new \Exception('Gameplay source not found');
         }
 
         $tmpDir = Storage::disk('public')->path("projects/{$this->project->id}/tmp");
-        $gameplayLoopPath = $tmpDir . '/gameplay_loop.mp4';
+        $gameplayLoopPath = $tmpDir . "/gameplay_loop_{$clipIndex}.mp4";
 
         try {
             // Call Python /loop-video endpoint
             $payload = [
-                'source_path' => $gameplaySourcePath,
+                'source_path' => $sourcePath,
                 'target_duration_seconds' => $targetDurationSeconds,
                 'output_width' => 1080,
                 'output_height' => 768,  // 40% of 1920
                 'output_path' => $gameplayLoopPath,
                 'project_id' => $this->project->id,
+                'start_seconds' => max(0.0, $startSeconds),
             ];
 
             $response = $this->pythonService->makeRequest('POST', '/loop-video', $payload);
@@ -1377,11 +1577,6 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
             }
         }
 
-        $rawCount = $this->settings['clip_count'] ?? self::DEFAULT_CLIPS;
-        if (!is_numeric($rawCount) || (int) $rawCount < self::MIN_CLIPS || (int) $rawCount > self::MAX_CLIPS) {
-            $errors[] = 'Number of videos must be between ' . self::MIN_CLIPS . ' and ' . self::MAX_CLIPS;
-        }
-
         if ($this->gameplayEnabled()) {
             $gameplaySource = $this->settings['gameplay_source'] ?? 'backend_library';
             if (!in_array($gameplaySource, ['backend_library', 'custom_upload'])) {
@@ -1433,7 +1628,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     {
         return [
             'name' => 'Long Video to Shorts',
-            'description' => 'Turn one YouTube video into multiple 9:16 vertical shorts — the best moments are auto-selected, dead air is edited out, and each short gets karaoke captions with optional gameplay footage at the bottom.',
+            'description' => 'Turn one YouTube video into multiple 9:16 vertical shorts. The AI ranks every moment for viral potential and ships only the winners (2-12, decided by the video, not by you), edits out dead air, and gives each short karaoke captions plus its own slice of gameplay footage at the bottom.',
             'requires_upload' => false,
             'min_duration' => 15,
             'max_duration' => 600,
@@ -1465,19 +1660,12 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                     'required' => true,
                     'visible_when' => ['input_mode' => 'upload']
                 ],
-                'clip_count' => [
-                    'type' => 'select',
-                    'label' => 'Number of Shorts',
-                    'options' => [
-                        '1' => '1 video',
-                        '2' => '2 videos',
-                        '3' => '3 videos',
-                        '4' => '4 videos (recommended)',
-                        '5' => '5 videos',
-                        '6' => '6 videos'
-                    ],
-                    'default' => '4'
-                ],
+                // NOTE: there is deliberately no "number of shorts" field. The
+                // count is decided per run: the source length sets a ceiling
+                // (2-12) and the clips' own viral scores decide how many of
+                // them clear the quality gate. Adding the field back lets a
+                // user demand 12 shorts from a 6-minute video, which can only
+                // be satisfied with weak, repetitive picks.
                 'gameplay_enabled' => [
                     'type' => 'checkbox',
                     'label' => 'Show gameplay video at the bottom',

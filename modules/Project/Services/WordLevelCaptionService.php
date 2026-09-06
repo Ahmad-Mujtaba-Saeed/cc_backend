@@ -175,8 +175,7 @@ class WordLevelCaptionService
         }
 
         $events = [];
-        $wordsPerLine = 5;
-        $lines = array_chunk($wordTimings, $wordsPerLine);
+        $lines = $this->chunkIntoLines($wordTimings, 5);
 
         $normalTag    = "\\fs{$template['font_size']}\\c{$template['normal_color']}";
         $highlightTag = "\\fs{$template['current_font_size']}\\c{$template['highlight_color']}";
@@ -184,8 +183,18 @@ class WordLevelCaptionService
 
         foreach ($lines as $lineWords) {
             foreach ($lineWords as $currentIdx => $wordData) {
-                $start = $wordData['start'] ?? 0;
-                $end   = $wordData['end']   ?? ($start + 0.3);
+                $start = (float) ($wordData['start'] ?? 0);
+                $end   = (float) ($wordData['end'] ?? ($start + 0.3));
+
+                // Hold the line until the next word takes over, otherwise the
+                // caption blinks out in every pause between words.
+                if (isset($lineWords[$currentIdx + 1])) {
+                    $end = max($end, (float) ($lineWords[$currentIdx + 1]['start'] ?? $end));
+                }
+
+                if ($end <= $start) {
+                    $end = $start + 0.12;
+                }
 
                 $parts = [];
                 foreach ($lineWords as $i => $wd) {
@@ -214,6 +223,58 @@ class WordLevelCaptionService
         }
 
         return $events;
+    }
+
+    /**
+     * Split words into caption lines.
+     *
+     * A line never spans two speech groups (each clip of a compilation is its
+     * own group) and never bridges a pause, so the karaoke line on screen
+     * always belongs to what is playing right now. Chunking blindly in fives
+     * used to put the next clip's words on the previous clip's picture.
+     *
+     * @param array $wordTimings words with optional 'group' keys
+     */
+    private function chunkIntoLines(array $wordTimings, int $wordsPerLine): array
+    {
+        // Callers that stitch several separate takes into one timeline mark
+        // each take with a 'group'. Only those get the pause rule as well:
+        // one continuous narration keeps its existing five-word lines.
+        $grouped = false;
+        foreach ($wordTimings as $word) {
+            if (isset($word['group'])) {
+                $grouped = true;
+                break;
+            }
+        }
+
+        $lines = [];
+        $current = [];
+        $previous = null;
+
+        foreach ($wordTimings as $word) {
+            $breaks = false;
+
+            if ($previous !== null && $grouped) {
+                $groupChanged = ($word['group'] ?? null) !== ($previous['group'] ?? null);
+                $gap = (float) ($word['start'] ?? 0) - (float) ($previous['end'] ?? 0);
+                $breaks = $groupChanged || $gap > 0.6;
+            }
+
+            if (!empty($current) && ($breaks || count($current) >= $wordsPerLine)) {
+                $lines[] = $current;
+                $current = [];
+            }
+
+            $current[] = $word;
+            $previous = $word;
+        }
+
+        if (!empty($current)) {
+            $lines[] = $current;
+        }
+
+        return $lines;
     }
 
     /**

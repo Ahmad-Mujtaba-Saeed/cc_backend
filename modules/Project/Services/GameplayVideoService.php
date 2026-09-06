@@ -34,8 +34,7 @@ class GameplayVideoService
             );
         }
 
-        $files = glob($this->libraryPath . '/*.{mp4,mov,webm,avi,mkv}', GLOB_BRACE);
-        $files = array_values(array_filter($files, 'is_file'));
+        $files = $this->libraryFiles();
 
         if (empty($files)) {
             throw new \Exception('No gameplay videos found in library');
@@ -49,6 +48,44 @@ class GameplayVideoService
         ]);
 
         return $selectedFile;
+    }
+
+    /**
+     * A pool of library videos to spread across $count shorts.
+     *
+     * The library is shuffled first, so a batch of shorts does not always draw
+     * the same file in the same order; when the library holds fewer videos
+     * than there are shorts the pool cycles (the caller then varies the START
+     * OFFSET inside each file, so two shorts on the same video still look
+     * different).
+     *
+     * @return array<int, string> absolute paths, $count entries
+     */
+    public function getPoolFromLibrary(int $count): array
+    {
+        $files = $this->libraryFiles();
+
+        if (empty($files)) {
+            throw new \Exception(
+                'Gameplay library is empty. Please upload gameplay videos to storage/app/public/gameplay/ '
+                . 'or choose custom upload mode.'
+            );
+        }
+
+        shuffle($files);
+
+        $pool = [];
+        for ($i = 0; $i < max(1, $count); $i++) {
+            $pool[] = $files[$i % count($files)];
+        }
+
+        Log::info('GameplayVideoService: Built gameplay pool', [
+            'requested' => $count,
+            'distinct_files' => min($count, count($files)),
+            'library_size' => count($files),
+        ]);
+
+        return $pool;
     }
 
     /**
@@ -81,6 +118,18 @@ class GameplayVideoService
 
         $files = glob($this->libraryPath . '/*.{mp4,mov,webm,avi,mkv}', GLOB_BRACE);
         return count($files ?? []) > 0;
+    }
+
+    /** Every playable file in the library, absolute paths. */
+    private function libraryFiles(): array
+    {
+        if (!is_dir($this->libraryPath)) {
+            return [];
+        }
+
+        $files = glob($this->libraryPath . '/*.{mp4,mov,webm,avi,mkv}', GLOB_BRACE) ?: [];
+
+        return array_values(array_filter($files, 'is_file'));
     }
 
     /**

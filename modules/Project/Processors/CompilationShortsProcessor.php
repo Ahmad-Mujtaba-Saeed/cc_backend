@@ -28,7 +28,8 @@ use Symfony\Component\Process\Process;
  * gpt-4o-mini text calls, both with full local fallbacks.
  *
  * Copyright-risk mitigation (reduction, NOT immunity):
- * - every clip hard-capped to max_clip_seconds (4-8s)
+ * - every clip window capped at max_clip_seconds (4-8s), and a clip may only
+ *   run past it by MAX_CLIP_STRETCH_SECONDS so its commentary can finish
  * - total footage per source capped at min(90s, 15% of duration)
  * - clips interleaved across sources and shuffled
  * - commentary voiceover mixed on top, original audio ducked to 25%
@@ -46,6 +47,22 @@ use Symfony\Component\Process\Process;
 class CompilationShortsProcessor extends AbstractVideoProcessor
 {
     private const TITLE_CARD_SECONDS = 1.6;
+
+    /**
+     * Most a clip may run past its selected window so the commentary fits.
+     * The clip selector is told about this so it can space windows far enough
+     * apart that a stretched clip never eats into the next pick.
+     */
+    private const MAX_CLIP_STRETCH_SECONDS = 3.0;
+
+    /** Beat of silence before the commentary starts, so it clears the cut. */
+    private const VOICE_LEAD_IN_SECONDS = 0.15;
+
+    /** Beat of silence after the commentary before the clip cuts away. */
+    private const VOICE_TAIL_SECONDS = 0.30;
+
+    /** How much the voiceover may be sped up to land inside its clip. */
+    private const MAX_VOICE_TEMPO = 1.25;
 
     private YoutubeDownloaderInterface $downloadService;
     private SceneDetectionService $sceneService;
@@ -253,7 +270,9 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
                 'error' => $e->getMessage(),
             ]);
 
-            $this->cleanupTempFiles();
+            // Keep the downloaded sources: a retry resumes with the download
+            // step already complete and cannot fetch them again by itself.
+            $this->cleanupTempFiles(true);
             $this->handleFailure('Compilation processing failed: ' . $e->getMessage());
 
             return false;
@@ -317,7 +336,68 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
             $sources[] = ['index' => $index, 'path' => $destination, 'title' => $initResult['title'], 'url' => $url];
         }
 
-        return $sources;
+        return $this->dropDuplicateSources($sources);
+    }
+
+    /**
+     * Drop sources that turned out to be the same video - a re-upload, or the
+     * same video behind two URL forms that survived the URL de-duplication.
+     *
+     * Two copies of one video are two independent candidate pools, and the
+     * "never replay the same footage" spacing rule only ever compares windows
+     * within a single source, so the compilation would show the same moments
+     * twice without noticing.
+     */
+    private function dropDuplicateSources(array $sources): array
+    {
+        $unique = [];
+        $fingerprints = [];
+
+        foreach ($sources as $source) {
+            $size = (int) @filesize($source['path']);
+
+            $duration = 0.0;
+            try {
+                $duration = $this->sceneService->getDuration($source['path']);
+            } catch (\Exception $e) {
+                // No readable duration just means this one cannot be fingerprinted.
+            }
+
+            $isDuplicate = false;
+            foreach ($fingerprints as $seen) {
+                $sizeClose = $size > 0 && $seen['size'] > 0
+                    && abs($size - $seen['size']) <= max(4096, (int) ($seen['size'] * 0.005));
+                $durationClose = $duration > 0.0 && $seen['duration'] > 0.0
+                    && abs($duration - $seen['duration']) <= 0.5;
+
+                if ($sizeClose && $durationClose) {
+                    $isDuplicate = true;
+                    break;
+                }
+            }
+
+            if ($isDuplicate) {
+                Log::warning('Compilation: two sources are the same video, dropping the duplicate', [
+                    'project_id' => $this->project->id,
+                    'index' => $source['index'],
+                    'url' => $source['url'] ?? null,
+                ]);
+                @unlink($source['path']);
+                continue;
+            }
+
+            $fingerprints[] = ['size' => $size, 'duration' => $duration];
+            $unique[] = $source;
+        }
+
+        if (count($unique) !== count($sources)) {
+            $this->logActivity('compilation_duplicate_sources', 'Duplicate source videos were ignored', [
+                'given' => count($sources),
+                'used' => count($unique),
+            ]);
+        }
+
+        return $unique;
     }
 
     /**
@@ -326,13 +406,24 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
     protected function analyzeScenes(array $sources): array
     {
         $maxClipSeconds = $this->maxClipSeconds();
+
+        // Give the selector room to work with. It discards every candidate that
+        // sits too close to a window it already took, so a thin candidate list
+        // is the usual reason a "30 moments" video ships with a dozen.
+        $maxCandidates = max(80, $this->targetClipCount() * 5);
+
         $durations = [];
         $candidates = [];
 
         foreach ($sources as $source) {
             $index = (int) $source['index'];
             $durations[$index] = $this->sceneService->getDuration($source['path']);
-            $candidates[$index] = $this->sceneService->buildCandidateMoments($source['path'], $maxClipSeconds);
+            $candidates[$index] = $this->sceneService->buildCandidateMoments(
+                $source['path'],
+                $maxClipSeconds,
+                2.5,
+                $maxCandidates
+            );
 
             if (empty($candidates[$index])) {
                 throw new \Exception("No candidate moments found in source video {$index}");
@@ -397,7 +488,8 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
             $ranked,
             $this->targetClipCount(),
             $this->maxClipSeconds(),
-            $analysis['durations']
+            $analysis['durations'],
+            self::MAX_CLIP_STRETCH_SECONDS
         );
     }
 
@@ -412,52 +504,78 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
             (string) ($this->settings['commentary_style'] ?? 'energetic')
         );
 
-        if (count($lines) !== count($clips)) {
-            throw new \Exception('Commentary line count does not match clip count');
+        // A short response is not worth failing a whole compilation over - top
+        // the list up so every clip still has something to say.
+        $orderedClips = array_values($clips);
+        $lines = array_slice(array_values($lines), 0, count($orderedClips));
+
+        while (count($lines) < count($orderedClips)) {
+            $counter = (int) ($orderedClips[count($lines)]['counter'] ?? (count($lines) + 1));
+            $lines[] = "Number {$counter}. Watch this one.";
         }
 
         return $lines;
     }
 
     /**
-     * STEP 8: Kokoro TTS per commentary line (free, local) with word timing.
+     * STEP 8: One TTS take per commentary line, cached by the LINE plus voice -
+     * never by position.
+     *
+     * A retry reshuffles the clip order, so the old position-keyed cache
+     * (tts_7.wav) happily handed clip 7 a voiceover recorded for a completely
+     * different moment. The word timings are cached beside the wav as well, so
+     * a resumed run still gets real karaoke instead of an even-spread guess.
      */
     protected function generateTTS(array $commentary): array
     {
         $tmpDir = $this->tmpDir();
         $voice = (string) ($this->settings['tts_voice'] ?? 'am_michael');
         $results = [];
+        $expected = [];
 
         foreach (array_values($commentary) as $index => $line) {
-            $audioPath = $tmpDir . "/tts_{$index}.wav";
+            $key = substr(sha1($voice . '|' . $line), 0, 16);
+            $audioPath = $tmpDir . "/tts_{$key}.wav";
+            $timingPath = $tmpDir . "/tts_{$key}.json";
 
-            if (!file_exists($audioPath) || filesize($audioPath) === 0) {
+            $expected[basename($audioPath)] = true;
+            $expected[basename($timingPath)] = true;
+
+            if (file_exists($audioPath) && filesize($audioPath) > 0 && file_exists($timingPath)) {
+                $decoded = json_decode((string) file_get_contents($timingPath), true);
+                $wordTimings = is_array($decoded) ? $decoded : [];
+            } else {
                 $result = $this->ttsService->generateTTS($line, $voice, $audioPath, true, $this->ttsContext());
 
                 if (empty($result['success']) || !file_exists($audioPath) || filesize($audioPath) === 0) {
                     throw new \Exception("TTS generation failed for clip {$index}: " . ($result['error'] ?? 'no audio produced'));
                 }
 
-                $wordTimings = $result['word_timings'] ?? [];
-            } else {
-                $wordTimings = [];
+                $wordTimings = is_array($result['word_timings'] ?? null) ? $result['word_timings'] : [];
+                file_put_contents($timingPath, json_encode($wordTimings));
             }
 
             $results[] = [
                 'audio_path' => $audioPath,
                 'duration' => $this->sceneService->getDuration($audioPath),
-                'word_timings' => is_array($wordTimings) ? $wordTimings : [],
+                'word_timings' => $wordTimings,
                 'line' => $line,
             ];
         }
+
+        $this->sweepStaleArtifacts($tmpDir, ['tts_*.wav', 'tts_*.json'], $expected);
 
         return $results;
     }
 
     /**
-     * STEP 9: Render each clip: cut, scale/crop, 5% zoom treatment, duck the
-     * original audio to 25% and mix the commentary on top. Uniform encode so
-     * concat is safe. Resume-safe per clip; deletes sources when done.
+     * STEP 9: Render each clip: cut the planned window, scale/crop with the 5%
+     * zoom treatment, duck the original audio and mix the commentary on top.
+     * Uniform encode so concat is safe.
+     *
+     * Every artifact is named after its CONTENT, so a resumed or retried run
+     * can only ever reuse a file that belongs to the moment it is rendering,
+     * and anything left over from a previous attempt is swept away.
      */
     protected function renderClips(array $sources, array $clips, array $ttsResults): array
     {
@@ -466,54 +584,58 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
         $audioMode = $this->originalAudioMode();
 
         $sourcePaths = [];
+        $sourceDurations = [];
         foreach ($sources as $source) {
-            $sourcePaths[(int) $source['index']] = $source['path'];
+            $index = (int) $source['index'];
+            $path = $this->ensureSourceAvailable($sources, $index);
+            $sourcePaths[$index] = $path;
+            $sourceDurations[$index] = $this->sceneService->getDuration($path);
         }
 
-        $rendered = [];
+        $orderedClips = array_values($clips);
+        $plan = $this->planClipTimeline($orderedClips, $ttsResults, $sourceDurations);
 
-        foreach (array_values($clips) as $index => $clip) {
-            $clipPath = $tmpDir . "/clip_{$index}.mp4";
-            $sourcePath = $sourcePaths[(int) $clip['source_index']] ?? null;
+        $rendered = [];
+        $expected = [];
+
+        foreach ($plan as $index => $step) {
+            $clipPath = $tmpDir . '/clip_' . $step['key'] . '.mp4';
+            $expected[basename($clipPath)] = true;
 
             if (!file_exists($clipPath) || filesize($clipPath) === 0) {
-                if (!$sourcePath || !file_exists($sourcePath)) {
+                $sourcePath = $sourcePaths[$step['source_index']] ?? null;
+
+                if (!$sourcePath) {
                     throw new \Exception("Source video for clip {$index} not found");
                 }
 
-                $start = (float) $clip['start'];
-                $clipDuration = (float) $clip['end'] - $start;
-                $ttsPath = $ttsResults[$index]['audio_path'] ?? null;
-                $ttsDuration = (float) ($ttsResults[$index]['duration'] ?? 0);
-
-                // Let the clip breathe long enough for its commentary, within
-                // limits. With no commentary the clip keeps its natural length.
-                $duration = $ttsDuration > 0
-                    ? max($clipDuration, min($ttsDuration + 0.2, $clipDuration + 3.0))
-                    : $clipDuration;
-
-                // Build the original-audio "bed" (vocal-stripped, kept or muted).
-                $bedPath = $this->prepareClipBed($sourcePath, $start, $duration, $audioMode, $index);
-
-                $this->renderSingleClip(
+                $bedPath = $this->prepareClipBed(
                     $sourcePath,
-                    $clipPath,
-                    $start,
-                    $duration,
-                    $width,
-                    $height,
-                    $bedPath,
-                    is_string($ttsPath) && file_exists($ttsPath) ? $ttsPath : null,
-                    $audioMode
+                    (float) $step['start'],
+                    (float) $step['source_seconds'],
+                    $audioMode,
+                    (string) $step['key']
                 );
+
+                $this->renderSingleClip($sourcePath, $clipPath, $step, $width, $height, $bedPath, $audioMode);
+
+                if ($bedPath !== null && file_exists($bedPath)) {
+                    @unlink($bedPath);
+                }
             }
 
             $rendered[] = [
                 'path' => $clipPath,
                 'duration' => $this->sceneService->getDuration($clipPath),
-                'counter' => (int) $clip['counter'],
+                'planned_duration' => (float) $step['duration'],
+                'counter' => (int) ($orderedClips[$index]['counter'] ?? ($index + 1)),
+                'voice_offset' => (float) $step['voice_offset'],
+                'voice_tempo' => (float) $step['voice_tempo'],
+                'voice_seconds' => (float) $step['voice_seconds'],
             ];
         }
+
+        $this->sweepStaleArtifacts($tmpDir, ['clip_*.mp4', 'bed_raw_*.wav', 'bed_bg_*.wav'], $expected);
 
         // Sources can be large - delete them as soon as every clip is rendered
         foreach ($sourcePaths as $path) {
@@ -524,6 +646,139 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
         Log::info('Compilation: source videos deleted after clip rendering', ['project_id' => $this->project->id]);
 
         return $rendered;
+    }
+
+    /**
+     * Return a usable local path for a source, downloading it again if an
+     * earlier failed attempt cleaned it away.
+     *
+     * A retry resumes with download_videos already marked complete, so its
+     * cached paths are handed straight to the renderer - and if the files are
+     * gone, every retry used to die on the first clip.
+     */
+    private function ensureSourceAvailable(array $sources, int $sourceIndex): string
+    {
+        foreach ($sources as $source) {
+            if ((int) $source['index'] !== $sourceIndex) {
+                continue;
+            }
+
+            $path = (string) $source['path'];
+
+            if (file_exists($path) && filesize($path) > 0) {
+                return $path;
+            }
+
+            $url = trim((string) ($source['url'] ?? ''));
+            if ($url === '') {
+                break;
+            }
+
+            Log::warning('Compilation: source missing on resume, downloading it again', [
+                'project_id' => $this->project->id,
+                'index' => $sourceIndex,
+            ]);
+
+            $initResult = $this->downloadService->initDownload($url);
+            $downloadUrl = $this->downloadService->pollUntilReady($initResult['progress_url']);
+            $this->downloadService->streamToStorage($downloadUrl, $path);
+
+            if (file_exists($path) && filesize($path) > 0) {
+                return $path;
+            }
+
+            break;
+        }
+
+        throw new \Exception("Source video {$sourceIndex} is unavailable and could not be downloaded again");
+    }
+
+    /**
+     * Work out, for every clip, how long it stays on screen, how much source
+     * footage backs it, and how its commentary is fitted inside it.
+     *
+     * The old code stretched a clip by "up to 3 seconds" and then mixed with
+     * amix duration=first, so a longer commentary line - or a clip whose
+     * original audio ran short - was cut off mid-word as the video jumped to
+     * the next moment. Here a clip is never shorter than the line it has to
+     * speak: the voice is nudged faster up to MAX_VOICE_TEMPO, and if even that
+     * is not enough the clip simply runs on (holding its last frame when the
+     * source ran out) rather than cutting the sentence in half.
+     */
+    private function planClipTimeline(array $clips, array $ttsResults, array $sourceDurations): array
+    {
+        [$width, $height] = $this->targetDimensions();
+        $audioMode = $this->originalAudioMode();
+        $plan = [];
+
+        foreach (array_values($clips) as $index => $clip) {
+            $sourceIndex = (int) $clip['source_index'];
+            $start = max(0.0, (float) $clip['start']);
+            $windowSeconds = max(0.5, (float) $clip['end'] - $start);
+
+            $voicePath = $ttsResults[$index]['audio_path'] ?? null;
+            $voiceRaw = (float) ($ttsResults[$index]['duration'] ?? 0.0);
+            $hasVoice = is_string($voicePath) && $voicePath !== '' && file_exists($voicePath) && $voiceRaw > 0.01;
+
+            $tempo = 1.0;
+            $duration = $windowSeconds;
+
+            if ($hasVoice) {
+                $ceiling = $windowSeconds + self::MAX_CLIP_STRETCH_SECONDS;
+                $needed = self::VOICE_LEAD_IN_SECONDS + $voiceRaw + self::VOICE_TAIL_SECONDS;
+
+                if ($needed > $ceiling) {
+                    $speakRoom = max(0.5, $ceiling - self::VOICE_LEAD_IN_SECONDS - self::VOICE_TAIL_SECONDS);
+                    $tempo = min(self::MAX_VOICE_TEMPO, max(1.0, $voiceRaw / $speakRoom));
+                    $needed = self::VOICE_LEAD_IN_SECONDS + ($voiceRaw / $tempo) + self::VOICE_TAIL_SECONDS;
+                }
+
+                $duration = max($windowSeconds, $needed);
+            }
+
+            $duration = round($duration, 3);
+
+            // Only ever extend FORWARD from the window start: that is the
+            // direction the selector's spacing rule budgeted for, so a
+            // stretched clip can never run into the next pick from the same
+            // source and replay footage the viewer has already seen.
+            $sourceDuration = (float) ($sourceDurations[$sourceIndex] ?? 0.0);
+            $sourceSeconds = $sourceDuration > 0.0
+                ? max(0.5, min($duration, $sourceDuration - $start))
+                : $duration;
+            $sourceSeconds = round($sourceSeconds, 3);
+
+            $plan[] = [
+                'source_index' => $sourceIndex,
+                'start' => round($start, 3),
+                'duration' => $duration,
+                'source_seconds' => $sourceSeconds,
+                'freeze_seconds' => round(max(0.0, $duration - $sourceSeconds), 3),
+                'voice_path' => $hasVoice ? $voicePath : null,
+                'voice_tempo' => round($tempo, 4),
+                'voice_offset' => $hasVoice ? self::VOICE_LEAD_IN_SECONDS : 0.0,
+                'voice_seconds' => $hasVoice ? round($voiceRaw / $tempo, 3) : 0.0,
+                'key' => substr(sha1(implode('|', [
+                    $sourceIndex,
+                    round($start, 2),
+                    $duration,
+                    $sourceSeconds,
+                    $hasVoice ? basename((string) $voicePath) : 'novoice',
+                    round($tempo, 3),
+                    $audioMode,
+                    $width . 'x' . $height,
+                ])), 0, 16),
+            ];
+        }
+
+        Log::info('Compilation: clip timeline planned', [
+            'project_id' => $this->project->id,
+            'clips' => count($plan),
+            'stretched_for_voiceover' => count(array_filter($plan, fn ($step) => $step['voice_tempo'] > 1.001)),
+            'total_seconds' => round(array_sum(array_column($plan, 'duration')), 2),
+        ]);
+
+        return $plan;
     }
 
     /**
@@ -540,7 +795,7 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
      *
      * Returns the absolute wav path, or null when there is no usable audio.
      */
-    private function prepareClipBed(string $sourcePath, float $start, float $duration, string $mode, int $index): ?string
+    private function prepareClipBed(string $sourcePath, float $start, float $duration, string $mode, string $index): ?string
     {
         if ($mode === 'mute') {
             return null;
@@ -552,7 +807,7 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
         // Extract the clip's original audio (stereo, 44.1k). No audio stream → no bed.
         $extract = new Process([
             'ffmpeg', '-y',
-            '-ss', (string) $start, '-t', (string) $duration, '-i', $sourcePath,
+            '-ss', $this->ffNumber($start), '-t', $this->ffNumber($duration), '-i', $sourcePath,
             '-vn', '-ac', '2', '-ar', '44100',
             $rawPath,
         ]);
@@ -609,31 +864,48 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
     }
 
     /**
-     * Render one clip with ffmpeg: cut, scale/crop with a 5% zoom treatment, and
-     * build the audio track from an optional background bed and optional
-     * commentary voiceover. Any combination is supported (incl. silent). Falls
-     * back to a silent video if the audio graph fails so a clip never aborts.
+     * Render one clip with ffmpeg: cut the planned window, scale/crop with a 5%
+     * zoom treatment, hold the last frame when the source ran out, and build
+     * the audio from an optional background bed and optional commentary.
+     *
+     * Both streams are pinned to exactly the planned duration, so a clip can
+     * never end while its commentary is still talking, the concat boundary
+     * never lands on a missing video frame, and the caption/counter offsets
+     * computed from these files stay true across the whole compilation.
      */
     private function renderSingleClip(
         string $sourcePath,
         string $clipPath,
-        float $start,
-        float $duration,
+        array $step,
         int $width,
         int $height,
         ?string $bedPath,
-        ?string $ttsPath,
         string $audioMode
     ): void {
+        $start = (float) $step['start'];
+        $duration = (float) $step['duration'];
+        $sourceSeconds = (float) $step['source_seconds'];
+        $freeze = (float) $step['freeze_seconds'];
+        $voicePath = $step['voice_path'] ?? null;
+        $tempo = (float) ($step['voice_tempo'] ?? 1.0);
+
         $videoChain = "[0:v]scale={$width}:{$height}:force_original_aspect_ratio=increase,"
             . "crop={$width}:{$height},scale=trunc(iw*1.05/2)*2:trunc(ih*1.05/2)*2,"
-            . "crop={$width}:{$height},setsar=1,fps=30[v]";
+            . "crop={$width}:{$height},setsar=1,fps=30";
 
-        $hasBed = $bedPath !== null && file_exists($bedPath);
-        $hasVoice = $ttsPath !== null && file_exists($ttsPath);
+        if ($freeze > 0.01) {
+            // The clip runs past the end of the source - hold the last frame
+            // instead of ending early on top of the commentary.
+            $videoChain .= ',tpad=stop_mode=clone:stop_duration=' . $this->ffNumber($freeze + 0.5);
+        }
+
+        $videoChain .= ',trim=duration=' . $this->ffNumber($duration) . ',setpts=PTS-STARTPTS[v]';
+
+        $hasBed = is_string($bedPath) && $bedPath !== '' && file_exists($bedPath);
+        $hasVoice = is_string($voicePath) && $voicePath !== '' && file_exists($voicePath);
 
         // Input 0 is always the source video.
-        $inputs = ['-ss', (string) $start, '-t', (string) $duration, '-i', $sourcePath];
+        $inputs = ['-ss', $this->ffNumber($start), '-t', $this->ffNumber($sourceSeconds), '-i', $sourcePath];
         $nextIdx = 1;
 
         $bedIdx = null;
@@ -646,55 +918,74 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
         $voiceIdx = null;
         if ($hasVoice) {
             $inputs[] = '-i';
-            $inputs[] = $ttsPath;
+            $inputs[] = $voicePath;
             $voiceIdx = $nextIdx++;
         }
 
         // When commentary plays, the bed sits underneath: keep-mode ducks the
         // full original hard (it still has voices); background_only can sit
         // louder since voices are gone. With no commentary the bed plays full.
-        if ($hasVoice) {
-            $bedVol = $audioMode === 'keep' ? 0.25 : 0.55;
-        } else {
-            $bedVol = 1.0;
+        $bedVol = $hasVoice ? ($audioMode === 'keep' ? 0.25 : 0.55) : 1.0;
+
+        $filters = [$videoChain];
+
+        // Every audio branch is padded and trimmed to the exact clip length, so
+        // a bed that runs out (or a voice that does not) can no longer decide
+        // when the mix stops - that is what used to cut commentary off.
+        if ($bedIdx !== null) {
+            $filters[] = "[{$bedIdx}:a]aresample=44100,volume={$bedVol},apad,atrim=duration="
+                . $this->ffNumber($duration) . ',asetpts=PTS-STARTPTS[bed]';
         }
 
-        $filter = $videoChain;
-        $audioMap = null;
+        if ($voiceIdx !== null) {
+            $voiceChain = "[{$voiceIdx}:a]aresample=44100";
+
+            if ($tempo > 1.001) {
+                $voiceChain .= ',atempo=' . $this->ffNumber($tempo);
+            }
+
+            $delayMs = (int) round(((float) ($step['voice_offset'] ?? 0.0)) * 1000);
+            if ($delayMs > 0) {
+                $voiceChain .= ",adelay={$delayMs}|{$delayMs}";
+            }
+
+            $voiceChain .= ',apad,atrim=duration=' . $this->ffNumber($duration) . ',asetpts=PTS-STARTPTS[vo]';
+            $filters[] = $voiceChain;
+        }
 
         if ($bedIdx !== null && $voiceIdx !== null) {
-            $filter .= ";[{$bedIdx}:a]aresample=44100,volume={$bedVol}[bed]"
-                . ";[{$voiceIdx}:a]aresample=44100[vo]"
-                . ';[bed][vo]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[a]';
-            $audioMap = '[a]';
+            $filters[] = '[bed][vo]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0[mixed]';
+            $mixLabel = '[mixed]';
         } elseif ($bedIdx !== null) {
-            $filter .= ";[{$bedIdx}:a]aresample=44100,volume={$bedVol},apad[a]";
-            $audioMap = '[a]';
+            $mixLabel = '[bed]';
         } elseif ($voiceIdx !== null) {
-            $filter .= ";[{$voiceIdx}:a]aresample=44100,apad[a]";
-            $audioMap = '[a]';
+            $mixLabel = '[vo]';
         } else {
-            // No audio at all — synthesize silence so concat stays uniform.
+            // No audio at all - synthesize silence so concat stays uniform.
             $inputs[] = '-f';
             $inputs[] = 'lavfi';
             $inputs[] = '-t';
-            $inputs[] = (string) $duration;
+            $inputs[] = $this->ffNumber($duration);
             $inputs[] = '-i';
             $inputs[] = 'anullsrc=channel_layout=stereo:sample_rate=44100';
-            $audioMap = $nextIdx . ':a';
+            $mixLabel = "[{$nextIdx}:a]";
             $nextIdx++;
         }
+
+        // Tiny fades: without them every hard cut clicks.
+        $filters[] = $mixLabel . 'afade=t=in:st=0:d=0.04,afade=t=out:st='
+            . $this->ffNumber(max(0.0, $duration - 0.12)) . ':d=0.12[a]';
 
         $cmd = array_merge(
             ['ffmpeg', '-y'],
             $inputs,
             [
-                '-filter_complex', $filter,
-                '-map', '[v]', '-map', $audioMap,
+                '-filter_complex', implode(';', $filters),
+                '-map', '[v]', '-map', '[a]',
                 '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21',
                 '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2',
                 '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
-                '-t', (string) $duration,
+                '-t', $this->ffNumber($duration),
                 $clipPath,
             ]
         );
@@ -715,14 +1006,14 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
 
         $fallbackCmd = [
             'ffmpeg', '-y',
-            '-ss', (string) $start, '-t', (string) $duration, '-i', $sourcePath,
-            '-f', 'lavfi', '-t', (string) $duration, '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
+            '-ss', $this->ffNumber($start), '-t', $this->ffNumber($sourceSeconds), '-i', $sourcePath,
+            '-f', 'lavfi', '-t', $this->ffNumber($duration), '-i', 'anullsrc=channel_layout=stereo:sample_rate=44100',
             '-filter_complex', $videoChain,
             '-map', '[v]', '-map', '1:a',
             '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21',
             '-c:a', 'aac', '-b:a', '128k', '-ar', '44100', '-ac', '2',
             '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
-            '-shortest',
+            '-t', $this->ffNumber($duration),
             $clipPath,
         ];
 
@@ -732,6 +1023,52 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
 
         if (!$fallback->isSuccessful() || !file_exists($clipPath) || filesize($clipPath) === 0) {
             throw new \Exception('Clip rendering failed: ' . substr($fallback->getErrorOutput() ?: $fallback->getOutput(), -800));
+        }
+    }
+
+    /**
+     * Format a number for an ffmpeg argument: fixed notation, a dot separator
+     * whatever the locale, and no trailing zeroes.
+     */
+    private function ffNumber(float $value): string
+    {
+        $formatted = rtrim(rtrim(number_format($value, 3, '.', ''), '0'), '.');
+
+        return ($formatted === '' || $formatted === '-') ? '0' : $formatted;
+    }
+
+    /**
+     * Delete files in $dir matching $patterns that the current plan does not
+     * expect.
+     *
+     * A failed run leaves rendered clips and voiceovers behind. They used to be
+     * named by position (clip_7.mp4), and a retry reshuffles the order, so
+     * clip 7's stale file was reused for a completely different moment - which
+     * is how the same footage ended up in the compilation twice.
+     *
+     * @param array $patterns glob patterns relative to $dir
+     * @param array $keep     [basename => true] of files the plan still needs
+     */
+    private function sweepStaleArtifacts(string $dir, array $patterns, array $keep): void
+    {
+        $removed = 0;
+
+        foreach ($patterns as $pattern) {
+            foreach (glob($dir . '/' . $pattern) ?: [] as $file) {
+                if (!is_file($file) || isset($keep[basename($file)])) {
+                    continue;
+                }
+
+                @unlink($file);
+                $removed++;
+            }
+        }
+
+        if ($removed > 0) {
+            Log::info('Compilation: swept artifacts left by an earlier attempt', [
+                'project_id' => $this->project->id,
+                'removed' => $removed,
+            ]);
         }
     }
 
@@ -772,20 +1109,38 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
             throw new \Exception('Concat failed: ' . substr($concat->getErrorOutput(), -800));
         }
 
-        // 3) Per-clip offsets in the final timeline
+        // 3) Per-clip offsets in the final timeline. The concat demuxer shifts
+        //    each file by its container duration, so reading the rendered files
+        //    back is what makes the counter badges and captions land on the
+        //    clip they belong to.
         $offsets = [];
         $cursor = self::TITLE_CARD_SECONDS;
+        $worstDrift = 0.0;
+
         foreach (array_values($rendered) as $index => $clip) {
             $offsets[$index] = $cursor;
-            $cursor += (float) $clip['duration'];
+            $actual = (float) $clip['duration'];
+            $worstDrift = max($worstDrift, abs($actual - (float) ($clip['planned_duration'] ?? $actual)));
+            $cursor += $actual;
         }
 
-        // 4) Karaoke captions from Kokoro word timings, offset into the timeline.
-        //    Only when the user wants captions AND there is commentary to caption.
+        Log::info('Compilation: timeline assembled', [
+            'project_id' => $this->project->id,
+            'clips' => count($rendered),
+            'total_seconds' => round($cursor, 2),
+            'worst_clip_drift_seconds' => round($worstDrift, 3),
+        ]);
+
+        // 4) Karaoke captions from the commentary word timings, offset into the
+        //    timeline. Only when the user wants captions AND there is
+        //    commentary to caption.
         $captionFilters = [];
-        if ($this->showCaptions() && !empty($ttsResults)) {
+        $wordTimings = ($this->showCaptions() && !empty($ttsResults))
+            ? $this->buildGlobalWordTimings($rendered, $ttsResults, $commentary, $offsets)
+            : [];
+
+        if (!empty($wordTimings)) {
             $captionsRelative = "projects/{$this->project->id}/tmp/captions.ass";
-            $wordTimings = $this->buildGlobalWordTimings($rendered, $ttsResults, $commentary, $offsets);
             $this->captionService->generateKaraokeCaptions(
                 $wordTimings,
                 $captionsRelative,
@@ -800,9 +1155,10 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
             $escapedCaptions = str_replace(["\\", "'"], ['/', "\\'"], $captionsAbs);
             $captionFilters[] = "ass='{$escapedCaptions}'";
         } else {
-            Log::info('Compilation: captions disabled or no commentary, skipping caption burn', [
+            Log::info('Compilation: captions skipped', [
                 'project_id' => $this->project->id,
                 'show_captions' => $this->showCaptions(),
+                'has_voiceover' => !empty($ttsResults),
             ]);
         }
 
@@ -878,45 +1234,68 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
         $global = [];
 
         foreach (array_values($rendered) as $index => $clip) {
-            $offset = $offsets[$index];
+            $offset = (float) ($offsets[$index] ?? 0.0);
             $clipDuration = (float) $clip['duration'];
-            $timings = $ttsResults[$index]['word_timings'] ?? [];
+            $lead = (float) ($clip['voice_offset'] ?? 0.0);
+            $tempo = max(0.1, (float) ($clip['voice_tempo'] ?? 1.0));
+            $speakSeconds = (float) ($clip['voice_seconds'] ?? 0.0);
 
-            if (empty($timings)) {
-                $line = (string) ($commentary[$index] ?? '');
-                $words = array_values(array_filter(explode(' ', trim($line)), fn ($w) => trim($w) !== ''));
-                $speakDuration = min((float) ($ttsResults[$index]['duration'] ?? $clipDuration), $clipDuration);
-                $perWord = count($words) > 0 ? $speakDuration / count($words) : 0;
-
-                $timings = [];
-                foreach ($words as $wordIndex => $word) {
-                    $timings[] = [
-                        'word' => $word,
-                        'start' => $wordIndex * $perWord,
-                        'end' => ($wordIndex + 1) * $perWord,
-                    ];
-                }
-            }
-
-            foreach ($timings as $timing) {
+            // Kokoro times the line as recorded. The renderer may have delayed
+            // it past the cut and sped it up to make it fit, so undo both here
+            // or the highlight drifts further behind with every clip.
+            $words = [];
+            foreach (($ttsResults[$index]['word_timings'] ?? []) as $timing) {
                 $word = trim((string) ($timing['word'] ?? ''));
                 if ($word === '') {
                     continue;
                 }
 
-                $start = $offset + (float) ($timing['start'] ?? 0);
-                $end = $offset + (float) ($timing['end'] ?? 0);
-
-                $global[] = [
+                $words[] = [
                     'word' => $word,
-                    'start' => round(min($start, $offset + $clipDuration), 3),
-                    'end' => round(min($end, $offset + $clipDuration), 3),
+                    'start' => $lead + ((float) ($timing['start'] ?? 0)) / $tempo,
+                    'end' => $lead + ((float) ($timing['end'] ?? 0)) / $tempo,
                 ];
             }
-        }
 
-        if (empty($global)) {
-            throw new \Exception('No word timings available for captions');
+            if (empty($words)) {
+                $tokens = preg_split('/\s+/', trim((string) ($commentary[$index] ?? '')), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                $span = $speakSeconds > 0.0 ? $speakSeconds : max(0.0, $clipDuration - $lead);
+                $perWord = count($tokens) > 0 ? $span / count($tokens) : 0.0;
+
+                foreach ($tokens as $tokenIndex => $token) {
+                    $words[] = [
+                        'word' => $token,
+                        'start' => $lead + ($tokenIndex * $perWord),
+                        'end' => $lead + (($tokenIndex + 1) * $perWord),
+                    ];
+                }
+            }
+
+            $clipEnd = $offset + $clipDuration;
+
+            foreach ($words as $word) {
+                $start = $offset + $word['start'];
+
+                // A word that would only appear after the cut belongs to
+                // nothing on screen - drop it rather than stamping a
+                // zero-length caption onto the next clip.
+                if ($start >= $clipEnd - 0.02) {
+                    continue;
+                }
+
+                $end = min($offset + $word['end'], $clipEnd);
+                if ($end - $start < 0.08) {
+                    $end = min($start + 0.08, $clipEnd);
+                }
+
+                $global[] = [
+                    'word' => $word['word'],
+                    'start' => round($start, 3),
+                    'end' => round($end, 3),
+                    // Keeps a caption line from spanning two clips.
+                    'group' => $index,
+                ];
+            }
         }
 
         return $global;
@@ -1047,8 +1426,11 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
 
     /**
      * STEP 13: Aggressive cleanup of tmp clips, audio and leftover sources.
+     *
+     * @param bool $keepSources leave the downloaded source videos in place
+     *                          (used on failure, so a retry can resume)
      */
-    protected function cleanupTempFiles(): bool
+    protected function cleanupTempFiles(bool $keepSources = false): bool
     {
         try {
             $projectDir = Storage::disk('public')->path("projects/{$this->project->id}");
@@ -1063,8 +1445,10 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
                 @rmdir($tmpDir);
             }
 
-            foreach (glob($projectDir . '/source_*.mp4') ?: [] as $file) {
-                @unlink($file);
+            if (!$keepSources) {
+                foreach (glob($projectDir . '/source_*.mp4') ?: [] as $file) {
+                    @unlink($file);
+                }
             }
 
             Log::info('Compilation: temp files cleaned up', ['project_id' => $this->project->id]);
@@ -1083,11 +1467,31 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
     private function collectYoutubeUrls(): array
     {
         $urls = [];
+        $seen = [];
+
         foreach (['youtube_url_1', 'youtube_url_2', 'youtube_url_3'] as $field) {
             $url = trim((string) ($this->settings[$field] ?? ''));
-            if ($url !== '') {
-                $urls[] = $url;
+            if ($url === '') {
+                continue;
             }
+
+            // The same video pasted twice (or in two URL forms) used to be
+            // downloaded twice and treated as two independent sources, so every
+            // moment it contributed could appear twice in the compilation.
+            $key = preg_match('/(?:v=|youtu\.be\/|shorts\/|embed\/)([\w-]{11})/', $url, $match)
+                ? $match[1]
+                : mb_strtolower($url);
+
+            if (isset($seen[$key])) {
+                Log::info('Compilation: duplicate source URL ignored', [
+                    'project_id' => $this->project->id,
+                    'field' => $field,
+                ]);
+                continue;
+            }
+
+            $seen[$key] = true;
+            $urls[] = $url;
         }
 
         return array_values($urls);

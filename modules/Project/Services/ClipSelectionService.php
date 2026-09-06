@@ -69,7 +69,7 @@ class ClipSelectionService
      */
     public function findBestClips(array $transcriptSegments, float $totalDurationSeconds, int $count = 1, string $mode = 'story'): array
     {
-        $count = max(1, min(10, $count));
+        $count = max(1, min(12, $count));
 
         Log::info('ClipSelectionService: Starting clip selection', [
             'total_segments' => count($transcriptSegments),
@@ -168,8 +168,19 @@ class ClipSelectionService
                 continue;
             }
 
+            // Re-score on the FINAL boundaries. Snapping moves them, and the
+            // hook/payoff/pacing signals are all boundary-dependent, so this
+            // has to happen after the snap and before any ranking.
+            if ($mode !== 'moments') {
+                $clip['ai_score'] = $clip['final_score'];
+                $clip['final_score'] = max(0, min(100, $clip['final_score'] + $this->viralAdjustment($clip)));
+            }
+
             $ready[] = $clip;
         }
+
+        // The adjustment reorders the pool, so re-rank before picking.
+        usort($ready, fn ($a, $b) => $b['final_score'] <=> $a['final_score']);
 
         // Pass 1: greedy by score, but keep the winners SPREAD across the
         // video. Model scores bunch in the high 80s and PHP's sort is stable,
@@ -193,6 +204,14 @@ class ClipSelectionService
             usort($selected, fn ($a, $b) => $b['final_score'] <=> $a['final_score']);
         }
 
+        // Final pass: one head-to-head call over the winners. Phase 1 graded
+        // each clip against its own window in isolation and never saw the
+        // others, so its scores cannot rank the batch. This pass does, and the
+        // caller's quality gate cuts the tail of exactly this ordering.
+        if (count($selected) > 1 && $mode !== 'moments') {
+            $selected = $this->rankFinalists($selected);
+        }
+
         Log::info('ClipSelectionService: Clip selection complete', [
             'requested' => $count,
             'selected' => count($selected),
@@ -204,6 +223,125 @@ class ClipSelectionService
         ]);
 
         return $selected;
+    }
+
+    /**
+     * Words that open a scroll-stopping first sentence. Checked against the
+     * clip's opening only — the same word twenty seconds in proves nothing.
+     */
+    private const HOOK_OPENERS = [
+        'why', 'how', 'what', 'who', 'when', 'imagine', 'nobody', 'everyone', 'most people',
+        'the truth', 'the secret', 'the problem', 'the biggest', 'the worst', 'the reason',
+        'never', 'always', 'stop', 'listen', 'look', 'turns out', 'i was', 'i lost', 'i quit',
+        'i got', 'you think', 'people think', 'they told', 'nobody talks', 'here is', "here's",
+        'this is why', 'that is when', "that's when",
+    ];
+
+    /** Emotional / stakes vocabulary that travels in the feed. */
+    private const EMOTION_WORDS = [
+        'crazy', 'insane', 'shocking', 'unbelievable', 'terrifying', 'hilarious', 'brutal',
+        'wild', 'died', 'death', 'scared', 'furious', 'angry', 'hate', 'love', 'worst',
+        'best', 'biggest', 'illegal', 'arrested', 'fired', 'bankrupt', 'lawsuit', 'secret',
+        'lied', 'lying', 'stole', 'ruined', 'disaster', 'nightmare', 'obsessed', 'humiliating',
+    ];
+
+    /** Channel housekeeping — never viral, always drags a clip down. */
+    private const KILL_PHRASES = [
+        'subscribe', 'sponsor', 'link in the description', 'link in the bio', 'patreon',
+        'like and share', 'smash that like', 'as you can see', 'on the screen', 'up here',
+        'welcome back to', 'in this video', 'before we get started', 'hit the bell',
+        'thanks for watching', 'use my code', 'promo code',
+    ];
+
+    /**
+     * A virality adjustment computed from the clip's own text and timing.
+     *
+     * The model's scores bunch in the high 80s — it grades every candidate as
+     * "pretty good" — so on their own they neither rank the batch nor tell the
+     * quality gate where to cut. These signals are cheap, deterministic and
+     * measure the things the model reliably under-weights: whether the FIRST
+     * sentence actually hooks, whether the clip ends on a finished thought,
+     * how densely packed the speech is, and whether it is channel housekeeping
+     * wearing a story's clothes.
+     *
+     * Returns a delta in roughly [-30, +20]; the caller clamps the sum to 0-100.
+     */
+    private function viralAdjustment(array $clip): int
+    {
+        $text = trim((string) ($clip['subtitle'] ?? ''));
+        if ($text === '') {
+            return -10;
+        }
+
+        $duration = max(0.1, (float) $clip['final_end_seconds'] - (float) $clip['final_start_seconds']);
+        $lower = mb_strtolower($text);
+        $words = preg_split('/\s+/u', $lower, -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $wordCount = count($words);
+        $opening = implode(' ', array_slice($words, 0, 14));
+
+        $delta = 0;
+
+        // ── Second 0-3: does the clip open on a hook? ──
+        foreach (self::HOOK_OPENERS as $opener) {
+            if (str_contains($opening, $opener)) {
+                $delta += 7;
+                break;
+            }
+        }
+        // A question or an exclamation early on is an open loop by construction.
+        $openingRaw = mb_substr($text, 0, 120);
+        if (str_contains($openingRaw, '?') || str_contains($openingRaw, '!')) {
+            $delta += 4;
+        }
+        // Receipts: a number in the opening beats a number buried at the end.
+        if (preg_match('/\d/', $openingRaw)) {
+            $delta += 3;
+        } elseif (preg_match('/\d/', $text)) {
+            $delta += 1;
+        }
+
+        // ── Shareability vocabulary (capped, so keyword spam cannot win) ──
+        $emotion = 0;
+        foreach (self::EMOTION_WORDS as $word) {
+            if (str_contains($lower, $word)) {
+                $emotion++;
+            }
+        }
+        $delta += min(8, $emotion * 2);
+
+        // ── Channel housekeeping drags hard ──
+        $kills = 0;
+        foreach (self::KILL_PHRASES as $phrase) {
+            if (str_contains($lower, $phrase)) {
+                $kills++;
+            }
+        }
+        $delta -= min(25, $kills * 10);
+
+        // ── Retention: dense speech reads as fast-paced; sparse reads as dead air ──
+        $wordsPerSecond = $wordCount / $duration;
+        if ($wordsPerSecond < 1.4) {
+            $delta -= 8;
+        } elseif ($wordsPerSecond < 2.0) {
+            $delta -= 3;
+        } elseif ($wordsPerSecond >= 2.4) {
+            $delta += 4;
+        }
+
+        // ── Length: the sweet spot for a talking-head short ──
+        if ($duration >= 18.0 && $duration <= 45.0) {
+            $delta += 5;
+        } elseif ($duration > 55.0) {
+            $delta -= 5;
+        } elseif ($duration < 17.0) {
+            $delta -= 3;
+        }
+
+        // ── Does it land? An unfinished last sentence has no payoff. ──
+        $lastChar = mb_substr(rtrim($text), -1);
+        $delta += in_array($lastChar, ['.', '!', '?', '"', '”'], true) ? 3 : -6;
+
+        return max(-30, min(20, $delta));
     }
 
     /**
@@ -484,10 +622,18 @@ class ClipSelectionService
         }
 
         // Multi-clip runs need wider coverage so distinct stories can come
-        // from different parts of the video.
+        // from different parts of the video. A 12-short batch cannot be filled
+        // from 6 windows without stacking picks on top of each other, so the
+        // ceiling scales with the ask.
         if ($clipCount > 1) {
-            $strategy['max_windows'] = min(10, $strategy['max_windows'] + (int) ceil($clipCount / 2));
+            $strategy['max_windows'] = min(16, $strategy['max_windows'] + (int) ceil($clipCount * 0.75));
         }
+
+        // A batch needs a candidate pool comfortably larger than the batch:
+        // dedupe, the overlap rule and the spread rule all eat candidates. The
+        // natural stride alone gives ~8 windows however many shorts are asked
+        // for, so ask for extra windows (which simply overlap more) instead.
+        $strategy['min_windows'] = min($strategy['max_windows'], $clipCount + 2);
 
         return $strategy;
     }
@@ -505,17 +651,27 @@ class ClipSelectionService
         $overlapSeconds = $strategy['overlap_seconds'];
         $maxWindows = $strategy['max_windows'];
 
-        // If more windows needed than max, sample evenly across duration
         $lastSegment = end($segments);
         $totalDuration = floatval($lastSegment['end'] ?? 0);
 
-        $windowCount = min(
-            ceil($totalDuration / ($windowSeconds - $overlapSeconds)),
-            $maxWindows
-        );
+        $minWindows = max(1, (int) ($strategy['min_windows'] ?? 1));
+        $step = max(1.0, (float) ($windowSeconds - $overlapSeconds));
+        $natural = max(1, (int) ceil($totalDuration / $step));
+        $windowCount = (int) min(max($natural, $minWindows), $maxWindows);
+
+        // Spread the windows across the WHOLE video instead of walking
+        // contiguously from 0. Walking from 0 meant a capped run only ever
+        // read the opening stretch of a long video — every short in a batch
+        // came out of the first half hour of a three-hour stream. The stride
+        // now stretches (sampling with gaps) or shrinks (denser overlap, for a
+        // big batch) so the last window lands on the end of the video, with a
+        // floor so extra windows can never collapse onto each other.
+        if ($windowCount > 1) {
+            $step = max($windowSeconds * 0.3, ($totalDuration - $windowSeconds) / ($windowCount - 1));
+        }
 
         for ($i = 0; $i < $windowCount; $i++) {
-            $start = ($i * ($windowSeconds - $overlapSeconds));
+            $start = max(0.0, $i * $step);
             $end = $start + $windowSeconds;
 
             $windowSegments = array_filter($segments, function ($seg) use ($start, $end) {
@@ -749,14 +905,31 @@ PROMPT;
         }
 
         return <<<'PROMPT'
-You are an expert viral short-form video editor. From a section of transcript, pick the
-best self-contained clip(s) — each one must tell a COMPLETE little story on its own.
+You are a top short-form editor who has cut thousands of clips that passed a million views.
+From a section of transcript, pick the clip(s) most likely to GO VIRAL as a standalone short.
 
-A great clip is a MINI-STORY, not a random highlight:
-- It opens on a strong HOOK — a sentence that instantly makes people want to keep watching.
-- It delivers a clear middle (the setup / the point / the tension).
-- It lands a satisfying PAYOFF or resolution at the end. The viewer should feel it "finished",
-  not that it was chopped off.
+Judge every candidate the way the feed does — second by second:
+
+SECOND 0-3 (the scroll-stopper). The very first sentence decides everything. It must be a
+claim, a question, a number, a confession, a contradiction or a promise that creates an
+instant open loop ("Nobody tells you this", "I lost $40,000 in one night", "Here's why that's
+completely wrong"). If the first sentence is context, throat-clearing, a greeting, a name
+drop, or "so basically", the clip is DEAD — move the start later to the sentence that
+actually hooks, or pick a different clip.
+
+SECOND 3-20 (retention). Every sentence must either raise the tension or pay part of it off.
+Tangents, backtracking, repeated setup and "anyway, as I was saying" kill retention.
+
+THE ENDING (the payoff). It must LAND: the open loop closes, the punchline hits, the lesson
+snaps shut. A viewer should feel it finished, not that it was chopped. A clip that trails off
+into "...and yeah, so that's kind of it" is worthless no matter how good the hook was.
+
+WHAT MAKES PEOPLE SHARE (look for at least one):
+- a surprising or counter-intuitive claim that contradicts what people assume
+- a concrete, quotable line someone would repeat verbatim
+- real stakes: money, failure, danger, conflict, an embarrassing admission
+- specific numbers, names, dates, receipts — vague inspiration does not travel
+- strong emotion: shock, outrage, awe, secondhand cringe, genuine laughter
 
 HARD BOUNDARY RULES (critical):
 - The clip MUST start at the FIRST WORD OF A SENTENCE. Never start mid-sentence or on filler
@@ -765,21 +938,27 @@ HARD BOUNDARY RULES (critical):
 - Trim any greeting/filler lead-in and any trailing tangent so every second carries the story fast.
 
 LENGTH: Choose whatever length tells the complete story best — anywhere from 15 to 60 seconds.
-Do not pad to fill time and do not truncate meaning to be short. Tight and complete beats long.
+20-45s is the sweet spot. Do not pad to fill time and do not truncate meaning to be short.
+Tight and complete beats long.
 
 DEAD AIR: The timestamps reveal silence — a large jump between consecutive segment timestamps
 means nobody is talking (music, gameplay noise, pauses). Prefer clips with continuous speech.
 A clip whose range contains long silent holes is weaker; pick a tighter continuous story instead.
 
 Scoring criteria (weight):
-- Hook strength: irresistible opening line (30%)
-- Story completeness: clear setup AND payoff, understandable with zero prior context (30%)
-- Emotional resonance: curiosity, surprise, shock, humour, strong feeling (20%)
-- Specificity: concrete facts, numbers, stories, examples (10%)
-- Audio-only viability: works without visuals ("as you can see" is disqualifying) (10%)
+- Hook strength: does the FIRST SENTENCE alone stop a scroll? (35%)
+- Payoff: the ending lands and closes the loop it opened (25%)
+- Shareability: surprise, stakes, emotion, or a quotable line (20%)
+- Standalone clarity: fully understandable with zero prior context (10%)
+- Specificity: concrete facts, numbers, names, examples (5%)
+- Audio-only viability: works without visuals ("as you can see" is disqualifying) (5%)
 
-DISQUALIFY: intros, outros, sponsor reads, subscribe begs, and any clip that ends on an
-unresolved/incomplete thought.
+Be a harsh grader. 90+ means you would personally post it. 70 is decent but forgettable.
+Below 50 means it should not be published. Do not inflate — an honest 55 is far more useful
+than a generous 85, because low scorers are dropped rather than shipped.
+
+DISQUALIFY: intros, outros, sponsor reads, subscribe begs, channel housekeeping, and any clip
+that ends on an unresolved/incomplete thought.
 
 Return ONLY valid JSON. No markdown. No explanation outside the JSON.
 PROMPT;
@@ -851,11 +1030,12 @@ Return JSON in exactly this shape (a "clips" array even for a single clip):
       "highlight_words": ["word1", "word2", "word3"],
       "score": 87,
       "score_breakdown": {
-        "hook_strength": 28,
-        "story_completeness": 27,
-        "emotional_resonance": 18,
-        "specificity": 9,
-        "audio_viability": 8
+        "hook_strength": 31,
+        "payoff": 22,
+        "shareability": 17,
+        "standalone_clarity": 9,
+        "specificity": 4,
+        "audio_viability": 4
       },
       "reason": "one sentence: the hook and the payoff that make this a complete story"
     }
@@ -906,6 +1086,142 @@ PROMPT;
 
         // Take top N
         return array_slice($unique, 0, $topN);
+    }
+
+    /**
+     * Rank the chosen clips against each other for viral potential.
+     *
+     * Returns them best-first with final_score replaced by the head-to-head
+     * verdict. Entirely non-fatal: any bad response leaves the input order
+     * (already score-descending) untouched, so a failed call costs ordering
+     * quality, never the run.
+     *
+     * @param array<int, array> $clips
+     * @return array<int, array>
+     */
+    private function rankFinalists(array $clips): array
+    {
+        $clips = array_values($clips);
+
+        $lines = '';
+        foreach ($clips as $i => $clip) {
+            $start = self::formatSeconds((float) $clip['final_start_seconds']);
+            $end = self::formatSeconds((float) $clip['final_end_seconds']);
+            $length = round((float) $clip['final_end_seconds'] - (float) $clip['final_start_seconds']);
+            $text = trim(preg_replace('/\s+/u', ' ', (string) $clip['subtitle']));
+
+            $lines .= "CLIP {$i} | {$start}s-{$end}s | {$length}s\n";
+            $lines .= "\"" . mb_substr($text, 0, 700) . "\"\n\n";
+        }
+
+        $total = count($clips);
+
+        $systemPrompt = <<<'PROMPT'
+You rank finished short-form clips by how well they will actually perform in a feed.
+You are ruthless and you never flatter: most clips are average, and saying so is the job.
+
+Rank on:
+1. Does the FIRST SENTENCE stop a scroll on its own? (the single biggest factor)
+2. Does the ending land the promise the opening made?
+3. Would a normal viewer send this to a friend — surprise, stakes, emotion, a quotable line?
+4. Does it stand alone with zero context from the rest of the video?
+
+Score 0-100 and spread the scores out. Two clips should almost never share a score.
+90+ = you would post it yourself. 70 = watchable but forgettable. Below 50 = do not publish.
+Return ONLY valid JSON.
+PROMPT;
+
+        $userPrompt = <<<PROMPT
+Here are {$total} clips cut from one video. Rank them best-first for viral potential.
+
+{$lines}
+Return JSON in exactly this shape, with every clip index appearing exactly once,
+ordered best-first:
+{
+  "ranking": [
+    { "index": 3, "viral_score": 92, "reason": "opens on a concrete confession, lands the payoff" }
+  ]
+}
+PROMPT;
+
+        try {
+            $response = Http::withToken($this->apiKey)
+                ->timeout(90)
+                ->post('https://api.openai.com/v1/chat/completions', LlmModels::tune([
+                    'model' => $this->model,
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => $userPrompt],
+                    ],
+                    'temperature' => 0.2,
+                    'max_tokens' => 200 + 120 * $total,
+                    'response_format' => ['type' => 'json_object'],
+                ]));
+
+            if (!$response->successful()) {
+                Log::warning('ClipSelectionService: final ranking request failed, keeping score order', [
+                    'status' => $response->status(),
+                ]);
+                return $clips;
+            }
+
+            CostTracker::recordChat($this->model, $response->json('usage'), 'clip_selection_rank');
+
+            $parsed = json_decode($response->json('choices.0.message.content') ?? '', true);
+            $ranking = is_array($parsed) ? ($parsed['ranking'] ?? null) : null;
+
+            if (!is_array($ranking) || empty($ranking)) {
+                return $clips;
+            }
+
+            $ordered = [];
+            $seen = [];
+            foreach ($ranking as $row) {
+                if (!is_array($row) || !isset($row['index'])) {
+                    continue;
+                }
+                $idx = (int) $row['index'];
+                if (!isset($clips[$idx]) || isset($seen[$idx])) {
+                    continue;
+                }
+                $seen[$idx] = true;
+
+                $clip = $clips[$idx];
+                $clip['rank_reason'] = (string) ($row['reason'] ?? '');
+                if (isset($row['viral_score']) && is_numeric($row['viral_score'])) {
+                    $clip['pre_rank_score'] = $clip['final_score'];
+                    $clip['final_score'] = max(0, min(100, (int) $row['viral_score']));
+                }
+                $ordered[] = $clip;
+            }
+
+            // Anything the model forgot keeps its place at the back rather
+            // than vanishing — a dropped clip is a lost short.
+            foreach ($clips as $i => $clip) {
+                if (!isset($seen[$i])) {
+                    $ordered[] = $clip;
+                }
+            }
+
+            if (count($ordered) !== count($clips)) {
+                return $clips;
+            }
+
+            Log::info('ClipSelectionService: finalists ranked head-to-head', [
+                'order' => array_map(fn ($c) => [
+                    'start' => round($c['final_start_seconds'], 1),
+                    'score' => $c['final_score'],
+                ], $ordered),
+            ]);
+
+            return $ordered;
+
+        } catch (\Exception $e) {
+            Log::warning('ClipSelectionService: final ranking failed, keeping score order', [
+                'error' => $e->getMessage(),
+            ]);
+            return $clips;
+        }
     }
 
     /**

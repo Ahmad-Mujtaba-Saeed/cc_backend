@@ -909,6 +909,10 @@ class LoopVideoRequest(BaseModel):
     output_height: int = 768
     output_path: str
     project_id: int
+    # Where inside the source to start reading. Every short in a batch used to
+    # begin at 0, so a run of 6 shorts showed the same opening seconds of the
+    # same gameplay six times. The caller now picks a different offset per short.
+    start_seconds: float = 0.0
 
 class LoopVideoResponse(BaseModel):
     success: bool
@@ -1262,9 +1266,19 @@ async def loop_video(request: LoopVideoRequest):
             f"setsar=1,fps=30"
         )
         
+        # Input seek, so the loop begins at the caller's offset instead of at
+        # frame 0. Placed before -i (fast seek); when -stream_loop wraps, it
+        # wraps back to this offset, which is exactly what we want.
+        seek_args = []
+        start_seconds = max(0.0, float(request.start_seconds or 0.0))
+        if start_seconds > 0.05:
+            seek_args = ['-ss', f'{start_seconds:.3f}']
+            logger.info(f"loop-video: starting source at {start_seconds:.2f}s")
+
         cmd = [
             'ffmpeg',
             '-stream_loop', '-1',
+            *seek_args,
             '-i', request.source_path,
             '-t', str(request.target_duration_seconds),
             '-vf', scale_filter,

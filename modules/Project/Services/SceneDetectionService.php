@@ -169,10 +169,16 @@ class SceneDetectionService
                     continue;
                 }
 
-                $candidates[] = [
-                    'start' => round($start, 2),
-                    'end' => round(min($end, $start + $maxClipSeconds), 2),
-                ];
+                // A long uncut scene holds more than one moment. Walk it in
+                // clip-sized windows instead of only ever taking its opening
+                // seconds: a slow-cutting source used to offer so few distinct
+                // candidates that the compilation came up short.
+                for ($t = $start; ($end - $t) >= $minClipSeconds; $t += $maxClipSeconds) {
+                    $candidates[] = [
+                        'start' => round($t, 2),
+                        'end' => round(min($end, $t + $maxClipSeconds), 2),
+                    ];
+                }
             }
         }
 
