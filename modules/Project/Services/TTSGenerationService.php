@@ -31,6 +31,11 @@ class TTSGenerationService
      * voice that belongs to the other engine (after an admin switch) onto the
      * template's default. An OpenAI failure falls back to Kokoro so a render
      * never dies because of a provider outage.
+     *
+     * A cloned voice (`clone_<id>`, "My Voices") outranks the admin switch —
+     * the user picked their own voice — but only for its owner, named by
+     * `$context['user_id']`. Anyone else's clone, an unready one, or an engine
+     * failure falls back to the stock narrator the same way.
      */
     public function generateTTS(string $text, string $voice = 'am_michael', string $outputPath = null, bool $wordTiming = false, array $context = []): array
     {
@@ -49,6 +54,28 @@ class TTSGenerationService
                 'requested_voice' => $voice,
                 'template_type' => $templateType,
             ]);
+
+            if (TtsVoices::isClone($voice)) {
+                $clone = VoiceCloneService::usable(isset($context['user_id']) ? (int) $context['user_id'] : null, $voice);
+
+                if ($clone) {
+                    $result = (new VoiceCloneService())->generateTTS($text, $clone, $outputPath, $wordTiming);
+                    if ($result['success'] ?? false) {
+                        return $result;
+                    }
+                    Log::warning('TTS: cloned voice failed — falling back to the stock narrator', [
+                        'voice' => $voice,
+                        'error' => $result['error'] ?? 'unknown',
+                    ]);
+                } else {
+                    Log::warning('TTS: cloned voice is not usable for this user — falling back to the stock narrator', [
+                        'voice' => $voice,
+                        'user_id' => $context['user_id'] ?? null,
+                    ]);
+                }
+
+                $voice = ''; // resolves to the template's default narrator below
+            }
 
             if ($provider === 'openai') {
                 $openaiVoice = TtsVoices::resolve($voice, 'openai', $templateType);
@@ -142,6 +169,8 @@ class TTSGenerationService
             'audio_path' => $outputRelativePath,
             'duration' => $duration,
             'word_timings' => (array) ($result['word_timings'] ?? []),
+            // 'clone' when a cloned voice actually spoke; null for the stock engines.
+            'engine' => $result['engine'] ?? null,
         ];
     }
 

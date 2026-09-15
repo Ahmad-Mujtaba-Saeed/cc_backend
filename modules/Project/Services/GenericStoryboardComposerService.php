@@ -172,9 +172,23 @@ class GenericStoryboardComposerService
         return $out;
     }
 
+    /**
+     * Phases one call may write.
+     *
+     * Sixteen is the largest skeleton the shapes could produce while the
+     * length slider stopped at three minutes (a full `demo`: hook, problem,
+     * product_intro, eight demo_steps, result, three second_features,
+     * payoff), so every video that composed in one call before this constant
+     * existed still composes in one call.
+     */
+    private const PHASES_PER_CALL = 16;
+
     private ?string $apiKey;
     private string $model;
     private int $attempts = 0;
+
+    /** The video's target length — the script window is sized from it. */
+    private int $targetSeconds = 60;
 
     /** The user's brief. This composer WRITES the narration and picks every
      *  card, so anything the guide asked for — the order of the beats, the
@@ -214,9 +228,115 @@ class GenericStoryboardComposerService
             return null;
         }
 
+        $skeleton = array_values($skeleton);
+        $this->targetSeconds = max(10, $targetSeconds);
+
+        // One focused retry against a CRITIQUE of the model's own draft.
+        //
+        // The prompt asks for variety, media and pacing, but a prompt rule the
+        // model quietly ignores is worth nothing — project 135 came back as
+        // seven single_focus text cards at a flat 9s each, and the linter
+        // faithfully reported all three failures AFTER the storyboard had
+        // already shipped. Naming the specific violations back to the model and
+        // asking once more is the cheapest way to actually enforce them; the
+        // better of the two drafts wins, so a retry can never make it worse.
+        $best = null;
+        $bestFaults = null;
+        for ($pass = 0; $pass < 2; $pass++) {
+            $parsed = $this->requestBoard(
+                $skeleton,
+                $script,
+                $targetSeconds,
+                $pass === 0 ? '' : implode("\n", $bestFaults)
+            );
+            if ($parsed === null) {
+                break;
+            }
+
+            $scenes = $this->mapScenes($parsed, $skeleton);
+            $faults = $this->critique($scenes, $skeleton, $targetSeconds, $script);
+
+            if ($best === null || count($faults) < count($bestFaults)) {
+                $best = $scenes;
+                $bestFaults = $faults;
+            }
+            if ($bestFaults === []) {
+                break;
+            }
+        }
+
+        if ($best === null || count($best) < max(3, (int) ceil(count($skeleton) * 0.6))) {
+            return null; // the model skipped too much — giant call does better
+        }
+
+        Log::info('GenericStoryboardComposer: storyboard composed by the tree', [
+            'scenes' => count($best),
+            'attempts' => $this->attempts,
+            'unresolved' => $bestFaults,
+        ]);
+
+        return ['scenes' => $best, 'summary' => ''];
+    }
+
+    /**
+     * Ask for the whole board, in as many calls as it takes.
+     *
+     * One call per storyboard is right up to about sixteen phases, which is
+     * every video the length slider could ask for when it stopped at three
+     * minutes. Six minutes plans two to four times that, and a single call
+     * asked for forty scenes-with-slots does not return forty: it returns
+     * twenty-five and a truncated JSON tail, which parses to nothing. So a
+     * long board is written in windows of {@see PHASES_PER_CALL} phases: each
+     * call is told which slice of the whole plan it holds and is handed the
+     * last line the narrator said, so the video still reads as one voice, but
+     * it only writes its own phases — keeping their global numbers, which is
+     * what lets the parts be merged back into one board. Short boards take
+     * exactly the one call they always did.
+     *
+     * @param  array<int, array{intent: string, brief: string}> $skeleton
+     * @return array<int, mixed>|null  the model's raw `scenes` entries
+     */
+    private function requestBoard(array $skeleton, string $script, int $targetSeconds, string $critique): ?array
+    {
+        $windows = array_chunk($skeleton, self::PHASES_PER_CALL, true);
+        $raw = [];
+        $tail = '';
+
+        foreach ($windows as $window) {
+            $part = $this->request(
+                $this->buildSystem($skeleton, $window, $targetSeconds),
+                $script,
+                $critique,
+                count($window),
+                $tail
+            );
+            if ($part === null) {
+                // One failed window is not a failed storyboard: the phases it
+                // held come back as dropped phases, which the critique names
+                // and compose() weighs against the 60% floor.
+                continue;
+            }
+            $raw = array_merge($raw, $part);
+            $last = end($part);
+            $tail = is_array($last) ? trim((string) ($last['narration'] ?? '')) : '';
+        }
+
+        return $raw === [] ? null : $raw;
+    }
+
+    /**
+     * The system prompt for ONE window of phases.
+     *
+     * @param  array $skeleton  every phase — the per-scene time budget is the
+     *                          whole video's, not this window's
+     * @param  array $window    the phases THIS call writes, keyed by their
+     *                          0-based index in $skeleton (phase number - 1)
+     */
+    private function buildSystem(array $skeleton, array $window, int $targetSeconds): string
+    {
         $offered = [];
         $phaseLines = '';
-        foreach (array_values($skeleton) as $i => $p) {
+        foreach ($window as $i => $p) {
             $intent = (string) ($p['intent'] ?? '');
             $menu = self::menuFor($intent);
             $offered = array_merge($offered, $menu);
@@ -239,6 +359,19 @@ class GenericStoryboardComposerService
         $phaseCount = max(1, count($skeleton));
         $avgSeconds = round($targetSeconds / $phaseCount, 1);
         $avgWords = max(6, (int) round($avgSeconds * 2.5));
+
+        // Where this window sits in the whole video. Only said when the board
+        // takes more than one call — a single-call board reads exactly the
+        // prompt it always read.
+        $windowNote = '';
+        if (count($window) !== $phaseCount) {
+            $first = (int) array_key_first($window) + 1;
+            $last = (int) array_key_last($window) + 1;
+            $windowNote = "\n\nTHIS CALL WRITES PHASES {$first}-{$last} OF {$phaseCount}. The video's other phases "
+                . 'are being written separately, so write ONLY the phases listed above, keep their phase numbers '
+                . 'exactly as given, and do not re-introduce the video or re-state its ending unless one of YOUR '
+                . 'phases is the hook or the payoff.';
+        }
 
         $system = <<<PROMPT
 You fill a PRE-DECIDED storyboard for a short explainer video. The phases and their allowed cards are fixed — you choose within each menu and write the content. Return ONLY JSON:
@@ -287,54 +420,28 @@ PROMPT;
                 . mb_substr($this->guide, 0, 1500);
         }
 
-        // One focused retry against a CRITIQUE of the model's own draft.
-        //
-        // The prompt asks for variety, media and pacing, but a prompt rule the
-        // model quietly ignores is worth nothing — project 135 came back as
-        // seven single_focus text cards at a flat 9s each, and the linter
-        // faithfully reported all three failures AFTER the storyboard had
-        // already shipped. Naming the specific violations back to the model and
-        // asking once more is the cheapest way to actually enforce them; the
-        // better of the two drafts wins, so a retry can never make it worse.
-        $best = null;
-        $bestFaults = null;
-        for ($pass = 0; $pass < 2; $pass++) {
-            $parsed = $this->request($system, $script, $pass === 0 ? '' : implode("\n", $bestFaults));
-            if ($parsed === null) {
-                break;
-            }
-
-            $scenes = $this->mapScenes($parsed, $skeleton);
-            $faults = $this->critique($scenes, $skeleton, $targetSeconds, $script);
-
-            if ($best === null || count($faults) < count($bestFaults)) {
-                $best = $scenes;
-                $bestFaults = $faults;
-            }
-            if ($bestFaults === []) {
-                break;
-            }
-        }
-
-        if ($best === null || count($best) < max(3, (int) ceil(count($skeleton) * 0.6))) {
-            return null; // the model skipped too much — giant call does better
-        }
-
-        Log::info('GenericStoryboardComposer: storyboard composed by the tree', [
-            'scenes' => count($best),
-            'attempts' => $this->attempts,
-            'unresolved' => $bestFaults,
-        ]);
-
-        return ['scenes' => $best, 'summary' => ''];
+        return $system . $windowNote;
     }
 
-    /** One chat round. Null on any transport/parse failure. */
-    private function request(string $system, string $script, string $critique): ?array
-    {
+    /** One chat round over one window of phases. Null on transport/parse failure. */
+    private function request(
+        string $system,
+        string $script,
+        string $critique,
+        int $phases = self::PHASES_PER_CALL,
+        string $previousNarration = ''
+    ): ?array {
         if ($critique !== '') {
             $system .= "\n\nYOUR PREVIOUS DRAFT BROKE THESE RULES. Fix every one of them in this draft, "
                 . "keeping everything that was already good:\n" . $critique;
+        }
+
+        // Continuity across a windowed board: the call cannot see the scenes
+        // written before it, so it is handed the last thing the narrator said.
+        $user = "SCRIPT / TOPIC:\n" . mb_substr(trim($script), 0, ScriptSkeletonService::scriptWindow($this->targetSeconds));
+        if ($previousNarration !== '') {
+            $user .= "\n\nTHE NARRATION SO FAR ENDS WITH:\n" . mb_substr($previousNarration, 0, 400)
+                . "\n\nPick the story up from there — do not repeat it.";
         }
 
         $this->attempts++;
@@ -345,12 +452,16 @@ PROMPT;
                     'model' => $this->model,
                     'messages' => [
                         ['role' => 'system', 'content' => $system],
-                        ['role' => 'user', 'content' => "SCRIPT / TOPIC:\n" . mb_substr(trim($script), 0, 2600)],
+                        ['role' => 'user', 'content' => $user],
                     ],
                     'temperature' => 0.4,
                     // More phases now reach this call (a 90s demo can plan 14),
                     // and every scene carries slots — 2600 truncated the tail.
-                    'max_tokens' => 4000,
+                    // Sized to the window rather than fixed: a 16-phase demo
+                    // needs more than a 6-phase argument, and a truncated JSON
+                    // tail parses to NOTHING, so under-budgeting here loses the
+                    // whole call.
+                    'max_tokens' => max(4000, min(8000, $phases * 420)),
                     'response_format' => ['type' => 'json_object'],
                 ]);
         } catch (\Throwable $e) {

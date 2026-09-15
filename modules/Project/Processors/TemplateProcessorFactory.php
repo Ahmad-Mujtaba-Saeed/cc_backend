@@ -194,8 +194,9 @@ class TemplateProcessorFactory
 
         // Both engines' voices validate regardless of the active provider so a
         // project saved under one engine still validates after an admin switch
-        // (the TTS router re-resolves at synth time).
-        $validVoices = TtsVoices::allIds();
+        // (the TTS router re-resolves at synth time). A cloned voice validates
+        // only for the signed-in user who owns it.
+        $userId = (int) auth()->id();
 
         // Pixabay background-music picker (injected into every template).
         if (isset($settings['music_category'])) {
@@ -221,7 +222,7 @@ class TemplateProcessorFactory
         switch ($templateType) {
             case 'yt_automation_short':
                 // Validate TTS voice
-                if (isset($settings['tts_voice']) && !in_array($settings['tts_voice'], $validVoices)) {
+                if (isset($settings['tts_voice']) && !TtsVoices::isAllowed((string) $settings['tts_voice'], $userId)) {
                     $errors[] = 'Invalid TTS voice selected';
                 }
 
@@ -245,7 +246,7 @@ class TemplateProcessorFactory
                     $errors[] = 'Invalid visual style selected';
                 }
 
-                if (isset($settings['tts_voice']) && !in_array($settings['tts_voice'], $validVoices)) {
+                if (isset($settings['tts_voice']) && !TtsVoices::isAllowed((string) $settings['tts_voice'], $userId)) {
                     $errors[] = 'Invalid TTS voice selected';
                 }
 
@@ -268,7 +269,7 @@ class TemplateProcessorFactory
                     $errors[] = 'Invalid visual style selected';
                 }
 
-                if (isset($settings['tts_voice']) && !in_array($settings['tts_voice'], $validVoices)) {
+                if (isset($settings['tts_voice']) && !TtsVoices::isAllowed((string) $settings['tts_voice'], $userId)) {
                     $errors[] = 'Invalid TTS voice selected';
                 }
 
@@ -360,7 +361,7 @@ class TemplateProcessorFactory
                     $errors[] = 'Invalid aspect ratio selected';
                 }
 
-                if (isset($settings['tts_voice']) && !in_array($settings['tts_voice'], $validVoices, true)) {
+                if (isset($settings['tts_voice']) && !TtsVoices::isAllowed((string) $settings['tts_voice'], $userId)) {
                     $errors[] = 'Invalid TTS voice selected';
                 }
 

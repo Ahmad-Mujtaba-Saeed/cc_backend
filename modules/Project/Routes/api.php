@@ -5,6 +5,7 @@ use Modules\Project\Http\Controllers\ProjectController;
 use Modules\Project\Http\Controllers\ExplainerController;
 use Modules\Project\Http\Controllers\MusicController;
 use Modules\Project\Http\Controllers\TtsController;
+use Modules\Project\Http\Controllers\VoiceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -40,6 +41,18 @@ Route::middleware('auth:sanctum')->group(function () {
     // Narration voices (active provider) + on-demand cached voice previews
     Route::get('/tts/voices', [TtsController::class, 'voices']);
     Route::post('/tts/preview', [TtsController::class, 'preview'])->middleware('throttle:20,1');
+
+    // "My Voices": the user's own cloned voices and the clips read in them.
+    // Private to their owner — anyone else's id answers 404.
+    Route::get('/voices', [VoiceController::class, 'index']);
+    Route::post('/voices', [VoiceController::class, 'store'])->middleware('throttle:10,1');
+    Route::get('/voices/clips', [VoiceController::class, 'clips']);
+    Route::post('/voices/clips', [VoiceController::class, 'storeClip'])->middleware('throttle:20,1');
+    Route::get('/voices/clips/{clipId}', [VoiceController::class, 'showClip'])->whereNumber('clipId');
+    Route::delete('/voices/clips/{clipId}', [VoiceController::class, 'destroyClip'])->whereNumber('clipId');
+    Route::get('/voices/{voiceId}', [VoiceController::class, 'show'])->whereNumber('voiceId');
+    Route::patch('/voices/{voiceId}', [VoiceController::class, 'update'])->whereNumber('voiceId');
+    Route::delete('/voices/{voiceId}', [VoiceController::class, 'destroy'])->whereNumber('voiceId');
 
     // Background-music browsing for the create flows (audition + select)
     Route::get('/music/options', [MusicController::class, 'options']);
@@ -117,3 +130,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}', [ExplainerController::class, 'updateSlot']);
     Route::patch('/explainer/projects/{project}/scenes/{sceneId}', [ExplainerController::class, 'updateScene']);
 });
+
+// Cloned-voice audio for <audio> tags, which cannot send a bearer token. The
+// signature is minted only inside the owner-scoped /voices responses above,
+// expires after an hour, and is checked relative so a TLS proxy can't break it.
+Route::get('/voices/media/{kind}/{id}', [VoiceController::class, 'media'])
+    ->whereIn('kind', ['sample', 'reference', 'clip'])
+    ->whereNumber('id')
+    ->middleware(['signed:relative', 'throttle:120,1'])
+    ->name('voices.media');

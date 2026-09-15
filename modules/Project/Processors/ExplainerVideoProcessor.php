@@ -376,14 +376,17 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
         // free) or OpenAI gpt-4o-mini-tts (styled delivery). Routed centrally.
         $tts = new TTSGenerationService();
         $provider = TtsVoices::activeProvider();
-        $voice = TtsVoices::resolve(
-            (string) ($settings['tts_voice'] ?? ''),
-            $provider,
-            $this->project->template_type
-        );
+        $voiceSetting = (string) ($settings['tts_voice'] ?? '');
+        // The owner's cloned voice passes through untouched: the router uses it
+        // (for this owner only) and falls back to the stock narrator itself.
+        $isClone = TtsVoices::isClone($voiceSetting);
+        $voice = $isClone
+            ? $voiceSetting
+            : TtsVoices::resolve($voiceSetting, $provider, $this->project->template_type);
         $ttsContext = [
             'template_type' => $this->project->template_type,
             'settings' => $settings,
+            'user_id' => (int) $this->project->user_id,
         ];
 
         // Worked-math videos only: spell stray notation ("x^2", "sqrt(9)")
@@ -407,7 +410,9 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
             // voice (or from the old fal Chatterbox audio) forces a re-synth.
             // The spoken text (post math-speech) drives the hash so an edited
             // notation line re-synthesizes.
-            $hash = md5($provider . ':' . $voice . '|' . $spoken);
+            // A cloned voice is not tied to the admin engine, so flipping
+            // providers must not re-synthesize it.
+            $hash = md5(($isClone ? 'clone' : $provider) . ':' . $voice . '|' . $spoken);
             $relPath = "projects/{$this->project->id}/explainer/narration_{$scene->scene_id}.wav";
             // Word-timing sidecar: lives and dies with the wav so cached audio
             // keeps its sync data across renders.
@@ -435,9 +440,12 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
                     $wordsRel,
                     json_encode(array_values($result['word_timings'] ?? []))
                 );
+                // Audio from the stock fallback must not be cached as if the
+                // clone had spoken it, or the next render would keep it forever.
+                $fellBack = $isClone && ($result['engine'] ?? null) !== 'clone';
                 ExplainerAsset::updateOrCreate(
                     ['project_id' => $this->project->id, 'scene_id' => $scene->scene_id, 'slot_key' => '__narration__'],
-                    ['type' => 'audio', 'path' => $result['audio_path'], 'original_name' => $hash]
+                    ['type' => 'audio', 'path' => $result['audio_path'], 'original_name' => $hash . ($fellBack ? '~fallback' : '')]
                 );
             }
 

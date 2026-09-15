@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Modules\Project\Services\OpenAiTtsService;
+use Modules\Project\Services\VoiceCloneService;
 use Modules\Project\Support\TtsVoices;
 
 /**
@@ -38,6 +39,9 @@ class TtsController extends Controller
             'provider' => $provider,
             'voices' => TtsVoices::forProvider($provider),
             'default' => TtsVoices::defaultFor($provider, is_string($template) ? $template : null),
+            // The signed-in user's own cloned voices ("My Voices"), offered
+            // beside the stock narrators. Nobody else ever sees these.
+            'clones' => VoiceCloneService::optionsFor((int) auth()->id()),
         ]);
     }
 
@@ -50,6 +54,10 @@ class TtsController extends Controller
         $data = $request->validate([
             'voice' => ['required', 'string', 'max:40'],
         ]);
+
+        if (TtsVoices::isClone($data['voice'])) {
+            return $this->clonePreview($data['voice']);
+        }
 
         $provider = TtsVoices::activeProvider();
         $voice = TtsVoices::resolve($data['voice'], $provider);
@@ -92,6 +100,29 @@ class TtsController extends Controller
             'provider' => $provider,
             'voice' => $voice,
             'url' => Storage::disk('public')->url($relative),
+        ]);
+    }
+
+    /**
+     * A cloned voice already has its sample (spoken when it was cloned); hand
+     * back a signed, relative URL to it — for its owner only.
+     */
+    private function clonePreview(string $voiceKey): JsonResponse
+    {
+        $voice = VoiceCloneService::usable((int) auth()->id(), $voiceKey);
+
+        if (!$voice || !Storage::disk('local')->exists($voice->samplePath())) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This voice has no sample yet.',
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'provider' => 'clone',
+            'voice' => $voiceKey,
+            'url' => VoiceCloneService::mediaUrl('sample', (int) $voice->id),
         ]);
     }
 }

@@ -73,6 +73,19 @@ return [
             'after_commit' => false,
         ],
 
+        // Voice cloning + text-to-speech clips (the voice-worker container).
+        // Its own connection for one reason: retry_after. On a CPU a long clip
+        // runs for many minutes, and the default 90 s would hand the same job
+        // out a second time while the first delivery is still speaking.
+        'voice' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => 'voice',
+            'retry_after' => (int) env('VOICE_QUEUE_RETRY_AFTER', 3600),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],

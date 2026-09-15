@@ -34,7 +34,13 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 2;
-    public int $timeout = 300;
+    // Five minutes covered a three-minute video: one planning call, one or two
+    // composing calls, then the deterministic synthesis passes. Six minutes
+    // plans two to four times the phases, and the composer writes them in
+    // windows — up to four 120s calls before the motif, geometry and text
+    // passes even start. The ceiling exists to kill a HUNG analysis, not a
+    // long one, so it now sits above the longest legitimate run.
+    public int $timeout = 900;
 
     public function __construct(public Project $project)
     {

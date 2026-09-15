@@ -57,6 +57,53 @@ services:
     networks:
       - app_net
 
+  # Cloning + stand-alone text-to-speech jobs ("My Voices") on their own queue
+  # connection, so a long render never makes a user wait for their voice and
+  # a slow CPU synthesis never holds up a render.
+  voice-worker:
+    # Same image as `worker` (compose's default name for it), so an existing
+    # worker image is reused instead of a second full PHP build; a fresh
+    # machine builds it once for both.
+    image: viralforgebackend-worker:latest
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    user: www-data
+    command: sh -c "sleep 25 && php artisan queue:work voice --queue=voice --sleep=2 --tries=1 --timeout=3000"
+    volumes:
+      - .:/var/www
+      - ./storage:/var/www/storage
+    depends_on:
+      - mysql
+      - redis
+      - voice
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    networks:
+      - app_net
+
+  # Voice cloning TTS: Chatterbox-Nano (Resemble AI, MIT). Its own image
+  # because chatterbox-tts pins torch/transformers versions the `ai` image
+  # cannot share. Storage is mounted at the SAME path as the PHP containers so
+  # file paths pass through unchanged; app.py is mounted so edits apply on a
+  # restart without a rebuild.
+  voice:
+    build:
+      context: ./docker/voice
+    volumes:
+      - ./storage:/var/www/storage
+      - ./docker/voice/app.py:/srv/app.py:ro
+      - hf_cache:/root/.cache/huggingface
+    environment:
+      - VOICE_STORAGE_ROOT=/var/www/storage
+    mem_limit: 3g
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    networks:
+      - app_net
+
   ai:
     build:
       context: .

@@ -62,6 +62,11 @@ class ScriptAnalysisService
             $this->model = LlmModels::for('math');
         }
 
+        // Output budget, sized to the scene count this length implies (see
+        // requestShotList). 8000 is the floor, so nothing that fitted before
+        // gets a smaller allowance.
+        $this->maxTokens = max(8000, min(16000, (int) ceil($targetSeconds * 55)));
+
         $systemPrompt = $this->buildSystemPrompt($aspectRatio, $targetSeconds, $mathTopic, $skeleton, $guide);
         $userPrompt = "SCRIPT / TOPIC:\n" . trim($script);
 
@@ -305,6 +310,9 @@ class ScriptAnalysisService
         return false;
     }
 
+    /** Output ceiling for one shot-list call, sized to the target length. */
+    private int $maxTokens = 8000;
+
     /** How many shot-list round trips this analysis took (cost signal). */
     public function attempts(): int
     {
@@ -324,7 +332,10 @@ class ScriptAnalysisService
                 // Long scripts (~25 scenes) overflow 4000 output tokens and the
                 // model silently drops optional fields (transition/mood/camera)
                 // to fit — every scene then validates to the same defaults.
-                'max_tokens' => 8000,
+                // The ceiling now follows the ask: a six-minute video plans
+                // three times the scenes a ninety-second one does, and 8000
+                // truncates its JSON into an unparseable tail.
+                'max_tokens' => $this->maxTokens,
                 'response_format' => ['type' => 'json_object'],
             ], 'low'));
 

@@ -123,7 +123,12 @@ class ExplainerController extends Controller
             'guide' => 'sometimes|nullable|string|max:2000',
             'aspect_ratio' => 'sometimes|string|in:16:9,9:16,1:1',
             'target_seconds' => 'sometimes|integer|min:10|max:600',
-            'tts_voice' => ['sometimes', 'string', 'in:' . implode(',', \Modules\Project\Support\TtsVoices::allIds())],
+            // A stock voice, or one of THIS user's own cloned voices.
+            'tts_voice' => ['sometimes', 'string', 'max:40', function (string $attribute, mixed $value, \Closure $fail) {
+                if (!\Modules\Project\Support\TtsVoices::isAllowed((string) $value, (int) auth()->id())) {
+                    $fail('That narrator voice is not available.');
+                }
+            }],
             'music_category' => ['sometimes', 'string', 'in:' . implode(',', array_merge(['none', 'auto', \Modules\Project\Services\UserMusicLibrary::CATEGORY], MusicProviderInterface::CATEGORIES))],
             'music_track_id' => ['sometimes', 'nullable', 'regex:/^[a-z0-9]{1,32}$/i'],
             'music_volume' => ['sometimes', 'numeric', 'min:0', 'max:1'],

@@ -11,6 +11,8 @@
 require __DIR__ . '/../vendor/autoload.php';
 $app = require __DIR__ . '/../bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+config(['cache.default' => 'array']);
+\Illuminate\Support\Facades\Cache::store('array')->forever('app_setting:llm_model', '__null__');
 
 use Modules\Project\Support\ShotListValidator;
 

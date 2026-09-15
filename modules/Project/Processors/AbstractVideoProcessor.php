@@ -51,13 +51,15 @@ abstract class AbstractVideoProcessor
 
     /**
      * Template context handed to TTSGenerationService so the OpenAI engine can
-     * pick per-template delivery instructions and resolve voices.
+     * pick per-template delivery instructions and resolve voices. The owner id
+     * is what lets a cloned voice (`clone_<id>`) speak — for its owner only.
      */
     protected function ttsContext(): array
     {
         return [
             'template_type' => $this->project->template_type,
             'settings' => $this->settings,
+            'user_id' => (int) $this->project->user_id,
         ];
     }
 

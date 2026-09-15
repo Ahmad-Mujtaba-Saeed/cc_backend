@@ -145,6 +145,15 @@ return [
         'voice' => env('KOKORO_VOICE', 'af_bella'),
     ],
 
+    // Voice cloning ("My Voices") — Chatterbox-Nano in the `voice` container.
+    // Jobs run on the `voice` queue connection (the voice-worker container).
+    'voice_clone' => [
+        'enabled' => env('VOICE_CLONE_ENABLED', true),
+        'url' => env('VOICE_SERVICE_URL', 'http://voice:8000'),
+        'timeout' => (int) env('VOICE_SERVICE_TIMEOUT', 3000),
+        'queue_connection' => env('VOICE_QUEUE_CONNECTION', 'voice'),
+    ],
+
     'fal_ai' => [
         'url' => env('FAL_AI_SERVICE_URL', 'http://fal:8000'),
         'image_generation_endpoint' => env('FAL_AI_IMAGE_GENERATION_ENDPOINT', '/xai/grok-imagine-image'),

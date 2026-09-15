@@ -132,7 +132,11 @@ PROMPT;
                 'model' => $this->model,
                 'messages' => $messages,
                 'temperature' => 0.7,
-                'max_tokens' => 2500,
+                // Sized to the ask. A six-minute script is ~900 words, and a
+                // flat 2500 leaves no room for the retry draft that comes back
+                // deliberately LONGER than the target — the JSON then truncates
+                // and the whole generation fails.
+                'max_tokens' => max(2500, (int) ceil($targetWords * 3)),
                 'response_format' => ['type' => 'json_object'],
             ]);
 

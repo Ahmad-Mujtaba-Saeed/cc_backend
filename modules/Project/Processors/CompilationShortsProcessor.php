@@ -1605,7 +1605,7 @@ class CompilationShortsProcessor extends AbstractVideoProcessor
             $errors[] = 'Invalid aspect ratio selected';
         }
 
-        if (isset($this->settings['tts_voice']) && !in_array($this->settings['tts_voice'], \Modules\Project\Support\TtsVoices::allIds(), true)) {
+        if (isset($this->settings['tts_voice']) && !\Modules\Project\Support\TtsVoices::isAllowed((string) $this->settings['tts_voice'], (int) $this->project->user_id)) {
             $errors[] = 'Invalid TTS voice selected';
         }
 

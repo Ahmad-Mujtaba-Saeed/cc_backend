@@ -65,6 +65,51 @@ class TtsVoices
     private const OPENAI_FALLBACK = 'alloy';
 
     /**
+     * A user's own cloned voice ("My Voices") is stored in `tts_voice` as
+     * `clone_<user_voices.id>`. It belongs to one user and bypasses the admin
+     * engine switch; see {@see \Modules\Project\Services\VoiceCloneService}.
+     */
+    public const CLONE_PREFIX = 'clone_';
+
+    public static function isClone(?string $voice): bool
+    {
+        return (bool) preg_match('/^clone_[1-9]\d{0,9}$/', trim((string) $voice));
+    }
+
+    public static function cloneKey(int $voiceId): string
+    {
+        return self::CLONE_PREFIX . $voiceId;
+    }
+
+    public static function cloneRowId(?string $voice): ?int
+    {
+        return self::isClone($voice) ? (int) substr(trim((string) $voice), strlen(self::CLONE_PREFIX)) : null;
+    }
+
+    /**
+     * Settings validation: every stock voice is allowed for everyone; a cloned
+     * voice only for the user who owns it, and only once it is ready.
+     */
+    public static function isAllowed(?string $voice, ?int $userId): bool
+    {
+        $voice = trim((string) $voice);
+
+        if (in_array($voice, self::allIds(), true)) {
+            return true;
+        }
+
+        $id = self::cloneRowId($voice);
+        if ($id === null || (int) $userId <= 0) {
+            return false;
+        }
+
+        return \Modules\Project\Models\UserVoice::where('id', $id)
+            ->where('user_id', (int) $userId)
+            ->where('status', \Modules\Project\Models\UserVoice::STATUS_READY)
+            ->exists();
+    }
+
+    /**
      * The admin-selected provider, degraded to kokoro when openai is selected
      * but no API key is configured (narration must never silently die because
      * a key was removed).

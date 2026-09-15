@@ -60,6 +60,38 @@ class ScriptSkeletonService
     /** Which intents may be dropped when the model does not use them. */
     private const GENERIC_OPTIONAL = ['counter', 'turning_point', 'second_feature', 'problem', 'result'];
 
+    /**
+     * How far over the caps above a video of this length may go.
+     *
+     * The caps are per-SHAPE structural limits — an argument gets five points,
+     * a journey five eras — and they were written when the length slider
+     * stopped at three minutes. They are also a hard ceiling on the whole
+     * storyboard: an argument can hold ten phases at most, and the composer
+     * writes exactly one scene per phase, so a six-minute script planned
+     * against the raw caps comes back as ten scenes of thirty-six seconds
+     * each, with the middle of the script silently dropped.
+     *
+     * A video of 90s or less is left EXACTLY where it was (factor 1) — that is
+     * the default length and the band every one of these numbers was chosen
+     * for. Past it the shape simply gets proportionally more room.
+     */
+    private static function repeatScale(int $targetSeconds): int
+    {
+        return $targetSeconds <= 90 ? 1 : (int) ceil($targetSeconds / 90);
+    }
+
+    /**
+     * How much of the script a planning/composing call is shown. A minute of
+     * speech is ~380 characters short of 1000; the old flat 2400 covered any
+     * video the slider could ask for, and stopped covering them the moment it
+     * reached six minutes — the planner would then plan acts for the first
+     * half and never learn the script had a second one.
+     */
+    public static function scriptWindow(int $targetSeconds): int
+    {
+        return max(2400, (int) ceil($targetSeconds * 22));
+    }
+
     private const MAX_REPEAT = 5; // work phases cap (argument steps get 6)
     /** Board sections a solve may occupy. Each becomes ONE math card carrying
      *  a full 3-6 line phase of the working, so a solve reads as a few headed
@@ -231,7 +263,7 @@ PROMPT;
                     'model' => LlmModels::for('planner'),
                     'messages' => [
                         ['role' => 'system', 'content' => $system],
-                        ['role' => 'user', 'content' => "SCRIPT / TOPIC:\n" . mb_substr(trim($script), 0, 2400)],
+                        ['role' => 'user', 'content' => "SCRIPT / TOPIC:\n" . mb_substr(trim($script), 0, self::scriptWindow($targetSeconds))],
                     ],
                     'temperature' => 0.0,
                     // A long demo can legitimately plan 16 phases; the old
@@ -261,7 +293,8 @@ PROMPT;
         return $this->repairGeneric(
             (string) ($parsed['shape'] ?? ''),
             is_array($parsed['phases'] ?? null) ? $parsed['phases'] : [],
-            $script
+            $script,
+            $targetSeconds
         );
     }
 
@@ -273,7 +306,7 @@ PROMPT;
      *
      * @return array<int, array{intent: string, brief: string}>
      */
-    public function repairGeneric(string $shape, array $raw, string $script = ''): array
+    public function repairGeneric(string $shape, array $raw, string $script = '', int $targetSeconds = 0): array
     {
         $shape = strtolower(trim($shape));
         if (!isset(self::GENERIC_SHAPES[$shape])) {
@@ -299,9 +332,16 @@ PROMPT;
             return []; // nothing usable — additive means no directive at all
         }
 
+        // Singletons stay singletons however long the video is — nobody wants
+        // two hooks. Only the REPEATABLE phases, the ones carrying the body of
+        // the script, are allowed to grow with the running time.
+        $scale = self::repeatScale($targetSeconds);
+
         $out = [];
         foreach ($order as $intent) {
-            $cap = self::GENERIC_REPEATS[$intent] ?? 1;
+            $cap = isset(self::GENERIC_REPEATS[$intent])
+                ? self::GENERIC_REPEATS[$intent] * $scale
+                : 1;
             $have = array_slice($briefs[$intent] ?? [], 0, $cap);
             if ($have === []) {
                 if (in_array($intent, self::GENERIC_OPTIONAL, true)) {

@@ -143,36 +143,7 @@ class OpenAiTtsService
      */
     private function recoverWordTimings(string $audioAbsPath): array
     {
-        try {
-            $result = (new PythonAIService())->transcribe($audioAbsPath, 'en', true);
-
-            if (!($result['success'] ?? false)) {
-                Log::warning('OpenAiTtsService: whisper timing recovery failed', [
-                    'error' => $result['error'] ?? 'unknown',
-                ]);
-                return [];
-            }
-
-            $timings = [];
-            foreach ($result['segments'] ?? [] as $segment) {
-                foreach ($segment['words'] ?? [] as $word) {
-                    $token = trim((string) ($word['word'] ?? ''));
-                    if ($token === '') {
-                        continue;
-                    }
-                    $timings[] = [
-                        'word' => $token,
-                        'start' => round((float) ($word['start'] ?? 0), 4),
-                        'end' => round((float) ($word['end'] ?? 0), 4),
-                    ];
-                }
-            }
-
-            return $timings;
-        } catch (\Throwable $e) {
-            Log::warning('OpenAiTtsService: whisper timing recovery threw', ['error' => $e->getMessage()]);
-            return [];
-        }
+        return \Modules\Project\Support\WhisperWordTimings::recover($audioAbsPath, 'OpenAiTtsService');
     }
 
     /**
