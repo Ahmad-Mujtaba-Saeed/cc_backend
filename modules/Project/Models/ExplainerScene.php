@@ -16,6 +16,7 @@ class ExplainerScene extends Model
         'narration',
         'layout_template',
         'slots',
+        'element_edits',
         'transition',
         'relation',
         'mood',
@@ -25,6 +26,7 @@ class ExplainerScene extends Model
         'order' => 'integer',
         'duration_seconds' => 'float',
         'slots' => 'array',
+        'element_edits' => 'array',
     ];
 
     public function project(): BelongsTo

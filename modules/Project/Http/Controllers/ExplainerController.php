@@ -24,6 +24,7 @@ use Modules\Project\Services\MusicProviderFactory;
 use Modules\Project\Services\TemplateSettingsService;
 use Modules\Project\Support\CanvasPlanValidator;
 use Modules\Project\Support\ChapterPlanValidator;
+use Modules\Project\Support\ElementEdits;
 use Modules\Project\Support\ExplainerRegistry;
 use Modules\Project\Support\ShotListValidator;
 use Modules\Billing\Services\CreditService;
@@ -940,6 +941,41 @@ class ExplainerController extends Controller
         }
 
         return response()->json(['success' => true, 'data' => ['slot' => $slot]]);
+    }
+
+    /**
+     * Save one scene's hand edits from the preview stage (move, resize,
+     * restyle, hide, reword an element). The client sends the scene's WHOLE
+     * edit map - the stage owns it and saves it debounced - so this is a
+     * replace, cleaned to the renderer's shape by ElementEdits::clean().
+     *
+     * It counts as a content edit: a finished MP4 reads as stale afterwards,
+     * because it no longer looks like the storyboard.
+     */
+    public function updateElementEdits(Request $request, Project $project, string $sceneId): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+        if ($this->revisionRunning($project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A revision is being applied - wait for it to finish before editing scenes.',
+            ], 409);
+        }
+
+        $scene = $project->explainerScenes()->where('scene_id', $sceneId)->first();
+        if (!$scene) {
+            return response()->json(['success' => false, 'message' => 'Unknown scene'], 404);
+        }
+
+        $edits = ElementEdits::clean($request->input('edits'));
+        if ($edits !== ($scene->element_edits ?? [])) {
+            $scene->update(['element_edits' => $edits === [] ? null : $edits]);
+            $this->markStoryboardEdited($project);
+        }
+
+        return response()->json(['success' => true, 'data' => ['element_edits' => (object) $edits]]);
     }
 
     /**
@@ -2046,6 +2082,8 @@ class ExplainerController extends Controller
                 'transition' => $scene->transition,
                 'mood' => $scene->mood ?? 'neutral',
                 'slots' => $slots,
+                // An object, never [], so the client can index it by id.
+                'element_edits' => (object) ($scene->element_edits ?? []),
             ];
         }
 

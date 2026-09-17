@@ -106,6 +106,11 @@ class ExplainerSceneAssembler
                 'mood' => $scene->mood ?? 'neutral',
                 'slots' => $slots,
             ];
+            // Hand edits from the preview stage - the renderer applies them
+            // through components/Editable.tsx, identically in preview and MP4.
+            if (!empty($scene->element_edits)) {
+                $scenePayload['element_edits'] = $scene->element_edits;
+            }
 
             // Per-scene ambient (legacy) or the video-wide shared backdrop;
             // only text-only scenes render it, media scenes cover the frame.
