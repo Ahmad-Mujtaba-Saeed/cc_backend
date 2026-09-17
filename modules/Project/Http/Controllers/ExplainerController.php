@@ -1756,6 +1756,87 @@ class ExplainerController extends Controller
      * what plays is the renderer itself rather than a mock-up of it — minus
      * the AI voice, which the service strips (see playerPayload()).
      */
+    /**
+     * A short-lived signed link to one finished file, served as an ATTACHMENT.
+     *
+     * The storage URLs live on the API host, and browsers ignore
+     * `<a download>` across origins — MP4, SRT, YouTube kit and thumbnail
+     * links all just opened in a tab. The dashboard asks for this link (owner
+     * only) and navigates to it; the browser's own download manager takes the
+     * file, so a large MP4 streams with progress instead of loading into page
+     * memory. Relative, like voices.media, so a TLS proxy can't break it.
+     *
+     * kind: video (variant = aspect, e.g. 9:16) | srt | youtube_kit |
+     *       thumbnail (variant = landscape|portrait, else thumbnail_path)
+     */
+    public function downloadLink(Request $request, Project $project, string $kind): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $variant = (string) $request->query('variant', '');
+        if ($this->resolveExport($project, $kind, $variant) === null) {
+            return response()->json(['success' => false, 'message' => 'That file is not ready — render the video first.'], 404);
+        }
+
+        $params = ['project' => $project->id, 'kind' => $kind] + ($variant !== '' ? ['variant' => $variant] : []);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'url' => \Illuminate\Support\Facades\URL::temporarySignedRoute('explainer.download', now()->addMinutes(10), $params, false),
+            ],
+        ]);
+    }
+
+    /** The signed half of downloadLink(): no session, the signature is the grant. */
+    public function downloadFile(Request $request, int $project, string $kind)
+    {
+        $model = Project::find($project);
+        $export = $model ? $this->resolveExport($model, $kind, (string) $request->query('variant', '')) : null;
+        if ($export === null) {
+            abort(404);
+        }
+
+        [$path, $filename] = $export;
+
+        return Storage::disk('public')->download($path, $filename, ['Cache-Control' => 'private, max-age=600']);
+    }
+
+    /** @return array{0: string, 1: string}|null  [storage path, download name] */
+    private function resolveExport(Project $project, string $kind, string $variant): ?array
+    {
+        $settings = $project->settings ?? [];
+        $base = \Illuminate\Support\Str::slug((string) ($project->title ?: 'explainer')) ?: 'explainer';
+
+        [$path, $suffix] = match ($kind) {
+            'video' => (function () use ($settings, $project, $variant) {
+                foreach ((array) ($settings['output_videos'] ?? []) as $v) {
+                    if ($variant !== '' && ($v['aspect'] ?? null) === $variant && !empty($v['path'])) {
+                        return [$v['path'], '-' . str_replace(':', 'x', $variant)];
+                    }
+                }
+                // No variant asked for (or no manifest yet): the primary render.
+                return [$variant === '' || $variant === $project->aspect_ratio ? $project->output_path : null, ''];
+            })(),
+            'srt' => [$settings['srt_path'] ?? null, ''],
+            'youtube_kit' => [$settings['youtube_packaging_path'] ?? null, '-youtube'],
+            'thumbnail' => in_array($variant, ['landscape', 'portrait'], true)
+                ? [$settings['thumbnails'][$variant] ?? null, "-thumbnail-{$variant}"]
+                : [$project->thumbnail_path, '-thumbnail'],
+            default => [null, ''],
+        };
+
+        if (!$path || !Storage::disk('public')->exists($path)) {
+            return null;
+        }
+
+        $ext = pathinfo($path, PATHINFO_EXTENSION) ?: 'bin';
+
+        return [$path, "{$base}{$suffix}.{$ext}"];
+    }
+
     public function playerPayload(Project $project): JsonResponse
     {
         if ($denied = $this->guard($project)) {
@@ -2095,6 +2176,19 @@ class ExplainerController extends Controller
                 ? Storage::disk('public')->url($project->settings['youtube_packaging_path'])
                 : null,
             'thumbnail_url' => $project->thumbnail_path ? Storage::disk('public')->url($project->thumbnail_path) : null,
+            // Both designed orientations (§10.5), for the download card. A
+            // plain ffmpeg frame grab leaves `thumbnails` unset — then only
+            // thumbnail_url exists and the card shows that one.
+            'thumbnails' => array_values(array_filter(array_map(
+                fn ($orientation) => !empty($project->settings['thumbnails'][$orientation])
+                    && Storage::disk('public')->exists($project->settings['thumbnails'][$orientation])
+                    ? [
+                        'orientation' => $orientation,
+                        'url' => Storage::disk('public')->url($project->settings['thumbnails'][$orientation]),
+                    ]
+                    : null,
+                ['landscape', 'portrait']
+            ))),
             'output_videos' => array_values(array_map(
                 fn ($v) => [
                     'aspect' => $v['aspect'] ?? '',

@@ -109,6 +109,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/explainer/projects/{project}/preview', [ExplainerController::class, 'preview']);
     // The same shot list the MP4 is rendered from, for the browser player.
     Route::get('/explainer/projects/{project}/player-payload', [ExplainerController::class, 'playerPayload']);
+    // A signed link to a finished file (cross-origin <a download> is ignored);
+    // the file itself is served by `explainer.download` below.
+    Route::get('/explainer/projects/{project}/download-link/{kind}', [ExplainerController::class, 'downloadLink'])
+        ->whereIn('kind', ['video', 'srt', 'youtube_kit', 'thumbnail']);
     Route::post('/explainer/projects/{project}/composition-mode', [ExplainerController::class, 'setCompositionMode']);
     Route::post('/explainer/projects/{project}/chapter-chip', [ExplainerController::class, 'toggleChapterChip']);
     Route::post('/explainer/projects/{project}/accent-shift', [ExplainerController::class, 'toggleAccentShift']);
@@ -139,3 +143,12 @@ Route::get('/voices/media/{kind}/{id}', [VoiceController::class, 'media'])
     ->whereNumber('id')
     ->middleware(['signed:relative', 'throttle:120,1'])
     ->name('voices.media');
+
+// The finished explainer files as attachments. No session — a plain browser
+// navigation cannot send the bearer token — so the relative signature minted
+// by ExplainerController::downloadLink (owner only, 10 minutes) is the grant.
+Route::get('/explainer/downloads/{project}/{kind}', [ExplainerController::class, 'downloadFile'])
+    ->whereNumber('project')
+    ->whereIn('kind', ['video', 'srt', 'youtube_kit', 'thumbnail'])
+    ->middleware(['signed:relative', 'throttle:60,1'])
+    ->name('explainer.download');
