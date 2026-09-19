@@ -97,6 +97,7 @@ class ShortEditDirector
             'directed_by_model' => $usedModel,
             'beat_count' => count($beats),
             'card_count' => count($cards),
+            'narration' => $this->cleanLine($plan['narration'] ?? '', 140),
         ];
     }
 
@@ -164,29 +165,20 @@ class ShortEditDirector
         $style_name = $style['name'];
         $summary = trim((string) ($analysis['visual_summary'] ?? ''));
         $type = (string) ($analysis['scene_type'] ?? 'other');
-        $streamBrief = '';
-        if (!empty($analysis['webcam']) || $type === 'gameplay_facecam') {
-            $streamBrief = <<<TXT
-
-THIS IS A LIVESTREAM CLIP: a streamer on webcam playing a game, both on screen.
-What makes a stream clip go viral is the STREAMER'S REACTION to what happens in
-the game — the rage, the panic, the disbelief, the trash talk, the clutch. Edit
-around him, not around the game:
- - put the beats on his reactions (the loud moments above are usually him)
- - stickers and emojis react to HIS reaction ("HE'S CRASHING OUT", "BRO PANICKED")
- - the hook sets up the situation from the viewer's side, e.g. "He was NOT ready
-   for this boss", "Chat told him not to do it" — never "streamer plays game"
- - a context card is only worth it if it adds stakes the viewer cannot see
-   ("third attempt at this boss", "one hit from dying"). If the transcript does
-   not tell you the stakes, write NO cards.
-TXT;
-        }
+        // The format playbook: what the payoff of THIS kind of video is.
+        $playbook = ShortPlaybook::text(ShortPlaybook::key(
+            (string) ($analysis['source_format'] ?? ''),
+            $type,
+            !empty($analysis['webcam'])
+        ));
+        $streamBrief = "\n\n" . $playbook;
 
         $prompt = <<<TXT
 You are the editor of a viral vertical short (TikTok / YouTube Shorts / Reels). Plan the edit of ONE clip.
 
 Edit style: {$style_name} (intensity {$d['intensity']} of 3). Scene: {$type}. {$summary}
-Source video: {$context}
+Source video:
+{$context}
 Clip length: {$duration}s.{$streamBrief}
 
 Transcript — each word has an index in [brackets]; {Ns} marks time:
@@ -224,7 +216,8 @@ Return ONLY JSON:
  "hashtags": ["3-5 relevant hashtags"],
  "key_words": [{"index": 12, "emoji": "optional emoji"}],
  "beats": [{"index": 12, "type": "zoom", "text": "for sticker only", "emoji": "for emoji only", "sfx": "name or empty"}],
- "context_cards": [{"index": 30, "text": "what the viewer is missing", "icon": "one emoji or empty"}]
+ "context_cards": [{"index": 30, "text": "what the viewer is missing", "icon": "one emoji or empty"}],
+ "narration": "ONE line a narrator says before the clip plays, 5-14 words, spoken English in the editor's own voice, setting up what is about to happen WITHOUT giving the payoff away (e.g. 'So he thought this boss would be easy... watch this.'). No hashtags, no emojis."
 }
 key_words: 3-8 words that carry the meaning (numbers, names, strong verbs) — they get the accent colour.
 Never invent facts about the people; stickers react to what is SAID or SHOWN.

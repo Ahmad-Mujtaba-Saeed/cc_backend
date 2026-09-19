@@ -62,53 +62,71 @@ class RapidApiTranscriptionService
             throw new \Exception('No active RapidAPI key configured. Add one in Settings → Integrations.');
         }
 
-        $data = null;
-        $lastError = null;
+        $errors = [];
+        // Providers in order, each tried with every key. A RapidAPI key is
+        // subscribed per API, so a key that 403s on one may work on the next.
+        foreach ($this->providers() as $provider) {
+            foreach ($credentials->values() as $credential) {
+                try {
+                    $data = $this->requestTranscript($credential->credential, $videoId, $provider, $language);
+                    $rows = $this->extractTranscriptRows($data);
+                    if (empty($rows)) {
+                        throw new \Exception('empty transcript (captions disabled?)');
+                    }
+                    $credential->markSuccess();
+                    if ($provider['host'] !== $this->host || $errors) {
+                        Log::info('RapidApiTranscriptionService: fallback succeeded', [
+                            'host' => $provider['host'],
+                            'credential_id' => $credential->id,
+                            'earlier_failures' => count($errors),
+                        ]);
+                    }
 
-        foreach ($credentials->values() as $index => $credential) {
-            try {
-                $data = $this->requestTranscript($credential->credential, $videoId);
-                $credential->markSuccess();
-
-                if ($index > 0) {
-                    Log::info('RapidApiTranscriptionService: fallback key succeeded', [
+                    return $this->normalize($rows, (string) ($data['language'] ?? $language), $provider['unit']);
+                } catch (\Exception $e) {
+                    $errors[] = "{$provider['host']}: {$e->getMessage()}";
+                    Log::warning('RapidApiTranscriptionService: provider/key failed, trying next', [
+                        'host' => $provider['host'],
                         'credential_id' => $credential->id,
-                        'keys_tried' => $index + 1,
+                        'error' => $e->getMessage(),
                     ]);
                 }
-                break;
-            } catch (\Exception $e) {
-                $lastError = $e;
-                $credential->markFailure($e->getMessage());
-
-                Log::warning('RapidApiTranscriptionService: key failed, trying next', [
-                    'credential_id' => $credential->id,
-                    'credential_label' => $credential->label,
-                    'error' => $e->getMessage(),
-                    'remaining_keys' => $credentials->count() - $index - 1,
-                ]);
             }
         }
 
-        if ($data === null) {
-            throw new \Exception(sprintf(
-                'All %d RapidAPI key(s) failed for transcription. Last error: %s',
-                $credentials->count(),
-                $lastError?->getMessage() ?? 'unknown'
-            ));
-        }
+        throw new \Exception('All RapidAPI transcript providers failed: ' . implode(' | ', array_slice($errors, -3)));
+    }
 
-        $rows = $this->extractTranscriptRows($data);
-
-        if (empty($rows)) {
-            Log::error('RapidApiTranscriptionService: empty transcript', [
-                'video_id' => $videoId,
-                'keys' => is_array($data) ? array_keys($data) : gettype($data),
-            ]);
-            throw new \Exception('RapidAPI returned no transcript — the video may have captions disabled');
-        }
-
-        return $this->normalize($rows, $data['language'] ?? $language);
+    /**
+     * The transcript APIs, in the order they are tried. `unit` is what their
+     * timings are in (1000 = milliseconds, 1 = seconds).
+     *
+     * @return array<int, array{host: string, path: string, unit: float, query: \Closure}>
+     */
+    private function providers(): array
+    {
+        return [
+            [
+                'host' => $this->host,
+                'path' => '/transcript',
+                'unit' => 1000.0,
+                'query' => fn (string $id, string $lang) => [
+                    'video_url' => $id, 'format' => 'json', 'include_timestamp' => 'true', 'send_metadata' => 'false',
+                ],
+            ],
+            // youtube-transcript3: rows are {text, offset, duration} in SECONDS
+            // (as strings), text HTML-escaped. Added 2026-09-19 after the first
+            // API 503'd for a whole day and every run fell to local Whisper,
+            // which the laptop's Docker VM could not hold for a long video.
+            [
+                'host' => (string) config('services.rapidapi.transcribe_fallback_host', 'youtube-transcript3.p.rapidapi.com'),
+                'path' => '/api/transcript-with-url',
+                'unit' => 1.0,
+                'query' => fn (string $id, string $lang) => [
+                    'url' => "https://www.youtube.com/watch?v={$id}", 'flat_text' => 'false', 'lang' => $lang,
+                ],
+            ],
+        ];
     }
 
     /**
@@ -116,46 +134,46 @@ class RapidApiTranscriptionService
      * Throws on any non-2xx response so the caller can fail over.
      *
      * A 5xx from this upstream is usually transient (502s show up on healthy
-     * keys under load) and failing over on one would burn a good key's quota
-     * and, with a single key configured, drop a two-hour video onto local
-     * Whisper. So retry the SAME key on a server-side error before giving up
-     * on it; a 4xx (bad key, quota, captions disabled) is not retried.
+     * keys under load), so retry the SAME key on a server-side error before
+     * giving up on it; a 4xx (bad key, quota, not subscribed) is not retried.
      */
-    private function requestTranscript(string $apiKey, string $videoId)
+    private function requestTranscript(string $apiKey, string $videoId, array $provider, string $language)
     {
         $attempts = 3;
         $lastStatus = null;
+        $host = $provider['host'];
 
         for ($attempt = 1; $attempt <= $attempts; $attempt++) {
             Log::info('RapidApiTranscriptionService: requesting transcript', [
                 'video_id' => $videoId,
-                'host' => $this->host,
+                'host' => $host,
                 'attempt' => $attempt,
             ]);
 
             $response = Http::withHeaders([
-                'x-rapidapi-host' => $this->host,
+                'x-rapidapi-host' => $host,
                 'x-rapidapi-key' => $apiKey,
                 'Content-Type' => 'application/json',
-            ])->timeout(60)->get("https://{$this->host}/transcript", [
-                'video_url' => $videoId,
-                'format' => 'json',
-                'include_timestamp' => 'true',
-                'send_metadata' => 'false',
-            ]);
+            ])->timeout(90)->get("https://{$host}{$provider['path']}", ($provider['query'])($videoId, $language));
 
             if ($response->successful()) {
-                return $response->json();
+                $json = $response->json();
+                if (is_array($json) && array_key_exists('success', $json) && $json['success'] === false) {
+                    throw new \Exception('provider said success=false: ' . substr((string) ($json['error'] ?? $json['message'] ?? ''), 0, 160));
+                }
+
+                return $json;
             }
 
             $lastStatus = $response->status();
             $retryable = $lastStatus >= 500 || $lastStatus === 429;
 
             Log::error('RapidApiTranscriptionService: request failed', [
+                'host' => $host,
                 'status' => $lastStatus,
                 'attempt' => $attempt,
                 'will_retry' => $retryable && $attempt < $attempts,
-                'body' => substr($response->body(), 0, 500),
+                'body' => substr($response->body(), 0, 300),
             ]);
 
             if (!$retryable || $attempt === $attempts) {
@@ -165,7 +183,7 @@ class RapidApiTranscriptionService
             sleep($attempt * 2);
         }
 
-        throw new \Exception('RapidAPI transcription failed: HTTP ' . $lastStatus);
+        throw new \Exception('HTTP ' . $lastStatus);
     }
 
     /**
@@ -198,11 +216,11 @@ class RapidApiTranscriptionService
      * Convert millisecond rows → seconds-based segments and clamp overlaps so
      * rolling YouTube auto-captions don't produce double-stacked captions.
      */
-    private function normalize(array $rows, string $language): array
+    private function normalize(array $rows, string $language, float $unit = 1000.0): array
     {
         $segments = [];
         foreach ($rows as $row) {
-            $text = trim((string) ($row['text'] ?? ''));
+            $text = trim(html_entity_decode((string) ($row['text'] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
             if ($text === '') {
                 continue;
             }
@@ -210,8 +228,8 @@ class RapidApiTranscriptionService
             $startMs = (float) ($row['start'] ?? $row['offset'] ?? 0);
             $durMs = (float) ($row['duration'] ?? $row['dur'] ?? 0);
 
-            $start = $startMs / 1000.0;
-            $end = ($startMs + max(0.0, $durMs)) / 1000.0;
+            $start = $startMs / $unit;
+            $end = ($startMs + max(0.0, $durMs)) / $unit;
 
             $segments[] = ['start' => $start, 'end' => $end, 'text' => $text];
         }

@@ -17,6 +17,8 @@ use Modules\Project\Services\WordLevelCaptionService;
 use Modules\Project\Contracts\YoutubeDownloaderInterface;
 use Modules\Project\Services\YoutubeDownloaderFactory;
 use Modules\Project\Services\Shorts\ClipSceneAnalyzer;
+use Modules\Project\Services\Shorts\VideoBriefService;
+use Modules\Project\Services\Shorts\ShortNarrator;
 use Modules\Project\Services\Shorts\ClipTightenService;
 use Modules\Project\Services\Shorts\ShortEditDirector;
 use Modules\Project\Services\Shorts\ShortLayoutPlanner;
@@ -80,6 +82,9 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     private YoutubeDownloaderInterface $downloadService;
     private VideoTranscriptionService $transcriptionService;
     private RapidApiTranscriptionService $rapidTranscriptionService;
+
+    /** One line of the video brief, prefixed to each clip's vision prompt. */
+    private string $briefLine = '';
     private ClipSelectionService $clipSelectionService;
     private ClipEditPlanService $editPlanService;
     private ClipTightenService $tightenService;
@@ -887,7 +892,12 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         // model's read of the scene). The styles are planned across the whole
         // batch from these, so every short gets a different edit. ──
         $viral = $this->viralEditingEnabled();
-        $titleForContext = (string) (($this->project->processing_state['video_title'] ?? null) ?: $this->project->title);
+        $videoTitle = (string) (($this->project->processing_state['video_title'] ?? null) ?: $this->project->title);
+        // What the whole video is (format, people, topic, stakes), read once so
+        // every short is edited knowing it — not from its own 40 seconds.
+        $brief = $viral ? $this->videoBrief($videoTitle, $segments, (float) ($transcription['totalDuration'] ?? 0)) : [];
+        $titleForContext = VideoBriefService::describe($brief, $videoTitle);
+        $this->briefLine = $brief ? str_replace('_', ' ', $brief['format']) . ($brief['summary'] ? ': ' . $brief['summary'] : '') : '';
         foreach ($cuts as $cutIndex => $cut) {
             $n = $cut['index'];
             $this->pusherService->sendProgress(
@@ -899,6 +909,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
             $cuts[$cutIndex]['analysis'] = $viral
                 ? $this->analyzeClip($cut, $cuts[$cutIndex]['words'])
                 : $this->minimalAnalysis($cut);
+            $cuts[$cutIndex]['analysis']['source_format'] = (string) ($brief['format'] ?? '');
         }
 
         // One webcam for the whole stream: clips that could not find it
@@ -991,6 +1002,15 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                         $style,
                         (float) $cut['duration'],
                         $titleForContext,
+                        $n
+                    );
+                    // A narrator on some shorts, in a different voice each time.
+                    [$edit, $narration] = (new ShortNarrator())->apply(
+                        $edit,
+                        $analysis,
+                        $style,
+                        (string) ($this->settings['voiceover'] ?? 'auto'),
+                        (int) $this->project->id,
                         $n
                     );
                     $music = $this->musicPlanner->plan(
@@ -1577,9 +1597,36 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         return filter_var($this->settings['captions_enabled'] ?? true, FILTER_VALIDATE_BOOLEAN);
     }
 
+    /** Cached per project: a re-render or a resumed run does not pay twice. */
+    private function videoBrief(string $title, array $segments, float $duration): array
+    {
+        $state = $this->project->processing_state ?? [];
+        if (!empty($state['video_brief']) && is_array($state['video_brief'])) {
+            return $state['video_brief'];
+        }
+        try {
+            $brief = (new VideoBriefService())->build($title, $segments, $duration);
+        } catch (\Throwable $e) {
+            Log::warning('[YT_GAMEPLAY] Video brief failed', ['project_id' => $this->project->id, 'error' => $e->getMessage()]);
+            $brief = [];
+        }
+        if ($brief) {
+            $state['video_brief'] = $brief;
+            $this->project->update(['processing_state' => $state]);
+            Log::info('[SHORTS] Video brief', ['project_id' => $this->project->id] + $brief);
+        }
+
+        return $brief;
+    }
+
     private function analyzeClip(array $cut, array $words): array
     {
         $text = implode(' ', array_map(fn ($w) => $w['word'], $words));
+        if ($this->briefLine !== '') {
+            // The vision model reads 8 frames; knowing it is "a podcast" or "a
+            // Twitch stream" settles most of what it would otherwise guess.
+            $text = "(Source video — {$this->briefLine})\n" . $text;
+        }
         $framesDir = Storage::disk('public')->path("projects/{$this->project->id}/tmp/frames_{$cut['index']}");
 
         try {
@@ -1964,6 +2011,16 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                         'fill_follow' => 'Follow the speaker (full screen)',
                         'stack_two' => 'Two speakers stacked',
                         'blur_fit' => 'Whole frame on blurred background',
+                    ],
+                    'default' => 'auto'
+                ],
+                'voiceover' => [
+                    'type' => 'select',
+                    'label' => 'Narrator voice',
+                    'options' => [
+                        'auto' => 'On some shorts — a different voice each time',
+                        'always' => 'On every short',
+                        'off' => 'Off',
                     ],
                     'default' => 'auto'
                 ],

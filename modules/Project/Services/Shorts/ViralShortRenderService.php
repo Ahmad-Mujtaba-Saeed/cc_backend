@@ -97,7 +97,10 @@ class ViralShortRenderService
             'words' => $edit['words'],
             'captionsEnabled' => $captionsEnabled,
             'hook' => $edit['hook'],
-            'events' => $this->takeovers($this->placeCards($edit['events'], (string) $layout['kind']), (string) $layout['kind']),
+            'events' => self::humanizeEvents(
+                $this->takeovers($this->placeCards($edit['events'], (string) $layout['kind']), (string) $layout['kind']),
+                crc32($clipRelativePath . ($style['id'] ?? ''))
+            ),
             // Mixed inside the composition rather than by the ffmpeg pass that
             // runs after a render: in here the bed is on the same clock as the
             // edit, so it survives the freezes and slow-mo the director adds.
@@ -134,6 +137,56 @@ class ViralShortRenderService
             default:
                 return $styleY;
         }
+    }
+
+    /**
+     * Hand-made timing. The director places beats exactly on word boundaries
+     * at a fixed strength per type, and a batch cut that precisely is its own
+     * fingerprint: every punch-in the same 1.18x, every one on the first frame
+     * of the word. Editors cut a touch EARLY (on the breath before the word),
+     * never twice at the same strength, and drop emojis and stickers wherever
+     * they land. Small, seeded per short, never enough to miss the moment.
+     *
+     * @param  array<int, array<string, mixed>>  $events
+     * @return array<int, array<string, mixed>>
+     */
+    public static function humanizeEvents(array $events, int $seed): array
+    {
+        mt_srand($seed);
+        $r = fn (float $lo, float $hi) => $lo + (mt_rand(0, 10000) / 10000) * ($hi - $lo);
+        foreach ($events as $i => $e) {
+            $type = $e['type'] ?? '';
+            if (in_array($type, ['zoom', 'shake', 'flash', 'glitch', 'bw', 'sticker', 'emoji'], true)) {
+                $shift = round($r(-0.12, 0.04), 3);
+                $events[$i]['start'] = round(max(0.0, (float) $e['start'] + $shift), 3);
+                if (isset($e['end'])) {
+                    $events[$i]['end'] = round(max($events[$i]['start'] + 0.2, (float) $e['end'] + $shift * 0.5 + $r(-0.05, 0.1)), 3);
+                }
+            }
+            if ($type === 'zoom' && isset($e['scale'])) {
+                $events[$i]['scale'] = round(1 + ((float) $e['scale'] - 1) * $r(0.8, 1.2), 3);
+            }
+            if ($type === 'shake' && isset($e['intensity'])) {
+                $events[$i]['intensity'] = round((float) $e['intensity'] * $r(0.75, 1.2), 3);
+            }
+            if (in_array($type, ['emoji', 'sticker'], true)) {
+                $events[$i]['x'] = round(max(0.12, min(0.88, (float) $e['x'] + $r(-0.05, 0.05))), 3);
+                $events[$i]['y'] = round(max(0.1, min(0.88, (float) $e['y'] + $r(-0.04, 0.04))), 3);
+                if ($type === 'sticker') {
+                    $events[$i]['rotate'] = round((float) ($e['rotate'] ?? 0) + $r(-4, 4), 1);
+                }
+                if ($type === 'emoji' && isset($e['size'])) {
+                    $events[$i]['size'] = (int) round((float) $e['size'] * $r(0.85, 1.15));
+                }
+            }
+            if ($type === 'sfx') {
+                $events[$i]['start'] = round(max(0.0, (float) $e['start'] + $r(-0.03, 0.02)), 3);
+                $events[$i]['volume'] = round((float) ($e['volume'] ?? 1) * $r(0.8, 1.05), 3);
+            }
+        }
+        mt_srand();
+
+        return $events;
     }
 
     /**

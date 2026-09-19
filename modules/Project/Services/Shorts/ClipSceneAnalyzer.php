@@ -266,6 +266,9 @@ TXT;
             // the one face that never moves), and where the game action is.
             'webcam' => $webcam,
             'action_track' => is_array($raw['action_track'] ?? null) ? $raw['action_track'] : null,
+            // Cuts to whoever is talking (mouth activity, with hysteresis);
+            // null unless two comparable faces share the frame.
+            'speaker_track' => is_array($raw['speaker_track'] ?? null) ? $raw['speaker_track'] : null,
             'faces_typical' => (int) ($raw['faces_typical'] ?? 0),
             'scene_cuts' => array_values(array_map('floatval', $raw['scene_cuts'] ?? [])),
             'audio_peaks' => array_values($raw['audio_peaks'] ?? []),

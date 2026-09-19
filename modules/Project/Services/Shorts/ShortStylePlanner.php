@@ -29,7 +29,6 @@ class ShortStylePlanner
         'minimal' => 'Minimal',
     ];
 
-    private const ACCENTS = ['#ffe600', '#00e5ff', '#ff3d7f', '#7cff4f', '#ff8a00', '#b388ff', '#ff4b4b', '#4dd2ff'];
 
     /** Which families suit which footage (higher = better). */
     private const AFFINITY = [
@@ -148,7 +147,7 @@ class ShortStylePlanner
     /** @return array<string, mixed> */
     private function build(string $family, array $recentAccents, array $recentY, array $analysis): array
     {
-        $accent = $this->pick(self::ACCENTS, $recentAccents);
+        $accent = $this->accent($recentAccents);
         $twoPanel = (int) ($analysis['people_on_screen'] ?? 0) >= 2;
 
         // Base looks per family; `alts` are the knobs dealt per short.
@@ -310,6 +309,11 @@ class ShortStylePlanner
 
         $caption += ['lowercase' => false, 'background' => null, 'rotate' => 0];
 
+        [$caption, $hook, $grade] = $this->humanize($caption, $hook, $grade, $accent, $family);
+        // Never a progress bar: the same strip on every short is a platform
+        // fingerprint (the user spotted it first), and no human editor adds one.
+        $progress = ['position' => 'none', 'color' => $accent, 'height' => 0];
+
         // How close the camera sits on the subject, and which way it drifts.
         //
         // Every other knob here is PAINT — a font, a colour, where the caption
@@ -331,7 +335,7 @@ class ShortStylePlanner
 
         $signature = implode('|', [
             $family, $accent, $caption['font'], $caption['wordsPerLine'], $caption['animation'],
-            $caption['highlightMode'], $caption['y'], $hook['style'], $grade['filter'], $progress['position'],
+            $caption['highlightMode'], $caption['y'], $caption['size'], $hook['style'], $hook['align'] ?? 'center', $grade['filter'],
             $framing['tightness'], $framing['drift_to'],
         ]);
 
@@ -350,6 +354,119 @@ class ShortStylePlanner
             'directives' => $directives,
             'signature' => $signature,
         ];
+    }
+
+    /**
+     * An accent from the whole colour wheel, not a list of eight. A batch drawn
+     * from eight swatches repeats them within a few shorts, and a channel that
+     * always uses the same yellow reads as a template. Kept away (±40°) from
+     * the last few hues so neighbours still look different.
+     */
+    private function accent(array $recent): string
+    {
+        $recentHues = array_map(fn ($hex) => $this->hue($hex), $recent);
+        for ($try = 0; $try < 20; $try++) {
+            $h = mt_rand(0, 359);
+            $clear = true;
+            foreach ($recentHues as $rh) {
+                $d = abs($h - $rh);
+                if (min($d, 360 - $d) < 40) {
+                    $clear = false;
+                    break;
+                }
+            }
+            if ($clear) {
+                break;
+            }
+        }
+
+        return self::hsl($h, mt_rand(78, 100) / 100, mt_rand(52, 62) / 100);
+    }
+
+    /**
+     * What makes a set of edits look like a PERSON made them rather than one
+     * template: nothing sits in exactly the same place, at exactly the same
+     * size, twice. Every value that was a fixed number becomes a small
+     * continuous range, dealt per short, and the opening is not always a
+     * designed title card — people editing on a phone use the app's own text
+     * box, plain white text, or no hook at all.
+     */
+    private function humanize(array $caption, array $hook, array $grade, string $accent, string $family): array
+    {
+        $jit = fn (float $v, float $pct) => $v * (1 + (mt_rand(-1000, 1000) / 1000) * $pct);
+
+        $caption['size'] = (int) round($jit((float) $caption['size'], 0.08));
+        if ((float) $caption['y'] !== 0.5) {   // 0.5 is a seam; leave it on the seam
+            $caption['y'] = round(max(0.5, min(0.86, $caption['y'] + mt_rand(-25, 25) / 1000)), 3);
+        }
+        if (!empty($caption['stroke'])) {
+            $caption['stroke'] = max(4, (int) $caption['stroke'] + mt_rand(-2, 2));
+        }
+
+        // How the short opens.
+        $roll = mt_rand(1, 100);
+        $designed = !in_array($family, ['minimal', 'podcast_clean'], true);
+        if ($roll <= ($designed ? 45 : 25)) {
+            // the family's own designed card, as dealt
+        } elseif ($roll <= 72) {
+            $dark = mt_rand(0, 1) === 1;
+            $hook = ['style' => 'native', 'bg' => $dark ? '#000000' : ($roll % 3 === 0 ? $accent : '#ffffff'),
+                'color' => $dark ? '#ffffff' : '#111111', 'font' => $this->pick(['inter', 'grotesk']), 'y' => $hook['y']];
+        } elseif ($roll <= 92) {
+            $hook = ['style' => 'plain', 'bg' => '#000000', 'color' => '#ffffff', 'font' => $this->pick(['inter', 'grotesk', $hook['font']]), 'y' => $hook['y']];
+        } else {
+            $hook['style'] = 'none';   // cold open: straight into the moment
+        }
+        $casual = in_array($hook['style'], ['native', 'plain'], true);
+        $hook['y'] = round(max(0.07, min(0.3, $hook['y'] + mt_rand(-30, 45) / 1000)), 3);
+        $hook['scale'] = round($jit(1.0, 0.1), 3);
+        $hook['rotate'] = $casual && mt_rand(0, 1) ? mt_rand(-40, 40) / 10 : 0;
+        $hook['align'] = $casual && mt_rand(1, 100) <= 30 ? 'left' : 'center';
+
+        // A grade no other short in the batch has exactly: the footage's own
+        // pixels differ, not just the paint on top of them.
+        $grade['filter'] = trim($grade['filter'] . sprintf(
+            ' brightness(%.3f) hue-rotate(%ddeg)',
+            1 + mt_rand(-30, 40) / 1000,
+            mt_rand(-5, 5)
+        ));
+        $grade['vignette'] = round(max(0, $grade['vignette'] + mt_rand(-8, 8) / 100), 2);
+
+        return [$caption, $hook, $grade];
+    }
+
+    private function hue(string $hex): int
+    {
+        $hex = ltrim($hex, '#');
+        if (strlen($hex) !== 6) {
+            return 0;
+        }
+        [$r, $g, $b] = array_map(fn ($c) => hexdec($c) / 255, str_split($hex, 2));
+        $max = max($r, $g, $b);
+        $d = $max - min($r, $g, $b);
+        if ($d == 0) {
+            return 0;
+        }
+        $h = match ($max) {
+            $r => fmod(($g - $b) / $d, 6),
+            $g => ($b - $r) / $d + 2,
+            default => ($r - $g) / $d + 4,
+        };
+
+        return (int) round(fmod($h * 60 + 360, 360));
+    }
+
+    public static function hsl(int $h, float $s, float $l): string
+    {
+        $c = (1 - abs(2 * $l - 1)) * $s;
+        $x = $c * (1 - abs(fmod($h / 60, 2) - 1));
+        $m = $l - $c / 2;
+        [$r, $g, $b] = match (intdiv($h % 360, 60)) {
+            0 => [$c, $x, 0], 1 => [$x, $c, 0], 2 => [0, $c, $x],
+            3 => [0, $x, $c], 4 => [$x, 0, $c], default => [$c, 0, $x],
+        };
+
+        return sprintf('#%02x%02x%02x', (int) round(($r + $m) * 255), (int) round(($g + $m) * 255), (int) round(($b + $m) * 255));
     }
 
     /** The renderer's ShortStyle (drops planner-only keys). */

@@ -10,6 +10,8 @@ namespace Modules\Project\Services\Shorts;
  * Layouts:
  *   fill_follow               one subject, crop follows their face
  *   stack_two                 two people, one per half (podcast/interview)
+ *   speaker_follow            podcast: full-frame crop that CUTS to whoever
+ *                             is talking
  *   facecam_top_gameplay      streamer: webcam inset on top, game underneath
  *   facecam_bubble_gameplay   streamer: game fills the phone, webcam as a
  *                             framed bubble at the top
@@ -64,6 +66,9 @@ class ShortLayoutPlanner
         $camera = is_array($analysis['camera_track'] ?? null) ? $analysis['camera_track'] : null;
         $canFollow = $camera !== null && (float) ($camera['coverage'] ?? 0) >= 0.34;
         $primary = $this->primaryTrack($tracks);
+        $speaker = is_array($analysis['speaker_track'] ?? null) ? $analysis['speaker_track'] : null;
+        $conversation = in_array($type, ['podcast', 'interview', 'talking_head', 'other'], true)
+            || in_array((string) ($analysis['source_format'] ?? ''), ['podcast', 'interview'], true);
 
         $kind = $forced !== 'auto' ? $forced : null;
         $reason = $forced !== 'auto' ? 'forced by settings' : '';
@@ -86,6 +91,12 @@ class ShortLayoutPlanner
                 // UI lose their meaning the moment part of the frame is gone.
                 $kind = 'blur_fit';
                 $reason = 'screen content — cropping would cut the text off';
+            } elseif ($speaker && $conversation) {
+                // Two people talking: alternate across a batch between the
+                // speaker cut and the stacked two-shot, so a podcast batch is
+                // not one look repeated.
+                $kind = ($this->variant % 2 === 1 && $this->isTwoHander($bigTracks, $type)) ? 'stack_two' : 'speaker_follow';
+                $reason = $kind === 'stack_two' ? 'two people, both on screen throughout' : sprintf('cuts to the speaker (%d switches)', count($speaker['switches'] ?? []));
             } elseif ($this->isTwoHander($bigTracks, $type)) {
                 $kind = 'stack_two';
                 $reason = 'two people, both on screen throughout';
@@ -114,6 +125,7 @@ class ShortLayoutPlanner
 
         $layout = match ($kind) {
             'stack_two' => $this->stackTwo($bigTracks ?: $tracks, $sw, $sh, $cuts),
+            'speaker_follow' => $speaker ? $this->fill($speaker, $sw, $sh, $this->withSwitches($cuts, $speaker)) : null,
             'facecam_top_gameplay', 'facecam_bubble_gameplay' => $this->streamer(
                 $kind,
                 $facecams[0]['box'] ?? null,
@@ -286,6 +298,15 @@ class ShortLayoutPlanner
                 'track' => ['width' => round($width, 4), 'keys' => $this->followKeys($track, $width, $cuts)],
             ]],
         ];
+    }
+
+    /** A speaker change is a hard cut for the crop, like a scene cut. */
+    private function withSwitches(array $cuts, array $speaker): array
+    {
+        $all = array_merge($cuts, array_map('floatval', $speaker['switches'] ?? []));
+        sort($all);
+
+        return $all;
     }
 
     private function stackTwo(array $tracks, int $sw, int $sh, array $cuts): ?array

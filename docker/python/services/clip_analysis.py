@@ -242,6 +242,7 @@ def _build_tracks(samples: list[dict], sample_count: int) -> list[dict]:
             'size': round(sizes[len(sizes) // 2], 4),
             'speaking': _speaking_score(pts),
             'points': [{'t': p['t'], **{k: v for k, v in p['box'].items() if k != '_mouth'}} for p in pts],
+            '_activity': _mouth_series(pts),
         })
 
     for t in out:
@@ -272,6 +273,79 @@ def _build_tracks(samples: list[dict], sample_count: int) -> list[dict]:
     for i, t in enumerate(top):
         t['id'] = f'face_{i + 1}'
     return top
+
+
+def _mouth_series(points: list[dict]) -> list[tuple[float, float]]:
+    """(t, mouth change) for each sample of a track — the per-moment version
+    of _speaking_score, which the speaker camera needs."""
+    out = []
+    prev = None
+    for p in points:
+        patch = p['box'].get('_mouth')
+        if patch is not None and prev is not None and patch.shape == prev.shape:
+            d = float(np.mean(np.abs(patch - prev))) / 255.0
+            out.append((float(p['t']), max(0.0, d - float(p.get('motion', 0.0)) * 0.5)))
+        if patch is not None:
+            prev = patch
+    return out
+
+
+SPEAKER_MIN_HOLD = 1.5      # seconds a speaker shot holds before it may cut away
+SPEAKER_MARGIN = 1.35       # the other face must be this much more active to cut
+
+
+def _speaker_path(tracks: list[dict], sample_times: list[float]) -> dict | None:
+    """A camera that cuts to whoever is talking — the podcast edit.
+
+    For each sample, every sizeable face's mouth activity is smoothed over
+    about ±0.7s and the most active one wins, with hysteresis: the shot holds
+    at least SPEAKER_MIN_HOLD, and it only cuts when the other face is clearly
+    (SPEAKER_MARGIN) more active, so a nod or a laugh does not flip the camera.
+    Only for footage where two or more faces share the frame for most of the
+    clip; a multi-cam edit that already cuts between people is left to the
+    ordinary camera path. Returns a track-shaped dict + `switches` (seconds).
+    """
+    big = [t for t in tracks if t['presence'] >= 0.45 and t.get('_activity')]
+    if len(big) < 2 or not sample_times:
+        return None
+    big.sort(key=lambda t: t['presence'], reverse=True)
+    big = big[:3]
+    sizes = [t['size'] for t in big]
+    if max(sizes) / max(1e-6, min(sizes)) > 2.5:
+        return None
+
+    def smooth(series, t):
+        near = [a for (ts, a) in series if abs(ts - t) <= 0.7]
+        return sum(near) / len(near) if near else 0.0
+
+    def box_at(track, t):
+        best = min(track['points'], key=lambda p: abs(p['t'] - t))
+        return best if abs(best['t'] - t) <= 1.0 else None
+
+    cur = None
+    since = -99.0
+    switches: list[float] = []
+    pts = []
+    for t in sample_times:
+        acts = [(smooth(tr['_activity'], t), i) for i, tr in enumerate(big) if box_at(tr, t)]
+        if not acts:
+            continue
+        best_a, best_i = max(acts)
+        if cur is None:
+            cur, since = best_i, t
+        elif best_i != cur and t - since >= SPEAKER_MIN_HOLD:
+            cur_a = next((a for a, i in acts if i == cur), 0.0)
+            if best_a > max(0.004, cur_a * SPEAKER_MARGIN):
+                cur, since = best_i, t
+                switches.append(round(t, 3))
+        b = box_at(big[cur], t)
+        if b:
+            pts.append({'t': round(t, 3), 'x': b['x'], 'y': b['y'], 'w': b['w'], 'h': b['h']})
+    if not switches or len(pts) < 4:
+        return None
+    return {'id': 'speaker', 'presence': 1.0, 'coverage': 1.0,
+            'cx': 0.5, 'cy': 0.5, 'size': float(np.median(sizes)),
+            'points': pts, 'switches': switches}
 
 
 def _speaking_score(points: list[dict]) -> float:
@@ -706,6 +780,9 @@ def analyze_clip(video_path: str, frames_dir: str, interval: float = 0.35,
         cap.release()
 
     tracks = _build_tracks(samples, len(samples))
+    speaker = _speaker_path(tracks, [s['t'] for s in samples])
+    for t in tracks:
+        t.pop('_activity', None)
     camera = _camera_path(samples, cuts)
     webcam = _find_webcam(tracks, v_acc / edge_n if edge_n else None, h_acc / edge_n if edge_n else None)
     action = _action_path(diffs, webcam['box'] if webcam else None, cuts)
@@ -728,6 +805,7 @@ def analyze_clip(video_path: str, frames_dir: str, interval: float = 0.35,
         'face_tracks': tracks,
         'camera_track': camera,
         'webcam': webcam,
+        'speaker_track': speaker,
         'action_track': action,
         'scene_cuts': cuts,
         'audio_peaks': audio.get('peaks', []),
