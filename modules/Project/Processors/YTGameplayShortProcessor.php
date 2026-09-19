@@ -16,6 +16,13 @@ use Modules\Project\Services\RapidApiTranscriptionService;
 use Modules\Project\Services\WordLevelCaptionService;
 use Modules\Project\Contracts\YoutubeDownloaderInterface;
 use Modules\Project\Services\YoutubeDownloaderFactory;
+use Modules\Project\Services\Shorts\ClipSceneAnalyzer;
+use Modules\Project\Services\Shorts\ClipTightenService;
+use Modules\Project\Services\Shorts\ShortEditDirector;
+use Modules\Project\Services\Shorts\ShortLayoutPlanner;
+use Modules\Project\Services\Shorts\ShortMusicPlanner;
+use Modules\Project\Services\Shorts\ShortStylePlanner;
+use Modules\Project\Services\Shorts\ViralShortRenderService;
 
 /**
  * YTGameplayShortProcessor
@@ -59,10 +66,10 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
      * allows it, never more than MAX_CLIPS.
      */
     private const MIN_CLIPS = 2;
-    private const MAX_CLIPS = 12;
+    private const MAX_CLIPS = 20;
 
     /** One short per this many seconds of source, before the score gate. */
-    private const SECONDS_PER_CLIP = 360.0;
+    private const SECONDS_PER_CLIP = 120.0;
 
     /** A short must score at least this to ship at all. */
     private const SCORE_FLOOR = 50;
@@ -75,12 +82,20 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     private RapidApiTranscriptionService $rapidTranscriptionService;
     private ClipSelectionService $clipSelectionService;
     private ClipEditPlanService $editPlanService;
+    private ClipTightenService $tightenService;
+    private ShortMusicPlanner $musicPlanner;
     private GameplayVideoService $gameplayService;
     private VideoClipCutterService $clipCutterService;
     private ShortComposerService $composerService;
     private WordLevelCaptionService $captionService;
     private R2UploadService $r2UploadService;
     private PythonAIService $pythonService;
+    private ClipSceneAnalyzer $sceneAnalyzer;
+    private ShortStylePlanner $stylePlanner;
+    private ShortLayoutPlanner $layoutPlanner;
+    private ShortEditDirector $editDirector;
+    private ViralShortRenderService $viralRenderer;
+    private ?bool $viralAvailable = null;
 
     /**
      * The YouTube transcript for this run, fetched once. [] means "tried and
@@ -97,12 +112,19 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         $this->rapidTranscriptionService = new RapidApiTranscriptionService();
         $this->clipSelectionService = new ClipSelectionService();
         $this->editPlanService = new ClipEditPlanService();
+        $this->tightenService = new ClipTightenService();
+        $this->musicPlanner = new ShortMusicPlanner();
         $this->gameplayService = new GameplayVideoService();
         $this->clipCutterService = new VideoClipCutterService();
         $this->composerService = new ShortComposerService();
         $this->captionService = new WordLevelCaptionService();
         $this->r2UploadService = new R2UploadService();
         $this->pythonService = new PythonAIService();
+        $this->sceneAnalyzer = new ClipSceneAnalyzer($this->pythonService);
+        $this->stylePlanner = new ShortStylePlanner();
+        $this->layoutPlanner = new ShortLayoutPlanner();
+        $this->editDirector = new ShortEditDirector();
+        $this->viralRenderer = new ViralShortRenderService();
     }
 
     public function process(): bool
@@ -590,6 +612,14 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                 return null;
             }
 
+            // RapidAPI reports `totalDuration`, local Whisper reports `duration`.
+            // Reading only the first left it 0 on every fallback run, and the
+            // selector then rejected EVERY clip as "ends after video ends"
+            // (project 194: six 88-scoring candidates, zero shorts).
+            $result['totalDuration'] = (float) ($result['totalDuration'] ?? 0)
+                ?: (float) ($result['duration'] ?? 0)
+                ?: (float) (end($result['segments'])['end'] ?? 0);
+
             // Persist only lightweight metadata. The full transcript can be
             // megabytes (3000+ segments on long videos); storing it in the
             // processing_state JSON bloats the row and breaks ORDER BY queries
@@ -768,8 +798,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         $tmpDir = Storage::disk('public')->path("projects/{$this->project->id}/tmp");
         @mkdir($tmpDir, 0755, true);
 
-        // Progress bookkeeping: each clip counts twice (cut + compose). The
-        // gameplay panel is now built inside the compose half, per clip.
+        // Progress bookkeeping: each clip counts twice (cut + edit/render).
         $progressBase = (float) $this->project->progress;
         $progressSpan = max(0, 95 - $progressBase);
         $unitsTotal = $clipTotal * 2;
@@ -786,6 +815,20 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         foreach (array_values($selectedClips) as $i => $clip) {
             $n = $i + 1;
             try {
+                // Which lines are dead weight. Asked BEFORE the cut, because
+                // this is the last point at which the source video still
+                // exists — after Phase A it is deleted to free the disk.
+                $drops = $this->viralEditingEnabled()
+                    ? $this->tightenService->dropSpans(
+                        $segments,
+                        (float) $clip['final_start_seconds'],
+                        (float) $clip['final_end_seconds'],
+                        (string) ($clip['hook'] ?? $clip['reason'] ?? ''),
+                        (string) (($this->project->processing_state['video_title'] ?? null) ?: $this->project->title),
+                        $n
+                    )
+                    : [];
+
                 $plan = $this->editPlanService->plan(
                     $segments,
                     (float) $clip['final_start_seconds'],
@@ -794,7 +837,8 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                         $sourceVideoPath,
                         (float) $clip['final_start_seconds'],
                         (float) $clip['final_end_seconds']
-                    )
+                    ),
+                    $drops
                 );
 
                 Log::info('[YT_GAMEPLAY] Cutting clip', [
@@ -804,6 +848,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                     'keep_ranges' => count($plan['ranges']),
                     'edited_duration' => $plan['edited_duration'],
                     'removed_silence' => $plan['removed_seconds'],
+                    'content_cuts' => count($drops),
                 ]);
 
                 $clipPath = $tmpDir . "/main_clip_{$n}.mp4";
@@ -818,6 +863,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                     // this, and a loop shorter than its clip would truncate
                     // the short now that vstack terminates on the shortest.
                     'duration' => (float) $cutResult['duration'],
+                    'content_cuts' => count($drops),
                 ];
             } catch (\Exception $e) {
                 Log::error('[YT_GAMEPLAY] Clip cut failed — skipping this clip', [
@@ -836,74 +882,150 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
         // Source video no longer needed — it can be 200-800MB, free it now.
         $this->deleteSourceVideoEarly($sourceVideoPath);
 
-        // ── Gameplay: one segment PER SHORT, each from its own random point.
-        // A single shared loop meant every short in the batch opened on the
-        // same gameplay frame; the plan below hands each short a different
-        // file (when the library has several) at a different offset. ──
+        // ── Phase B0: what each short SAYS (exact word timings from its own
+        // audio) and what it SHOWS (faces, cuts, peaks, and the vision
+        // model's read of the scene). The styles are planned across the whole
+        // batch from these, so every short gets a different edit. ──
+        $viral = $this->viralEditingEnabled();
+        $titleForContext = (string) (($this->project->processing_state['video_title'] ?? null) ?: $this->project->title);
+        foreach ($cuts as $cutIndex => $cut) {
+            $n = $cut['index'];
+            $this->pusherService->sendProgress(
+                $this->project->id,
+                (int) $this->project->progress,
+                "Watching short {$n} of {$clipTotal}"
+            );
+            $cuts[$cutIndex]['words'] = $this->clipWordTimings($segments, $cut);
+            $cuts[$cutIndex]['analysis'] = $viral
+                ? $this->analyzeClip($cut, $cuts[$cutIndex]['words'])
+                : $this->minimalAnalysis($cut);
+        }
+
+        // One webcam for the whole stream: clips that could not find it
+        // borrow the box the others agreed on.
+        if ($viral) {
+            $shared = ClipSceneAnalyzer::shareWebcam(array_map(fn ($c) => $c['analysis'], $cuts));
+            foreach ($cuts as $cutIndex => $cut) {
+                $cuts[$cutIndex]['analysis'] = $shared[$cutIndex];
+            }
+        }
+
+        $styles = $this->stylePlanner->assign(
+            array_map(fn ($c) => $c['analysis'], $cuts),
+            $this->editStyleMode(),
+            (int) $this->project->id * 7919 + count($cuts)
+        );
+
+        // Library gameplay under a talking head is one flavour among several,
+        // not the default look: alternate it across the shorts that suit it.
         $gameplayPlan = [];
         if ($gameplayEnabled) {
             try {
                 $gameplayPlan = $this->planGameplaySegments($cuts);
             } catch (\Exception $e) {
-                // Losing the panel is survivable; losing the shorts is not.
-                Log::warning('[YT_GAMEPLAY] Could not plan gameplay segments — shorts will be full-frame', [
+                Log::warning('[YT_GAMEPLAY] Could not plan gameplay segments — no gameplay panels', [
                     'project_id' => $this->project->id,
                     'error' => $e->getMessage(),
                 ]);
             }
         }
+        $stockTurn = 0;
 
-        // ── Phase B: captions + compose + thumbnail per clip ──
+        // ── Phase B: layout → edit → render (+ thumbnail) per short ──
         $outputs = [];
         foreach ($cuts as $cutIndex => $cut) {
             $n = $cut['index'];
             try {
+                $analysis = $cut['analysis'];
+                $style = $styles[$cutIndex] ?? $styles[0];
+
+                // Decide the layout; only build a gameplay loop if it is used.
+                $singleSpeaker = $this->isSingleSpeaker($analysis);
+                $stockAllowed = $gameplayEnabled && isset($gameplayPlan[$cutIndex])
+                    && ($singleSpeaker || !$viral)
+                    && ($stockTurn++ % 2 === 0 || !$viral);
+                $layout = $this->layoutPlanner->plan(
+                    $analysis,
+                    $stockAllowed,
+                    $this->layoutMode(),
+                    (float) ($style['framing']['tightness'] ?? 1.0),
+                    (int) $this->project->id + $cutIndex
+                );
+
                 $gameplayLoopPath = null;
-                if ($gameplayEnabled && isset($gameplayPlan[$cutIndex])) {
+                if ($layout['kind'] === 'gameplay_split_stock' || (!$viral && $stockAllowed)) {
                     try {
-                        // Sized to THIS clip plus slack: vstack ends on the
-                        // shortest input, so a loop even a frame short would
-                        // clip the end off the short.
                         $gameplayLoopPath = $this->loopGameplay(
                             $gameplayPlan[$cutIndex]['source'],
                             (float) $gameplayPlan[$cutIndex]['start'],
-                            (float) $cut['duration'] + 2.0,
+                            (float) $cut['duration'] + 6.0,
                             $n
                         );
                     } catch (\Exception $e) {
-                        // One bad panel should cost the panel, not the short.
-                        Log::warning('[YT_GAMEPLAY] Gameplay panel failed — composing this short full-frame', [
+                        Log::warning('[YT_GAMEPLAY] Gameplay panel failed — re-planning this short without it', [
                             'project_id' => $this->project->id,
                             'clip' => "{$n}/{$clipTotal}",
                             'error' => $e->getMessage(),
                         ]);
+                        $layout = $this->layoutPlanner->plan(
+                            $analysis,
+                            false,
+                            $this->layoutMode(),
+                            (float) ($style['framing']['tightness'] ?? 1.0),
+                            (int) $this->project->id + $cutIndex
+                        );
                     }
                 }
-
-                $captionsAss = $this->buildClipCaptions($segments, $cut['clip'], $cut['plan'], $n, $cut['path'], $cut['duration']);
 
                 $outputRelative = "projects/{$this->project->id}/output_{$n}.mp4";
                 $outputAbsolute = Storage::disk('public')->path($outputRelative);
 
-                $composed = $this->composerService->compose(
-                    $cut['path'],
-                    $gameplayLoopPath,
-                    $captionsAss,
-                    $outputAbsolute,
-                    $this->project->id,
-                    [
-                        'aspect_ratio' => $this->project->aspect_ratio ?? '9:16',
-                        'caption_position' => $this->settings['caption_position'] ?? 'top_section',
-                        'focus_x' => $this->detectFocusX($cut['path'], $n),
-                    ]
-                );
+                $edit = null;
+                $engine = 'basic';
+                $duration = null;
+                $music = null;
+                if ($viral) {
+                    $edit = $this->editDirector->direct(
+                        $cut['words'],
+                        $analysis,
+                        $style,
+                        (float) $cut['duration'],
+                        $titleForContext,
+                        $n
+                    );
+                    $music = $this->musicPlanner->plan(
+                        $analysis,
+                        $edit,
+                        (int) $this->project->id,
+                        $n,
+                        (string) ($this->settings['music_category'] ?? 'auto')
+                    );
+                    $rendered = $this->renderViralShort($cut, $analysis, $layout, $style, $edit, $gameplayLoopPath, $outputAbsolute, $music);
+                    if ($rendered) {
+                        $engine = 'viral';
+                        $duration = $this->probeDuration($outputAbsolute) ?? (float) $edit['duration'];
+                    }
+                }
+
+                if ($engine === 'basic') {
+                    // The plain composer: crop + optional gameplay + karaoke.
+                    $captionsAss = $this->writeCaptionFile($cut['words'], $n, 'clip_audio');
+                    $composed = $this->composerService->compose(
+                        $cut['path'],
+                        $gameplayLoopPath,
+                        $captionsAss,
+                        $outputAbsolute,
+                        $this->project->id,
+                        [
+                            'aspect_ratio' => $this->project->aspect_ratio ?? '9:16',
+                            'caption_position' => $this->settings['caption_position'] ?? 'top_section',
+                            'focus_x' => $this->focusFromAnalysis($analysis) ?? $this->detectFocusX($cut['path'], $n),
+                        ]
+                    );
+                    $duration = $composed['duration'] ?? (float) $cut['plan']['edited_duration'];
+                }
 
                 $thumbnailRelative = $this->generateClipThumbnail($outputAbsolute, $n);
-
-                // The plan's edited_duration is a prediction; the composer
-                // measures the file it just wrote. Prefer the measurement, so
-                // the dashboard and the manifest agree with the MP4.
-                $duration = $composed['duration'] ?? (float) $cut['plan']['edited_duration'];
 
                 $outputs[] = [
                     'path' => $outputRelative,
@@ -914,10 +1036,24 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                     'source_start' => round((float) $cut['clip']['final_start_seconds'], 2),
                     'source_end' => round((float) $cut['clip']['final_end_seconds'], 2),
                     'removed_silence_seconds' => (float) $cut['plan']['removed_seconds'],
-                    'gameplay' => $gameplayLoopPath !== null,
+                'content_cuts' => (int) ($cut['content_cuts'] ?? 0),
+                    'gameplay' => $gameplayLoopPath !== null && ($engine === 'basic' || $layout['kind'] === 'gameplay_split_stock'),
                     'gameplay_start' => $gameplayLoopPath !== null
                         ? (float) ($gameplayPlan[$cutIndex]['start'] ?? 0.0)
                         : null,
+                    'engine' => $engine,
+                    'edit_style' => $engine === 'viral' ? (string) $style['name'] : 'Basic',
+                    'edit_family' => $engine === 'viral' ? (string) $style['family'] : null,
+                    'layout' => $engine === 'viral' ? (string) $layout['kind'] : null,
+                    'framing' => $engine === 'viral'
+                        ? sprintf('%.2fx %s', $style['framing']['tightness'] ?? 1.0, $style['framing']['drift_to'] ?? 'in')
+                        : null,
+                    'scene_type' => (string) ($analysis['scene_type'] ?? ''),
+                    'music' => $engine === 'viral' && $music ? $music['category'] : null,
+                    'title' => $edit['title'] ?? null,
+                    'hook' => $edit['hook']['text'] ?? null,
+                    'hashtags' => $edit['hashtags'] ?? [],
+                    'beats' => $edit['beat_count'] ?? 0,
                 ];
             } catch (\Exception $e) {
                 Log::error('[YT_GAMEPLAY] Clip composition failed — skipping this clip', [
@@ -926,15 +1062,21 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                     'error' => $e->getMessage(),
                 ]);
             }
-            $tick("Composed short {$n} of {$clipTotal}");
+            $tick("Edited short {$n} of {$clipTotal}");
         }
 
         if (empty($outputs)) {
             throw new \Exception('All clip compositions failed');
         }
 
-        // Optional Pixabay music bed under each short (default: none).
+        // The ffmpeg music pass, for shorts the composition did NOT bed itself.
+        // A short rendered with `music` in its props already has the track
+        // mixed on the edit's own clock; running this over it would lay a
+        // second, unsynced copy on top.
         foreach ($outputs as $output) {
+            if (!empty($output['music'])) {
+                continue;
+            }
             $this->applyBackgroundMusic(Storage::disk('public')->path($output['path']));
         }
 
@@ -1235,43 +1377,42 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     }
 
     /**
-     * Build karaoke captions for one clip.
+     * Exact word timings for one cut clip, on the clip's own clock.
      *
-     * Preferred path: transcribe the CUT clip's own audio with Whisper word
-     * timestamps — the timings come from the exact audio that plays in the
-     * final short, so captions are perfectly in sync with no remapping.
+     * Preferred: Whisper with word timestamps on the CUT clip's audio — the
+     * timings come from the exact audio that plays in the short. Fallback:
+     * the source transcript spread across its segments and remapped through
+     * the edit plan. Never throws; an empty list means a silent clip.
      *
-     * Fallback (per-clip transcription failed / found no speech): derive word
-     * timings from the source transcript and remap them through the edit plan,
-     * as before. Returns the absolute path of the generated .ass file.
+     * @return array<int, array{word: string, start: float, end: float}>
      */
-    protected function buildClipCaptions(array $segments, array $selectedClip, array $plan, int $clipIndex, string $clipPath, ?float $clipDuration = null): string
+    protected function clipWordTimings(array $segments, array $cut): array
     {
-        // Captions are clamped to the clip's length, so use the MEASURED one:
-        // clamping to the shorter planned duration would freeze the last few
-        // words on screen at the wrong time.
-        $duration = $clipDuration ?: (float) $plan['edited_duration'];
-
+        $duration = (float) ($cut['duration'] ?: $cut['plan']['edited_duration']);
         try {
-            return $this->buildClipCaptionsFromClipAudio($clipPath, $clipIndex, $duration);
+            return $this->wordTimingsFromClipAudio($cut['path'], $cut['index'], $duration);
         } catch (\Exception $e) {
-            Log::warning('[YT_GAMEPLAY] Per-clip audio captions failed — falling back to source-transcript remap', [
+            Log::warning('[YT_GAMEPLAY] Per-clip audio timings failed — falling back to source-transcript remap', [
                 'project_id' => $this->project->id,
-                'clip' => $clipIndex,
+                'clip' => $cut['index'],
                 'error' => $e->getMessage(),
             ]);
-
-            return $this->buildClipCaptionsFromSourceTranscript($segments, $selectedClip, $plan, $clipIndex, $duration);
+            try {
+                return $this->wordTimingsFromSourceTranscript($segments, $cut['clip'], $cut['plan'], $duration);
+            } catch (\Exception $inner) {
+                return [];
+            }
         }
     }
 
     /**
-     * Transcribe the edited clip's audio (Whisper, word-level timestamps) and
-     * build word timings directly on the clip's timeline.
+     * Transcribe the edited clip's audio (Whisper, word-level timestamps).
+     *
+     * @return array<int, array{word: string, start: float, end: float}>
      */
-    protected function buildClipCaptionsFromClipAudio(string $clipPath, int $clipIndex, float $editedDuration): string
+    protected function wordTimingsFromClipAudio(string $clipPath, int $clipIndex, float $editedDuration): array
     {
-        Log::info('[YT_GAMEPLAY] Transcribing cut clip for exact caption timings', [
+        Log::info('[YT_GAMEPLAY] Transcribing cut clip for exact word timings', [
             'project_id' => $this->project->id,
             'clip' => $clipIndex,
             'path' => basename($clipPath),
@@ -1288,22 +1429,16 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
             $words = $segment['words'] ?? [];
 
             if (!empty($words)) {
-                // Exact per-word timings from Whisper.
                 foreach ($words as $w) {
                     $word = trim((string) ($w['word'] ?? ''));
                     if ($word === '') {
                         continue;
                     }
-
                     $start = max(0.0, min((float) ($w['start'] ?? 0), $editedDuration));
                     $end = max($start + 0.05, min((float) ($w['end'] ?? 0), $editedDuration));
-
                     $wordTimings[] = ['word' => $word, 'start' => $start, 'end' => $end];
                 }
             } else {
-                // Segment came back without word detail — spread its words
-                // evenly. Still accurate: the segment bounds are measured on
-                // the clip's own audio.
                 foreach ($this->spreadWordsAcrossWindow(
                     (string) ($segment['text'] ?? ''),
                     (float) ($segment['start'] ?? 0),
@@ -1319,7 +1454,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
             throw new \Exception('Clip transcription produced no word timings');
         }
 
-        return $this->writeCaptionFile($wordTimings, $clipIndex, 'clip_audio');
+        return $wordTimings;
     }
 
     /**
@@ -1353,23 +1488,21 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
      * FALLBACK: word timings approximated from the source transcript segments
      * inside the clip window, mapped through the edit plan's keep-ranges onto
      * the edited timeline.
+     *
+     * @return array<int, array{word: string, start: float, end: float}>
      */
-    protected function buildClipCaptionsFromSourceTranscript(array $segments, array $selectedClip, array $plan, int $clipIndex, ?float $clipDuration = null): string
+    protected function wordTimingsFromSourceTranscript(array $segments, array $selectedClip, array $plan, float $editedDuration): array
     {
         $clipStart = (float) $selectedClip['final_start_seconds'];
         $clipEnd = (float) $selectedClip['final_end_seconds'];
         $ranges = $plan['ranges'];
-        $editedDuration = $clipDuration ?: (float) $plan['edited_duration'];
 
-        // Segments that overlap the clip window
         $clipSegments = array_filter($segments, function ($seg) use ($clipStart, $clipEnd) {
             $segStart = floatval($seg['start'] ?? 0);
             $segEnd = floatval($seg['end'] ?? 0);
             return $segEnd > $clipStart && $segStart < $clipEnd;
         });
 
-        // Word-level timings, evenly spread across each segment, then mapped
-        // onto the edited timeline.
         $wordTimings = [];
         foreach ($clipSegments as $segment) {
             $words = explode(' ', trim($segment['text'] ?? ''));
@@ -1382,13 +1515,9 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                     continue;
                 }
 
-                $sourceStart = $segStart + ($i * $timePerWord);
-                $sourceEnd = $segStart + (($i + 1) * $timePerWord);
+                $editedStart = $this->editPlanService->toEditedTime($segStart + ($i * $timePerWord), $ranges);
+                $editedEnd = $this->editPlanService->toEditedTime($segStart + (($i + 1) * $timePerWord), $ranges);
 
-                $editedStart = $this->editPlanService->toEditedTime($sourceStart, $ranges);
-                $editedEnd = $this->editPlanService->toEditedTime($sourceEnd, $ranges);
-
-                // Word fell inside a removed gap — drop it.
                 if ($editedEnd - $editedStart < 0.05) {
                     continue;
                 }
@@ -1396,11 +1525,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                 $editedStart = max(0.0, min($editedStart, $editedDuration));
                 $editedEnd = max($editedStart + 0.05, min($editedEnd, $editedDuration));
 
-                $wordTimings[] = [
-                    'word' => trim($word),
-                    'start' => $editedStart,
-                    'end' => $editedEnd
-                ];
+                $wordTimings[] = ['word' => trim($word), 'start' => $editedStart, 'end' => $editedEnd];
             }
         }
 
@@ -1408,7 +1533,155 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
             throw new \Exception('No word timings extracted from transcript');
         }
 
-        return $this->writeCaptionFile($wordTimings, $clipIndex, 'source_transcript_remap');
+        return $wordTimings;
+    }
+
+    // ------------------------------------------------------------------
+    // The viral editor
+    // ------------------------------------------------------------------
+
+    /** Full edits need the Remotion render service; otherwise the plain composer runs. */
+    private function viralEditingEnabled(): bool
+    {
+        if (($this->settings['edit_style'] ?? 'auto_mix') === 'basic') {
+            return false;
+        }
+        if ($this->viralAvailable === null) {
+            $this->viralAvailable = $this->viralRenderer->isAvailable();
+            if (!$this->viralAvailable) {
+                Log::warning('[YT_GAMEPLAY] Render service unreachable — using the basic composer', [
+                    'project_id' => $this->project->id,
+                ]);
+            }
+        }
+
+        return $this->viralAvailable;
+    }
+
+    private function editStyleMode(): string
+    {
+        $mode = (string) ($this->settings['edit_style'] ?? 'auto_mix');
+
+        return array_key_exists($mode, ShortStylePlanner::FAMILY_LABELS) ? $mode : 'auto_mix';
+    }
+
+    private function layoutMode(): string
+    {
+        $mode = (string) ($this->settings['layout_mode'] ?? 'auto');
+
+        return in_array($mode, ['auto', 'fill_follow', 'stack_two', 'blur_fit'], true) ? $mode : 'auto';
+    }
+
+    private function captionsEnabled(): bool
+    {
+        return filter_var($this->settings['captions_enabled'] ?? true, FILTER_VALIDATE_BOOLEAN);
+    }
+
+    private function analyzeClip(array $cut, array $words): array
+    {
+        $text = implode(' ', array_map(fn ($w) => $w['word'], $words));
+        $framesDir = Storage::disk('public')->path("projects/{$this->project->id}/tmp/frames_{$cut['index']}");
+
+        try {
+            return $this->sceneAnalyzer->analyze($cut['path'], $framesDir, $text, (int) $this->project->id, (int) $cut['index']);
+        } catch (\Throwable $e) {
+            Log::warning('[YT_GAMEPLAY] Scene analysis failed — plain layout', [
+                'project_id' => $this->project->id,
+                'clip' => $cut['index'],
+                'error' => $e->getMessage(),
+            ]);
+            return $this->minimalAnalysis($cut);
+        }
+    }
+
+    private function minimalAnalysis(array $cut): array
+    {
+        return [
+            'source_width' => 1920, 'source_height' => 1080, 'duration' => (float) $cut['duration'],
+            'scene_type' => 'other', 'people_on_screen' => 1, 'regions' => [], 'recommended_layout' => '',
+            'visual_summary' => '', 'mood' => '', 'reaction_moments' => [], 'face_tracks' => [],
+            'scene_cuts' => [], 'audio_peaks' => [], 'energy' => [], 'motion_mean' => 0.0,
+            'faces_per_frame' => 0.0, 'faces_typical' => 0, 'camera_track' => null,
+            'vision_used' => false,
+        ];
+    }
+
+    private function isSingleSpeaker(array $analysis): bool
+    {
+        $tracks = array_filter($analysis['face_tracks'] ?? [], fn ($t) => $t['presence'] >= 0.35);
+        $type = (string) ($analysis['scene_type'] ?? '');
+
+        return count($tracks) === 1
+            && !in_array($type, ['gameplay', 'gameplay_facecam', 'screen_recording', 'sports'], true);
+    }
+
+    /** The basic composer's horizontal focus, from the tracker when we have it. */
+    private function focusFromAnalysis(array $analysis): ?float
+    {
+        $tracks = $analysis['face_tracks'] ?? [];
+        if (!$tracks) {
+            return null;
+        }
+        usort($tracks, fn ($a, $b) => ($b['presence'] * $b['size']) <=> ($a['presence'] * $a['size']));
+
+        return min(0.95, max(0.05, 0.5 + ((float) $tracks[0]['cx'] - 0.5) * 0.85));
+    }
+
+    private function renderViralShort(
+        array $cut,
+        array $analysis,
+        array $layout,
+        array $style,
+        array $edit,
+        ?string $gameplayLoopPath,
+        string $outputAbsolute,
+        ?array $music = null
+    ): bool {
+        $publicRoot = rtrim(str_replace('\\', '/', Storage::disk('public')->path('')), '/') . '/';
+        $toRelative = fn (string $abs) => ltrim(str_replace($publicRoot, '', str_replace('\\', '/', $abs)), '/');
+
+        $gameplay = null;
+        if ($gameplayLoopPath && $layout['kind'] === 'gameplay_split_stock') {
+            $gameplay = [
+                'url' => ViralShortRenderService::assetUrl($toRelative($gameplayLoopPath)),
+                'duration' => (float) ($this->probeDuration($gameplayLoopPath) ?? ($cut['duration'] + 6)),
+            ];
+        }
+
+        $props = $this->viralRenderer->buildProps(
+            $toRelative($cut['path']),
+            (float) $cut['duration'],
+            $analysis,
+            $layout,
+            $style,
+            $edit,
+            $gameplay,
+            $this->captionsEnabled() && !empty($edit['words']),
+            $music
+        );
+
+        // Kept beside the temp files so a failed render can be replayed by
+        // hand (scripts/short-render-check.ts <out> <props.json>).
+        @file_put_contents(
+            Storage::disk('public')->path("projects/{$this->project->id}/tmp/short_props_{$cut['index']}.json"),
+            json_encode($props, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)
+        );
+
+        $result = $this->viralRenderer->render($props, $outputAbsolute, (int) $this->project->id, (int) $cut['index']);
+        $ok = $result['success'] && is_file($outputAbsolute) && filesize($outputAbsolute) > 0;
+
+        Log::log($ok ? 'info' : 'warning', $ok ? '[YT_GAMEPLAY] Short edited' : '[YT_GAMEPLAY] Edited render failed — falling back to the basic composer', [
+            'project_id' => $this->project->id,
+            'clip' => $cut['index'],
+            'style' => $style['name'],
+            'layout' => $layout['kind'],
+            'layout_reason' => $layout['reason'] ?? '',
+            'events' => count($edit['events']),
+            'seconds' => $result['render_seconds'] ?? null,
+            'error' => $result['error'] ?? null,
+        ]);
+
+        return $ok;
     }
 
     /**
@@ -1628,7 +1901,7 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
     {
         return [
             'name' => 'Long Video to Shorts',
-            'description' => 'Turn one YouTube video into multiple 9:16 vertical shorts. The AI ranks every moment for viral potential and ships only the winners (2-12, decided by the video, not by you), edits out dead air, and gives each short karaoke captions plus its own slice of gameplay footage at the bottom.',
+            'description' => 'Turn one long video into up to 20 fully edited 9:16 shorts. The AI finds the moments worth posting, watches each one to understand the scene (podcast, streamer with facecam, talking head, screen), lays it out for a phone (speaker-following crop, stacked speakers, facecam over gameplay), and edits every short in its own style: animated captions, punch-in zooms, meme pops and sound effects.',
             'requires_upload' => false,
             'min_duration' => 15,
             'max_duration' => 600,
@@ -1666,9 +1939,42 @@ class YTGameplayShortProcessor extends AbstractVideoProcessor
                 // them clear the quality gate. Adding the field back lets a
                 // user demand 12 shorts from a 6-minute video, which can only
                 // be satisfied with weak, repetitive picks.
+                'edit_style' => [
+                    'type' => 'select',
+                    'label' => 'Edit style',
+                    'options' => [
+                        'auto_mix' => 'AI mix — every short edited differently',
+                        'meme_chaos' => 'Meme chaos (zooms, sound effects, freeze frames)',
+                        'hormozi' => 'Bold captions',
+                        'podcast_clean' => 'Clean podcast',
+                        'neon_gamer' => 'Neon gamer',
+                        'storyteller' => 'Storyteller',
+                        'comic_pop' => 'Comic pop',
+                        'news_flash' => 'News flash',
+                        'minimal' => 'Minimal',
+                        'basic' => 'Basic (captions only)',
+                    ],
+                    'default' => 'auto_mix'
+                ],
+                'layout_mode' => [
+                    'type' => 'select',
+                    'label' => 'Framing',
+                    'options' => [
+                        'auto' => 'AI decides per short',
+                        'fill_follow' => 'Follow the speaker (full screen)',
+                        'stack_two' => 'Two speakers stacked',
+                        'blur_fit' => 'Whole frame on blurred background',
+                    ],
+                    'default' => 'auto'
+                ],
+                'captions_enabled' => [
+                    'type' => 'checkbox',
+                    'label' => 'Animated captions',
+                    'default' => true
+                ],
                 'gameplay_enabled' => [
                     'type' => 'checkbox',
-                    'label' => 'Show gameplay video at the bottom',
+                    'label' => 'Add gameplay under some single-speaker shorts',
                     'default' => true
                 ],
                 'gameplay_source' => [

@@ -42,8 +42,12 @@ class ClipEditPlanService
     /** Never produce an edited clip shorter than this. */
     private const MIN_EDITED_DURATION = 10.0;
 
-    /** Hard cap on cut points — beyond this the clip feels choppy anyway. */
-    private const MAX_RANGES = 24;
+    /**
+     * Hard cap on cut points. Higher than it was (24): a jump-cut edit that
+     * removes dead conversation legitimately produces more cuts than silence
+     * trimming ever did, and merging them back destroys the edit.
+     */
+    private const MAX_RANGES = 36;
 
     /** A measured silence shorter than this isn't worth a visible cut. */
     private const MIN_SILENCE_TO_CUT = 0.45;
@@ -60,6 +64,10 @@ class ClipEditPlanService
      * @param array<int, array{start: float, end: float}> $measuredSilences
      *        Silence intervals measured from the audio, in source seconds.
      *        Optional — omit to get the transcript-only plan.
+     * @param array<int, array{start: float, end: float}> $dropSpans
+     *        Spans to remove because of what is SAID in them, not because they
+     *        are quiet (see ClipTightenService). Already snapped to transcript
+     *        boundaries by the time they arrive here.
      *
      * @return array{
      *   ranges: array<int, array{start: float, end: float}>,
@@ -68,8 +76,13 @@ class ClipEditPlanService
      *   is_edited: bool
      * }
      */
-    public function plan(array $segments, float $clipStart, float $clipEnd, array $measuredSilences = []): array
-    {
+    public function plan(
+        array $segments,
+        float $clipStart,
+        float $clipEnd,
+        array $measuredSilences = [],
+        array $dropSpans = []
+    ): array {
         $window = max(0.0, $clipEnd - $clipStart);
         $contiguous = [
             'ranges' => [['start' => $clipStart, 'end' => $clipEnd]],
@@ -101,7 +114,7 @@ class ClipEditPlanService
             // captions). Measured silence is then the only editor available.
             return $this->applyMeasuredSilence(
                 [['start' => $clipStart, 'end' => $clipEnd]],
-                $measuredSilences, $clipStart, $clipEnd, $window, $contiguous
+                $measuredSilences, $clipStart, $clipEnd, $window, $contiguous, $dropSpans
             );
         }
 
@@ -140,7 +153,7 @@ class ClipEditPlanService
             return $contiguous;
         }
 
-        return $this->applyMeasuredSilence($ranges, $measuredSilences, $clipStart, $clipEnd, $window, $contiguous);
+        return $this->applyMeasuredSilence($ranges, $measuredSilences, $clipStart, $clipEnd, $window, $contiguous, $dropSpans);
     }
 
     /**
@@ -156,9 +169,15 @@ class ClipEditPlanService
         float $clipStart,
         float $clipEnd,
         float $window,
-        array $contiguous
+        array $contiguous,
+        array $dropSpans = []
     ): array {
         $ranges = $this->subtractSilences($ranges, $measuredSilences);
+        // Content cuts go in AFTER the silence cuts and are NOT padded: a
+        // silence is trimmed conservatively so a cut lands in the quiet, but a
+        // dropped line is meant to disappear completely, and padding it back
+        // would leave the first syllable of the sentence we deleted.
+        $ranges = $this->subtract($ranges, $dropSpans, 0.0);
 
         if (empty($ranges)) {
             return $contiguous;
@@ -237,6 +256,20 @@ class ClipEditPlanService
             }
         }
 
+        return $this->subtract($ranges, $cuts, self::MIN_KEEP_PIECE);
+    }
+
+    /**
+     * Remove a set of intervals from a set of keep ranges.
+     *
+     * @param array<int, array{start: float, end: float}> $ranges
+     * @param array<int, array{start: float, end: float}> $cuts
+     * @param float $minPiece keep pieces shorter than this are slivers, dropped
+     * @return array<int, array{start: float, end: float}>
+     */
+    private function subtract(array $ranges, array $cuts, float $minPiece): array
+    {
+        $cuts = array_values(array_filter($cuts, fn ($c) => ($c['end'] ?? 0) > ($c['start'] ?? 0)));
         if (empty($cuts)) {
             return $ranges;
         }
@@ -263,7 +296,7 @@ class ClipEditPlanService
                 $pieces = $next;
             }
             foreach ($pieces as $piece) {
-                if ($piece['end'] - $piece['start'] >= self::MIN_KEEP_PIECE) {
+                if ($piece['end'] - $piece['start'] >= $minPiece) {
                     $result[] = $piece;
                 }
             }

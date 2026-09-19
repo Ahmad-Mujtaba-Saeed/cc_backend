@@ -1816,6 +1816,51 @@ async def image_phash(request: ImagePhashRequest):
         return ImagePhashResponse(success=False, error=str(e))
 
 
+class AnalyzeClipRequest(BaseModel):
+    video_path: str
+    frames_dir: str
+    # ~3 samples a second. One a second (the old default) cannot describe a
+    # camera move, and the shorts editor's whole framing job is a camera move.
+    interval_seconds: float = 0.35
+    max_samples: int = 400
+    vlm_frames: int = 8
+    vlm_width: int = 640
+    project_id: Optional[int] = None
+
+
+@app.post("/analyze-clip")
+async def analyze_clip_endpoint(request: AnalyzeClipRequest):
+    """Face tracks, scene cuts, motion, audio peaks and vision frames for one
+    cut clip (Long Video to Shorts editor). Non-fatal by contract: the caller
+    falls back to a plain centre crop on success=False."""
+    from docker.python.services.clip_analysis import analyze_clip
+
+    try:
+        path = _to_local_path(request.video_path)
+        if not os.path.exists(path):
+            return {"success": False, "error": f"Video not found: {path}"}
+        frames_dir = _to_local_path(request.frames_dir)
+        result = await asyncio.to_thread(
+            analyze_clip, path, frames_dir,
+            max(0.2, request.interval_seconds),
+            max(4, min(600, request.max_samples)),
+            max(0, min(16, request.vlm_frames)),
+            max(256, min(1280, request.vlm_width)),
+        )
+        logger.info(
+            f"analyze-clip: {os.path.basename(path)} {result['duration']}s "
+            f"{len(result['samples'])} samples, {len(result['face_tracks'])} face track(s) "
+            f"[{result['detector']}], camera "
+            f"{(result.get('camera_track') or {}).get('coverage', 0)} coverage, "
+            f"{len(result['scene_cuts'])} cut(s), "
+            f"{len(result['audio_peaks'])} peak(s), motion={result['motion_mean']}"
+        )
+        return {"success": True, **result}
+    except Exception as e:
+        logger.warning(f"analyze-clip error (non-fatal): {e}")
+        return {"success": False, "error": str(e)}
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

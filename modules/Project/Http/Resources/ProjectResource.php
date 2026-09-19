@@ -88,6 +88,13 @@ class ProjectResource extends JsonResource
                 'duration' => $video['duration'] ?? null,
                 'score' => $video['score'] ?? null,
                 'subtitle' => $video['subtitle'] ?? null,
+                // Long Video to Shorts editor: how this short was edited.
+                'edit_style' => $video['edit_style'] ?? null,
+                'layout' => $video['layout'] ?? null,
+                'scene_type' => $video['scene_type'] ?? null,
+                'title' => $video['title'] ?? null,
+                'hook' => $video['hook'] ?? null,
+                'hashtags' => array_values((array) ($video['hashtags'] ?? [])),
             ];
         }
 

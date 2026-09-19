@@ -1,0 +1,349 @@
+{
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "video": {
+        "url": "http://localhost:3020/storage/projects/195/tmp/main_clip_5.mp4",
+        "width": 854,
+        "height": 480,
+        "duration": 22.879
+    },
+    "gameplay": null,
+    "segments": [
+        {
+            "src": 0,
+            "dur": 22.879,
+            "rate": 1
+        }
+    ],
+    "layout": {
+        "kind": "facecam_top_gameplay",
+        "panels": [
+            {
+                "dest": [
+                    0,
+                    0,
+                    1,
+                    0.4
+                ],
+                "source": "main",
+                "crop": [
+                    0.7,
+                    0.1,
+                    0.2,
+                    0.2
+                ],
+                "primary": true
+            },
+            {
+                "dest": [
+                    0,
+                    0.4,
+                    1,
+                    0.6
+                ],
+                "source": "main",
+                "crop": [
+                    0,
+                    0,
+                    0.7,
+                    1
+                ]
+            }
+        ],
+        "background": "black",
+        "divider": {
+            "color": "#000000",
+            "thickness": 8
+        }
+    },
+    "style": {
+        "id": "hormozi_5",
+        "name": "Bold captions",
+        "caption": {
+            "font": "bricolage",
+            "weight": 900,
+            "size": 92,
+            "uppercase": true,
+            "wordsPerLine": 3,
+            "color": "#ffffff",
+            "highlight": "#ffe600",
+            "keyColor": "#ffe600",
+            "highlightMode": "color",
+            "stroke": 8,
+            "strokeColor": "#000000",
+            "shadow": true,
+            "animation": "typewriter",
+            "y": 0.4,
+            "lowercase": false,
+            "background": null,
+            "rotate": 0
+        },
+        "hook": {
+            "style": "bold",
+            "bg": "#000000",
+            "color": "#ffffff",
+            "font": "bricolage",
+            "y": 0.14
+        },
+        "grade": {
+            "filter": "contrast(1.06) saturate(1.1)",
+            "vignette": 0.2,
+            "tint": null
+        },
+        "progress": {
+            "position": "none",
+            "color": "#ffe600",
+            "height": 8
+        },
+        "sfxVolume": 0.6,
+        "accent": "#ffe600",
+        "drift": 0.97,
+        "stickerFont": "bricolage"
+    },
+    "words": [
+        {
+            "text": "Did",
+            "start": 0,
+            "end": 0.08
+        },
+        {
+            "text": "you",
+            "start": 0.04,
+            "end": 0.16
+        },
+        {
+            "text": "see?",
+            "start": 0.16,
+            "end": 0.44
+        },
+        {
+            "text": "Both,",
+            "start": 0.88,
+            "end": 1.14
+        },
+        {
+            "text": "Shadow.",
+            "start": 1.3,
+            "end": 1.4
+        },
+        {
+            "text": "It's",
+            "start": 2.14,
+            "end": 2.52
+        },
+        {
+            "text": "all",
+            "start": 2.52,
+            "end": 3.06
+        },
+        {
+            "text": "about",
+            "start": 3.06,
+            "end": 3.34
+        },
+        {
+            "text": "him.",
+            "start": 3.34,
+            "end": 3.54
+        },
+        {
+            "text": "Let's",
+            "start": 4.24,
+            "end": 4.56
+        },
+        {
+            "text": "move.",
+            "start": 4.56,
+            "end": 4.72
+        },
+        {
+            "text": "But",
+            "start": 6.41,
+            "end": 6.55
+        },
+        {
+            "text": "when",
+            "start": 6.55,
+            "end": 6.81
+        },
+        {
+            "text": "we",
+            "start": 6.81,
+            "end": 7.01
+        },
+        {
+            "text": "kill",
+            "start": 7.01,
+            "end": 7.23
+        },
+        {
+            "text": "Essex,",
+            "start": 7.23,
+            "end": 7.69
+        },
+        {
+            "text": "Shadow,",
+            "start": 7.71,
+            "end": 8.95
+        },
+        {
+            "text": "we",
+            "start": 9.4,
+            "end": 9.48
+        },
+        {
+            "text": "kill",
+            "start": 9.48,
+            "end": 9.72
+        },
+        {
+            "text": "Essex,",
+            "start": 9.72,
+            "end": 10.28
+        },
+        {
+            "text": "boy!",
+            "start": 10.34,
+            "end": 10.56,
+            "key": true,
+            "emoji": "💥"
+        },
+        {
+            "text": "You",
+            "start": 11.8,
+            "end": 12.06
+        },
+        {
+            "text": "look",
+            "start": 12.06,
+            "end": 12.2
+        },
+        {
+            "text": "like",
+            "start": 12.2,
+            "end": 12.42
+        },
+        {
+            "text": "you",
+            "start": 12.42,
+            "end": 12.52
+        },
+        {
+            "text": "need",
+            "start": 12.52,
+            "end": 12.62
+        },
+        {
+            "text": "to",
+            "start": 12.62,
+            "end": 12.72
+        },
+        {
+            "text": "break",
+            "start": 12.72,
+            "end": 12.9
+        },
+        {
+            "text": "something.",
+            "start": 12.9,
+            "end": 13.28
+        },
+        {
+            "text": "Smash",
+            "start": 13.84,
+            "end": 14.14
+        },
+        {
+            "text": "this",
+            "start": 14.14,
+            "end": 14.44
+        },
+        {
+            "text": "window.",
+            "start": 14.44,
+            "end": 14.72
+        },
+        {
+            "text": "What",
+            "start": 16.58,
+            "end": 17.1
+        },
+        {
+            "text": "is",
+            "start": 22.06,
+            "end": 22.2
+        },
+        {
+            "text": "this?",
+            "start": 22.2,
+            "end": 22.36
+        }
+    ],
+    "captionsEnabled": true,
+    "hook": {
+        "text": "Wolverine's Epic Smash Moment! 🔥",
+        "emoji": "🔥",
+        "until": 2.2
+    },
+    "events": [
+        {
+            "type": "sfx",
+            "start": 0.05,
+            "name": "whoosh_fast",
+            "volume": 0.7
+        },
+        {
+            "type": "zoom",
+            "start": 6.37,
+            "end": 7.51,
+            "scale": 1.42
+        },
+        {
+            "type": "sfx",
+            "start": 6.38,
+            "name": "pop"
+        },
+        {
+            "type": "zoom",
+            "start": 10.585,
+            "end": 11.725,
+            "scale": 1.42
+        },
+        {
+            "type": "sfx",
+            "start": 10.595,
+            "name": "snare"
+        },
+        {
+            "type": "sfx",
+            "start": 13.81,
+            "name": "whoosh_fast"
+        },
+        {
+            "type": "flash",
+            "start": 13.84
+        },
+        {
+            "type": "context",
+            "start": 2.6,
+            "end": 4.8,
+            "text": "Wolverine is on a mission!",
+            "icon": "🤯",
+            "place": "top"
+        },
+        {
+            "type": "context",
+            "start": 6.55,
+            "end": 8.75,
+            "text": "Shadow is a key character.",
+            "icon": "💯",
+            "place": "bottom"
+        }
+    ],
+    "music": {
+        "url": "http://localhost:3020/storage/audio/jamendo/funny/22159.mp3",
+        "volume": 0.055
+    },
+    "sourceVolume": 1
+}

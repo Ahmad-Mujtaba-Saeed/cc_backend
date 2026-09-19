@@ -37,6 +37,8 @@ class CostTracker
         'gpt_4o_output_per_1m' => 10.00,
         'gpt_5_nano_input_per_1m' => 0.05,
         'gpt_5_nano_output_per_1m' => 0.40,
+        'gpt_5_6_luna_input_per_1m' => 0.20,
+        'gpt_5_6_luna_output_per_1m' => 1.20,
         'openai_tts_per_minute' => 0.015,
         'fal_image_each' => 0.05,
     ];
@@ -48,6 +50,8 @@ class CostTracker
         'gpt_4o_output_per_1m' => 'gpt-4o output — $ per 1M tokens',
         'gpt_5_nano_input_per_1m' => 'gpt-5-nano input — $ per 1M tokens',
         'gpt_5_nano_output_per_1m' => 'gpt-5-nano output — $ per 1M tokens (reasoning tokens included)',
+        'gpt_5_6_luna_input_per_1m' => 'gpt-5.6-luna input — $ per 1M tokens (shorts vision + edit director)',
+        'gpt_5_6_luna_output_per_1m' => 'gpt-5.6-luna output — $ per 1M tokens (reasoning tokens included)',
         'openai_tts_per_minute' => 'OpenAI TTS — $ per minute of audio',
         'fal_image_each' => 'Fal AI — $ per generated image',
     ];
@@ -123,7 +127,10 @@ class CostTracker
 
         $rates = self::rates();
         $model = (string) $model;
-        if (str_starts_with($model, 'gpt-5')) {
+        if (str_starts_with($model, 'gpt-5.6-luna')) {
+            $rateIn = $rates['gpt_5_6_luna_input_per_1m'];
+            $rateOut = $rates['gpt_5_6_luna_output_per_1m'];
+        } elseif (str_starts_with($model, 'gpt-5')) {
             // gpt-5-nano (and any gpt-5 sibling until it earns its own
             // bucket) — without this branch "gpt-5-nano" carries no "mini"
             // and would bill at full gpt-4o rates, a ~50x overstatement.

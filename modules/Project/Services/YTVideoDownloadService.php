@@ -51,7 +51,7 @@ class YTVideoDownloadService extends AbstractYoutubeDownloader
             'x-rapidapi-host' => $this->rapidApiHost,
             'x-rapidapi-key' => $this->rapidApiKey,
         ])->get('https://' . $this->rapidApiHost . '/ajax/download.php', [
-            'format' => '480',
+            'format' => (string) config('services.rapidapi.download_format', '720'),
             'url' => $ytUrl,
             'audio_quality' => '128',
             'no_merge' => 'false',

@@ -1,0 +1,462 @@
+{
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "video": {
+        "url": "http://localhost:3020/storage/projects/195/tmp/main_clip_3.mp4",
+        "width": 854,
+        "height": 480,
+        "duration": 48.43
+    },
+    "gameplay": null,
+    "segments": [
+        {
+            "src": 0,
+            "dur": 48.43,
+            "rate": 1
+        }
+    ],
+    "layout": {
+        "kind": "facecam_top_gameplay",
+        "panels": [
+            {
+                "dest": [
+                    0,
+                    0,
+                    1,
+                    0.4
+                ],
+                "source": "main",
+                "crop": [
+                    0.05,
+                    0.05,
+                    0.2,
+                    0.2
+                ],
+                "primary": true
+            },
+            {
+                "dest": [
+                    0,
+                    0.4,
+                    1,
+                    0.6
+                ],
+                "source": "main",
+                "crop": [
+                    0.383,
+                    0.1,
+                    0.434,
+                    0.8
+                ]
+            }
+        ],
+        "background": "black",
+        "divider": {
+            "color": "#000000",
+            "thickness": 8
+        }
+    },
+    "style": {
+        "id": "neon_gamer_3",
+        "name": "Neon gamer",
+        "caption": {
+            "font": "mono",
+            "weight": 800,
+            "size": 76,
+            "uppercase": true,
+            "wordsPerLine": 2,
+            "color": "#ffffff",
+            "highlight": "#b4ff00",
+            "keyColor": "#00f0ff",
+            "highlightMode": "scale",
+            "stroke": 8,
+            "strokeColor": "#07001a",
+            "shadow": true,
+            "animation": "slide",
+            "y": 0.4,
+            "rotate": -2,
+            "lowercase": false,
+            "background": null
+        },
+        "hook": {
+            "style": "tape",
+            "bg": "#b4ff00",
+            "color": "#07001a",
+            "font": "mono",
+            "y": 0.13
+        },
+        "grade": {
+            "filter": "saturate(1.45) contrast(1.1)",
+            "vignette": 0.4,
+            "tint": "rgba(120,0,255,0.12)"
+        },
+        "progress": {
+            "position": "bottom",
+            "color": "#b4ff00",
+            "height": 12
+        },
+        "sfxVolume": 0.9,
+        "accent": "#ff3d7f",
+        "drift": 1.05,
+        "stickerFont": "mono"
+    },
+    "words": [
+        {
+            "text": "Adaptations,",
+            "start": 0,
+            "end": 0.72
+        },
+        {
+            "text": "let",
+            "start": 0.72,
+            "end": 0.94
+        },
+        {
+            "text": "me",
+            "start": 0.94,
+            "end": 1.02
+        },
+        {
+            "text": "see",
+            "start": 0.98,
+            "end": 1.12
+        },
+        {
+            "text": "you.",
+            "start": 1.12,
+            "end": 1.4
+        },
+        {
+            "text": "YouTube",
+            "start": 11.9,
+            "end": 12.38
+        },
+        {
+            "text": "is",
+            "start": 12.38,
+            "end": 12.62
+        },
+        {
+            "text": "a",
+            "start": 12.62,
+            "end": 12.7
+        },
+        {
+            "text": "little",
+            "start": 12.64,
+            "end": 12.72
+        },
+        {
+            "text": "back",
+            "start": 12.72,
+            "end": 12.9
+        },
+        {
+            "text": "up",
+            "start": 12.9,
+            "end": 13.06
+        },
+        {
+            "text": "chat,",
+            "start": 13.06,
+            "end": 13.32
+        },
+        {
+            "text": "hold",
+            "start": 13.44,
+            "end": 13.56
+        },
+        {
+            "text": "on.",
+            "start": 13.56,
+            "end": 13.78
+        },
+        {
+            "text": "God",
+            "start": 14.46,
+            "end": 14.84
+        },
+        {
+            "text": "damn.",
+            "start": 14.84,
+            "end": 15.14
+        },
+        {
+            "text": "Hey",
+            "start": 25.4,
+            "end": 25.7
+        },
+        {
+            "text": "yo.",
+            "start": 25.7,
+            "end": 25.98
+        },
+        {
+            "text": "In",
+            "start": 26.24,
+            "end": 26.36
+        },
+        {
+            "text": "this",
+            "start": 26.36,
+            "end": 26.5
+        },
+        {
+            "text": "test",
+            "start": 26.5,
+            "end": 26.64
+        },
+        {
+            "text": "6",
+            "start": 26.64,
+            "end": 26.86
+        },
+        {
+            "text": "is",
+            "start": 26.86,
+            "end": 27.04
+        },
+        {
+            "text": "laptop.",
+            "start": 27.04,
+            "end": 27.32
+        },
+        {
+            "text": "You",
+            "start": 28.1,
+            "end": 28.24
+        },
+        {
+            "text": "blind",
+            "start": 28.24,
+            "end": 28.66
+        },
+        {
+            "text": "if",
+            "start": 28.66,
+            "end": 28.86
+        },
+        {
+            "text": "you",
+            "start": 28.86,
+            "end": 28.98
+        },
+        {
+            "text": "can't",
+            "start": 28.98,
+            "end": 29.26
+        },
+        {
+            "text": "see",
+            "start": 29.26,
+            "end": 29.48
+        },
+        {
+            "text": "that.",
+            "start": 29.48,
+            "end": 29.72
+        },
+        {
+            "text": "You're",
+            "start": 30.16,
+            "end": 30.46
+        },
+        {
+            "text": "the",
+            "start": 30.46,
+            "end": 30.54
+        },
+        {
+            "text": "one",
+            "start": 30.54,
+            "end": 30.78
+        },
+        {
+            "text": "who",
+            "start": 30.78,
+            "end": 31.34
+        },
+        {
+            "text": "can't",
+            "start": 31.34,
+            "end": 31.76
+        },
+        {
+            "text": "see",
+            "start": 31.76,
+            "end": 31.88
+        },
+        {
+            "text": "shit.",
+            "start": 31.88,
+            "end": 32.38
+        },
+        {
+            "text": "Damn.",
+            "start": 33,
+            "end": 33.2
+        },
+        {
+            "text": "Damn.",
+            "start": 33.64,
+            "end": 33.88,
+            "key": true
+        }
+    ],
+    "captionsEnabled": true,
+    "hook": {
+        "text": "Wolverine Gameplay Madness!",
+        "emoji": "🎮",
+        "until": 2.2
+    },
+    "events": [
+        {
+            "type": "sfx",
+            "start": 0.05,
+            "name": "whoosh_fast",
+            "volume": 0.7
+        },
+        {
+            "type": "zoom",
+            "start": 1.08,
+            "end": 2.12,
+            "scale": 1.18
+        },
+        {
+            "type": "sfx",
+            "start": 1.09,
+            "name": "snare"
+        },
+        {
+            "type": "zoom",
+            "start": 7.585,
+            "end": 8.725,
+            "scale": 1.42
+        },
+        {
+            "type": "sfx",
+            "start": 7.595,
+            "name": "snare"
+        },
+        {
+            "type": "shake",
+            "start": 7.625,
+            "end": 7.975,
+            "intensity": 0.6
+        },
+        {
+            "type": "zoom",
+            "start": 11.085,
+            "end": 12.225,
+            "scale": 1.42
+        },
+        {
+            "type": "sfx",
+            "start": 11.095,
+            "name": "boom"
+        },
+        {
+            "type": "shake",
+            "start": 11.125,
+            "end": 11.475,
+            "intensity": 0.6
+        },
+        {
+            "type": "sfx",
+            "start": 13.03,
+            "name": "boom"
+        },
+        {
+            "type": "shake",
+            "start": 13.06,
+            "end": 13.61,
+            "intensity": 1
+        },
+        {
+            "type": "zoom",
+            "start": 13.06,
+            "end": 13.66,
+            "scale": 1.12
+        },
+        {
+            "type": "zoom",
+            "start": 21.335,
+            "end": 22.475,
+            "scale": 1.42
+        },
+        {
+            "type": "sfx",
+            "start": 21.345,
+            "name": "whoosh_fast"
+        },
+        {
+            "type": "shake",
+            "start": 21.375,
+            "end": 21.725,
+            "intensity": 0.6
+        },
+        {
+            "type": "zoom",
+            "start": 26.6,
+            "end": 27.74,
+            "scale": 1.42
+        },
+        {
+            "type": "sfx",
+            "start": 26.61,
+            "name": "whoosh_fast"
+        },
+        {
+            "type": "shake",
+            "start": 26.64,
+            "end": 26.99,
+            "intensity": 0.6
+        },
+        {
+            "type": "zoom",
+            "start": 30.12,
+            "end": 31.16,
+            "scale": 1.18
+        },
+        {
+            "type": "sfx",
+            "start": 33.61,
+            "name": "riser"
+        },
+        {
+            "type": "flash",
+            "start": 33.64
+        },
+        {
+            "type": "zoom",
+            "start": 35.869,
+            "end": 37.009,
+            "scale": 1.42
+        },
+        {
+            "type": "sfx",
+            "start": 35.879,
+            "name": "bass_drop"
+        },
+        {
+            "type": "shake",
+            "start": 35.909,
+            "end": 36.259,
+            "intensity": 0.6
+        },
+        {
+            "type": "context",
+            "start": 13.44,
+            "end": 15.64,
+            "text": "Streamer is facing intense challenges",
+            "icon": "🔥",
+            "place": "top"
+        }
+    ],
+    "music": {
+        "url": "http://localhost:3020/storage/audio/jamendo/funny/1881104.mp3",
+        "volume": 0.055
+    },
+    "sourceVolume": 1
+}

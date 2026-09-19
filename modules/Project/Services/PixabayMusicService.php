@@ -49,6 +49,23 @@ class PixabayMusicService implements MusicProviderInterface
     private const LOCAL_DIR = 'audio';
     private const LOCAL_ALIASES = ['relaxing' => 'calm'];
 
+    /**
+     * Search phrases for categories whose NAME is not a good Pixabay query.
+     *
+     * The other categories are searched by their own name, which works because
+     * they are words Pixabay's own tagging uses ("cinematic", "corporate").
+     * The shorts vibes are not: searching "hype" returns novelty tracks with
+     * "hype" in the title, not the hard beat the category means. Anything
+     * missing here falls back to the category name, so the map stays short.
+     */
+    private const QUERIES = [
+        'hype' => 'hip hop trap beat energetic',
+        'tension' => 'suspense tension riser build up',
+        'funny' => 'funny comedy quirky playful',
+        'phonk' => 'phonk dark trap bass',
+        'epic' => 'epic trailer dramatic powerful',
+    ];
+
     private MusicLibraryService $library;
 
     public function __construct(?MusicLibraryService $library = null)
@@ -222,7 +239,7 @@ class PixabayMusicService implements MusicProviderInterface
             try {
                 $response = Http::timeout(30)->get(self::ENDPOINT, [
                     'key' => $credential->credential,
-                    'q' => $category,
+                    'q' => self::QUERIES[$category] ?? $category,
                     'per_page' => self::PER_PAGE,
                     'safesearch' => 'true',
                 ]);

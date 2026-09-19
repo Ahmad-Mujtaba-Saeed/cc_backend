@@ -67,6 +67,11 @@ class JamendoMusicService implements MusicProviderInterface
         'adventure' => 'adventure epic cinematic orchestral',
         'documentary' => 'ambient documentary piano atmospheric',
         'relaxing' => 'relaxing calm ambient chillout',
+        'hype' => 'electronic energetic powerful beat hiphop',
+        'tension' => 'suspense tension building dramatic riser',
+        'funny' => 'funny quirky comedy playful silly',
+        'phonk' => 'dubstep drumnbass aggressive electronic',
+        'epic' => 'epic cinematic trailer',
     ];
 
     /**
@@ -82,6 +87,25 @@ class JamendoMusicService implements MusicProviderInterface
 
     /** Retries for that flake, before an empty answer is believed at all. */
     private const EMPTY_RETRIES = 2;
+
+    /**
+     * Categories that also ask Jamendo for a TEMPO, because for these the
+     * energy is the point — a slow "epic" track is not epic, it is ambient.
+     *
+     * Measured against the live API: this genuinely changes the results (the
+     * same tags at `high` return driving tracks where the unfiltered query
+     * returns soundtrack pads). It can also empty a result set completely —
+     * `hiphop electronic beat` at `veryhigh` returns nothing at all — so the
+     * retry drops it rather than letting a category go silent. Tempo is a
+     * preference here, never a requirement.
+     */
+    private const SPEEDS = [
+        'hype' => 'high',
+        'phonk' => 'veryhigh',
+        'epic' => 'high',
+        'gaming' => 'high',
+        'tension' => 'medium',
+    ];
 
     /** Category -> the space-separated fuzzytags string Jamendo needs. */
     private static function tagsFor(string $category): string
@@ -260,7 +284,7 @@ class JamendoMusicService implements MusicProviderInterface
         foreach (ApiCredential::forProvider('jamendo') as $credential) {
             for ($attempt = 0; $attempt <= self::EMPTY_RETRIES; $attempt++) {
                 try {
-                    $response = Http::timeout(30)->get(self::ENDPOINT, [
+                    $query = [
                         'client_id' => $credential->credential,
                         'format' => 'json',
                         'limit' => self::PER_PAGE,
@@ -274,7 +298,14 @@ class JamendoMusicService implements MusicProviderInterface
                         'audioformat' => 'mp32',
                         'order' => 'popularity_total_desc',
                         'include' => 'licenses',
-                    ]);
+                    ];
+                    // First try asks for the tempo the category wants; a retry
+                    // drops it, because an empty result is worse than a slow one.
+                    if ($attempt === 0 && isset(self::SPEEDS[$category])) {
+                        $query['speed'] = self::SPEEDS[$category];
+                    }
+
+                    $response = Http::timeout(30)->get(self::ENDPOINT, $query);
 
                     if (!$response->successful()) {
                         $credential->markFailure("HTTP {$response->status()}: " . substr($response->body(), 0, 200));

@@ -30,6 +30,13 @@ interface MusicProviderInterface
     public const CATEGORIES = [
         'horror', 'cinematic', 'emotional', 'sad', 'happy', 'vlog',
         'technology', 'corporate', 'gaming', 'adventure', 'documentary', 'relaxing',
+        // Added for the shorts editor. Every viral short rides a bed that
+        // matches what is happening — a hard beat under a challenge, a riser
+        // under a build-up, something silly under a silly moment — and the
+        // twelve categories above are all scored for long-form video, where
+        // the music stays out of the way. These are the opposite: they are
+        // meant to be heard. Usable from any template that wants them.
+        'hype', 'tension', 'funny', 'phonk', 'epic',
     ];
 
     /**

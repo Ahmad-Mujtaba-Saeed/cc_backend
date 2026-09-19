@@ -42,6 +42,23 @@ return [
         // Model used by the explainer script-analysis "brain".
         'explainer_model' => env('OPENAI_EXPLAINER_MODEL', 'gpt-4o-mini'),
         /*
+         * Long Video to Shorts editor. `shorts_vision_model` reads sampled
+         * frames of every short (what the scene is, where the people and the
+         * facecam sit); `shorts_director_model` writes each short's edit
+         * (hook, punch-ins, meme beats, context cards) and `shorts_tighten`
+         * picks the lines to cut.
+         *
+         * gpt-4o-mini, not gpt-5.6-luna. This is the highest-VOLUME model use
+         * in the app — three calls per short, up to 20 shorts a run — and luna
+         * bills output at $1.20/1M against 4o-mini's $0.60, for work that is
+         * structured extraction against a fixed JSON schema with a
+         * deterministic fallback behind every field. 4o-mini is also
+         * vision-capable, so the frame-reading call keeps working. Set
+         * OPENAI_SHORTS_*_MODEL to put a stronger brain back on either job.
+         */
+        'shorts_vision_model' => env('OPENAI_SHORTS_VISION_MODEL', 'gpt-4o-mini'),
+        'shorts_director_model' => env('OPENAI_SHORTS_DIRECTOR_MODEL', 'gpt-4o-mini'),
+        /*
          * Mechanical work: punchline extraction, YouTube packaging, the motif
          * prompt, the chapter grouping. All of these read something we already
          * have and reshape it, and all of them have a deterministic fallback
@@ -184,6 +201,9 @@ return [
         'key' => env('RAPIDAPI_KEY'),
         'download_host' => env('RAPIDAPI_DOWNLOAD_HOST', 'youtube-info-download-api.p.rapidapi.com'),
         'transcribe_host' => env('RAPIDAPI_TRANSCRIBE_HOST', 'youtube-transcriber11.p.rapidapi.com'),
+        // Source resolution. 720, not 480: a 9:16 short crops about a third of a
+        // 16:9 frame, so at 480p it was ~4x upscaled and a stream's webcam far more.
+        'download_format' => env('RAPIDAPI_DOWNLOAD_FORMAT', '720'),
     ],
 
     // Apify Configuration — alternative YouTube downloader (truefetch/youtube-video-downloader actor)

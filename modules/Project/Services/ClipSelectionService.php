@@ -626,7 +626,7 @@ class ClipSelectionService
         // from 6 windows without stacking picks on top of each other, so the
         // ceiling scales with the ask.
         if ($clipCount > 1) {
-            $strategy['max_windows'] = min(16, $strategy['max_windows'] + (int) ceil($clipCount * 0.75));
+            $strategy['max_windows'] = min(24, $strategy['max_windows'] + (int) ceil($clipCount * 0.75));
         }
 
         // A batch needs a candidate pool comfortably larger than the batch:

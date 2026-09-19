@@ -16,6 +16,12 @@ class TemplateProcessorFactory
     private const MUSIC_CATEGORY_DEFAULTS = [
         'ai_horror_shorts' => 'horror',
         'ai_explainer_video' => 'auto',
+        // Long Video to Shorts picks a bed PER SHORT from that short's own mood
+        // and scene (ShortMusicPlanner), which is the whole point — a hot-wing
+        // challenge and a quiet story out of the same stream should not share a
+        // track. Left on the 'none' fallback it silently shipped seven silent
+        // shorts, so 'auto' is the default here.
+        'yt_gameplay_short' => 'auto',
     ];
 
     /**

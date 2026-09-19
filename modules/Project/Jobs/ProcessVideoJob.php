@@ -30,12 +30,14 @@ class ProcessVideoJob implements ShouldQueue
      * This must be longer than the longest expected video processing time
      * so the job is not released back to the queue while still running.
      */
-    public int $retryAfter = 3600;
+    public int $retryAfter = 14400;
 
     /**
      * The maximum number of seconds a job should run.
      */
-    public int $timeout = 3600; // 1 hour
+    // Long Video to Shorts renders up to 20 fully edited shorts, a few
+    // minutes each on a modest host — an hour is not enough headroom.
+    public int $timeout = 14400; // 4 hours
 
     /**
      * Create a new job instance.
