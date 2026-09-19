@@ -98,6 +98,7 @@ class ShotListValidator
         $scenes = $this->enforceTransitionVariety($scenes);
         $scenes = $this->enforceCardSuitability($scenes);
         $scenes = $this->enforceTemplateCaps($scenes);
+        $scenes = $this->enforceCinematicShare($scenes);
         $scenes = $this->enforceStockCap($scenes);
         $scenes = $this->ensurePeakCards($scenes);
         $scenes = $this->ensureMediaFloor($scenes);
@@ -1045,7 +1046,7 @@ class ShotListValidator
                 'stat_spotlight', 'quote_card',
                 'versus_card', 'animated_chart', 'big_counter', 'checklist_card', 'icon_grid',
                 'timeline_card', 'step_flow', 'before_after', 'list_ranking', 'progress_meter', 'quote_portrait',
-                'phone_mockup', 'photo_stack', 'image_grid', 'custom_card', 'map_card', 'headline_ticker', 'myth_fact', 'pictogram_percent',
+                'phone_mockup', 'photo_stack', 'image_grid', 'custom_card', 'cinematic_card', 'map_card', 'headline_ticker', 'myth_fact', 'pictogram_percent',
                 'cycle_diagram', 'spectrum_card', 'quadrant_map', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card', 'venn_card', 'term_card', 'receipt_card', 'decision_tree',
                 'practice_card', 'common_mistake',
                 'math_steps', 'geometry_diagram', 'function_plot', 'scenario_diagram', 'formula_anatomy',
@@ -1451,6 +1452,16 @@ class ShotListValidator
     public function stripBoardMediaSlots(array $scenes): array
     {
         foreach ($scenes as &$scene) {
+            // The board has its own camera and draws only its own cards; a
+            // cinematic card there would fall through to a note that shows
+            // none of its parts. Its parts become the note's bullets instead.
+            if (($scene['layout_template'] ?? '') === 'cinematic_card') {
+                $this->warn("Scene {$scene['scene_id']}: cinematic_card on the maths board -> plain card.");
+                $this->changed = true;
+                $scene = $this->degradeCappedCard($scene);
+                continue;
+            }
+
             $slots = $scene['slots'] ?? [];
             $touched = false;
             foreach ($slots as $key => $slot) {
@@ -1656,6 +1667,22 @@ class ShotListValidator
                 // a second grid — the card's whole point is that it is rare.
                 $scene['layout_template'] = 'single_focus';
                 $scene['slots'] = ['slot_main' => $slots['slot_image_1'] ?? $this->genericTextBlock('')];
+                return $scene;
+            }
+
+            case 'cinematic_card': {
+                // Past the runtime share (or next to another one): the same
+                // explanation as a plain card — its parts become the bullets.
+                [$heading, $bullets] = $this->cinematicAsText(is_array($slots['slot_cinematic'] ?? null) ? $slots['slot_cinematic'] : []);
+                $scene['layout_template'] = 'single_focus';
+                $scene['slots'] = ['slot_main' => $bullets === []
+                    ? $this->genericTextBlock((string) ($scene['narration']['text'] ?? ''), $heading)
+                    : array_filter([
+                        'content_type' => 'text_block',
+                        'heading' => $heading,
+                        'bullets' => $bullets,
+                        'reveal' => 'sequential',
+                    ], fn ($v) => $v !== null)];
                 return $scene;
             }
 
@@ -2778,6 +2805,7 @@ class ShotListValidator
             'formula' => $this->clampFormulaAnatomyContent($slot) ?? $this->genericTextBlock($narrationText),
             'cycle' => $this->clampCycleContent($slot) ?? $this->genericTextBlock($narrationText),
             'custom_html' => $this->clampCustomHtmlContent($slot) ?? $this->genericTextBlock($narrationText),
+            'cinematic' => $this->clampCinematicContent($slot, $narrationText) ?? $this->genericTextBlock($narrationText),
             'vector_motif' => $this->clampVectorMotifContent($slot) ?? $this->genericTextBlock($narrationText),
             'spectrum' => $this->clampSpectrumContent($slot) ?? $this->genericTextBlock($narrationText),
             'quadrant' => $this->clampQuadrantContent($slot) ?? $this->genericTextBlock($narrationText),
@@ -4087,6 +4115,127 @@ class ShotListValidator
      *
      * Null when nothing usable survives, so the caller degrades to text.
      */
+    /**
+     * Clamp a cinematic staging (see Support\CinematicScene). Null when fewer
+     * than two parts survive — the caller degrades the beat to text.
+     */
+    private function clampCinematicContent(array $slot, string $narrationText = ''): ?array
+    {
+        $icons = array_flip(ExplainerRegistry::iconNames());
+        $result = CinematicScene::sanitize($slot, static fn (string $n) => isset($icons[$n]), $narrationText);
+
+        foreach ($result['warnings'] as $warning) {
+            $this->warn($warning);
+            $this->changed = true;
+        }
+
+        return $result['ok'] ? $result['slot'] : null;
+    }
+
+    /**
+     * A cinematic card's content as a plain card: its heading, and one bullet
+     * per part that has words (a stat keeps its label: "7% — earned every year").
+     *
+     * @return array{0: ?string, 1: string[]}
+     */
+    private function cinematicAsText(array $slot): array
+    {
+        $heading = mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null;
+        $bullets = [];
+        foreach ((array) ($slot['elements'] ?? []) as $el) {
+            if (!is_array($el) || count($bullets) >= 4) {
+                continue;
+            }
+            $kind = (string) ($el['kind'] ?? '');
+            $sub = trim((string) ($el['sub'] ?? ''));
+            // A formula does not read as a bullet (it would print as raw
+            // notation); its sub line says what it gives.
+            $main = $kind === 'formula' ? $sub : trim((string) ($el['text'] ?? ''));
+            if ($kind === 'stat' && $main !== '' && $sub !== '') {
+                $main .= ' — ' . $sub;
+            }
+            if ($main !== '') {
+                $bullets[] = mb_substr($main, 0, 60);
+            }
+        }
+
+        return [$heading, $bullets];
+    }
+
+    /**
+     * The cinematic budget. The user's rule is that these cards are the
+     * video's key explaining beats, never its texture — "maximum 3/10th of the
+     * video". Two passes, both deterministic:
+     *
+     * 1. Never two in a row. A cinematic beat lands because the cards around
+     *    it are calm; back to back, the second one is just more camera. The
+     *    second of an adjacent pair is demoted.
+     * 2. At most 30% of the runtime. While over, demote the weakest remaining
+     *    card — fewest staged parts, then the shortest, then the latest — so
+     *    the richest staging of the core idea is the one that survives.
+     *
+     * Demotion keeps the content: the parts become the bullets of a plain card
+     * with the same narration.
+     */
+    private function enforceCinematicShare(array $scenes): array
+    {
+        $isCine = fn (array $s) => ($s['layout_template'] ?? '') === 'cinematic_card';
+
+        foreach ($scenes as $i => $scene) {
+            if ($i > 0 && $isCine($scene) && $isCine($scenes[$i - 1])) {
+                $this->warn("Scene {$scene['scene_id']}: cinematic_card right after another -> degraded.");
+                $this->changed = true;
+                $scenes[$i] = $this->degradeCappedCard($scene);
+            }
+        }
+
+        $total = 0.0;
+        foreach ($scenes as $scene) {
+            $total += max(0.0, (float) ($scene['duration_seconds'] ?? 0));
+        }
+        if ($total <= 0) {
+            return $scenes;
+        }
+        $cap = ExplainerRegistry::cinematicMaxShare();
+
+        while (true) {
+            $cine = [];
+            $seconds = 0.0;
+            foreach ($scenes as $i => $scene) {
+                if ($isCine($scene)) {
+                    $cine[] = $i;
+                    $seconds += (float) ($scene['duration_seconds'] ?? 0);
+                }
+            }
+            if ($cine === [] || $seconds <= $total * $cap + 0.01) {
+                break;
+            }
+
+            usort($cine, function (int $a, int $b) use ($scenes) {
+                $pa = count((array) ($scenes[$a]['slots']['slot_cinematic']['elements'] ?? []));
+                $pb = count((array) ($scenes[$b]['slots']['slot_cinematic']['elements'] ?? []));
+                if ($pa !== $pb) {
+                    return $pa <=> $pb;
+                }
+                $da = (float) ($scenes[$a]['duration_seconds'] ?? 0);
+                $db = (float) ($scenes[$b]['duration_seconds'] ?? 0);
+                if (abs($da - $db) > 0.01) {
+                    return $da <=> $db;
+                }
+
+                return $b <=> $a;
+            });
+            $weakest = $cine[0];
+            $share = (int) round(100 * $seconds / $total);
+            $this->warn("Scene {$scenes[$weakest]['scene_id']}: cinematic cards took {$share}% of the runtime (cap "
+                . (int) round($cap * 100) . '%) -> degraded.');
+            $this->changed = true;
+            $scenes[$weakest] = $this->degradeCappedCard($scenes[$weakest]);
+        }
+
+        return $scenes;
+    }
+
     private function clampCustomHtmlContent(array $slot): ?array
     {
         $result = CustomHtml::sanitize(
@@ -6057,6 +6206,20 @@ class ShotListValidator
                     );
                 }
                 $scene['slots'] = ['slot_layers' => $stack];
+                return $scene;
+            }
+
+            case 'cinematic_card': {
+                $raw = is_array($slots['slot_cinematic'] ?? null) ? $slots['slot_cinematic'] : [];
+                $clean = $this->clampCinematicContent($raw, $narrationText);
+                if ($clean === null) {
+                    // Staging failed or never ran. The parts that did survive
+                    // (or the heading) still say what the beat was about.
+                    [$heading, $bullets] = $this->cinematicAsText($raw);
+                    return $degradeToText('cinematic card was never staged', $heading, $bullets);
+                }
+                $scene['slots'] = ['slot_cinematic' => $clean];
+
                 return $scene;
             }
 

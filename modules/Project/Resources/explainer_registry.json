@@ -1,5 +1,5 @@
 {
-  "version": 47,
+  "version": 48,
   "motion_styles": {
     "default": "auto",
     "styles": {
@@ -166,6 +166,40 @@
       "pulse"
     ],
     "use_when": "the beat is about a concrete object or mechanism the viewer should SEE, and no registry card draws it"
+  },
+  "cinematic": {
+    "max_runtime_share": 0.3,
+    "min_parts": 2,
+    "max_parts": 6,
+    "kinds": [
+      "text",
+      "stat",
+      "formula",
+      "icon",
+      "html"
+    ],
+    "places": [
+      "top_left",
+      "top",
+      "top_right",
+      "left",
+      "center",
+      "right",
+      "bottom_left",
+      "bottom",
+      "bottom_right"
+    ],
+    "depths": [
+      "near",
+      "mid",
+      "far"
+    ],
+    "cameras": [
+      "push",
+      "angle",
+      "rack"
+    ],
+    "use_when": "the video's key explaining beats (at most 30% of the runtime, never two in a row): each part on its own 3D layer (Flute), arriving out of focus on its cue word while the camera pushes in and the rest blurs, ending on a wide sharp view \u2014 the one card exempt from the flat-design no-blur rule"
   },
   "default_scene_seconds": 6,
   "composition_modes": [
@@ -608,6 +642,14 @@
       ],
       "supports_camera_move": false,
       "description": "A visual you AUTHOR yourself in a small fragment of HTML (inline SVG allowed) plus optional css, for the one beat in a video that no other card can express \u2014 a boarding pass, a chat thread, a scoreboard, a nutrition label, a keyboard, a receipt printer. LAST RESORT ONLY: if any other card fits, that card is better, because it is designed, typeset and animated for you. The fragment is sanitised (no script, no network, no shadows or gradients) and its css is scoped to the card. Animate it ONLY with data-at (0..1 through the scene), data-word (land on that narration word) and data-anim (fade|rise|pop|slide|grow) \u2014 never with css animations. Use the theme variables var(--accent), var(--text), var(--muted), var(--panel), var(--bg) for colour and var(--font-display), var(--font-body), var(--font-mono) for type, so the card matches the video."
+    },
+    "cinematic": {
+      "label": "Cinematic Explanation",
+      "required": [
+        "brief"
+      ],
+      "supports_camera_move": false,
+      "description": "The video's KEY explanation, staged in depth. Give ONLY `brief`: one sentence naming what the viewer must understand and the 3-5 pieces involved, in the order the narration introduces them (\"how a vaccine trains the body: the virus, a harmless copy of its spike, the antibodies, the memory cells\"), plus heading?. A later pass stages it: every piece on its own 3D layer, arriving out of focus when the narrator names it while the camera pushes in and the rest blurs, then a wide sharp view of the whole. Write that beat's narration so it NAMES each piece in turn, 9-14 seconds long."
     },
     "vector_motif": {
       "label": "Drawn Motif",
@@ -1433,6 +1475,18 @@
           "label": "Custom",
           "allowed": [
             "custom_html"
+          ]
+        }
+      }
+    },
+    "cinematic_card": {
+      "label": "Cinematic Explanation",
+      "description": "The video's key explaining beat, staged in depth with a moving camera and focus pulls. use_when: the beat that carries the CORE explanation \u2014 how the mechanism works, why the result happens, how the pieces relate \u2014 and names 3-5 pieces the viewer must see together. Several per video are fine, but together at most 30% of the runtime and never two in a row; never for a hook, a transition, a list of tips or a lone statistic.",
+      "slots": {
+        "slot_cinematic": {
+          "label": "Cinematic",
+          "allowed": [
+            "cinematic"
           ]
         }
       }

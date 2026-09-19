@@ -174,6 +174,7 @@ class ReviseExplainerStoryboardJob implements ShouldQueue
             $pusher->sendProgress($this->project->id, 55, 'Rewriting the cards you asked about…');
 
             $drafts = $service->draft($normalized['ops'], $current, $this->request, $context);
+            $drafts = $this->stageCinematic($drafts, $aspect);
 
             $validator = new ShotListValidator();
             $applyOptions = [
@@ -202,6 +203,7 @@ class ReviseExplainerStoryboardJob implements ShouldQueue
                     $context,
                     $result['rejected']
                 );
+                $retry = $this->stageCinematic($retry, $aspect);
                 $second = StoryboardRevision::apply(
                     $current,
                     $normalized['ops'],
@@ -607,6 +609,38 @@ class ReviseExplainerStoryboardJob implements ShouldQueue
             );
         } catch (Throwable $e) {
             Log::warning('ReviseExplainerStoryboardJob: progress push failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * A draft that turns a card into a cinematic_card arrives with a brief and
+     * no parts, exactly like the composer's; stage it here, the same way the
+     * analyze job does, or the validator would degrade it straight to text.
+     */
+    private function stageCinematic(array $drafts, string $aspect): array
+    {
+        $wants = false;
+        foreach ($drafts as $d) {
+            if (is_array($d) && ($d['layout_template'] ?? '') === 'cinematic_card') {
+                $wants = true;
+                break;
+            }
+        }
+        if (!$wants) {
+            return $drafts;
+        }
+        try {
+            $staged = (new \Modules\Project\Services\CinematicSceneService())->designAll(
+                ['scenes' => $drafts],
+                (string) $this->project->title,
+                $aspect
+            );
+
+            return is_array($staged['scenes'] ?? null) ? $staged['scenes'] : $drafts;
+        } catch (\Throwable $e) {
+            Log::info('ReviseExplainerStoryboardJob: cinematic staging unavailable', ['error' => $e->getMessage()]);
+
+            return $drafts;
         }
     }
 }

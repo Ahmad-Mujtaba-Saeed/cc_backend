@@ -25,12 +25,12 @@ class GenericStoryboardComposerService
     private const MENUS = [
         'hook' => ['single_focus', 'stat_spotlight', 'quote_card', 'full_bleed_with_banner', 'phone_mockup', 'split_side_by_side', 'animated_chart', 'image_grid'],
         'context' => ['single_focus', 'full_bleed_with_side_panel', 'labeled_diagram', 'cycle_diagram', 'formula_anatomy', 'term_card', 'layer_stack', 'hierarchy_card', 'image_grid', 'custom_card'],
-        'point' => ['single_focus', 'animated_chart', 'stat_spotlight', 'quote_card', 'myth_fact', 'pictogram_percent', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'spectrum_card', 'quadrant_map', 'venn_card', 'receipt_card', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'image_grid', 'custom_card'],
+        'point' => ['single_focus', 'cinematic_card', 'animated_chart', 'stat_spotlight', 'quote_card', 'myth_fact', 'pictogram_percent', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'spectrum_card', 'quadrant_map', 'venn_card', 'receipt_card', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'image_grid', 'custom_card'],
         'counter' => ['single_focus', 'quote_card', 'myth_fact', 'common_mistake'],
-        'resolution' => ['single_focus', 'animated_chart', 'pictogram_percent', 'receipt_card', 'proportion_flow', 'evidence_card', 'practice_card'],
+        'resolution' => ['single_focus', 'animated_chart', 'pictogram_percent', 'receipt_card', 'proportion_flow', 'evidence_card', 'practice_card', 'cinematic_card'],
         'origin' => ['single_focus', 'map_card', 'full_bleed_with_banner'],
         'era' => ['single_focus', 'timeline_card', 'map_card', 'full_bleed_with_side_panel', 'image_grid'],
-        'turning_point' => ['single_focus', 'stat_spotlight', 'quote_card', 'before_after', 'myth_fact', 'image_grid', 'custom_card'],
+        'turning_point' => ['single_focus', 'stat_spotlight', 'quote_card', 'before_after', 'myth_fact', 'image_grid', 'custom_card', 'cinematic_card'],
         'legacy' => ['single_focus', 'big_counter', 'image_grid'],
         'contenders' => ['split_side_by_side', 'versus_card'],
         'round' => ['single_focus', 'versus_card', 'before_after', 'split_side_by_side', 'spectrum_card', 'scale_comparison', 'image_grid'],
@@ -38,7 +38,7 @@ class GenericStoryboardComposerService
         'setup' => ['single_focus', 'term_card'],
         'ranking_reveal' => ['list_ranking'],
         'number_one' => ['single_focus', 'full_bleed_with_banner', 'stat_spotlight'],
-        'aspect' => ['single_focus', 'split_side_by_side', 'animated_chart', 'icon_grid', 'phone_mockup', 'labeled_diagram', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'math_steps', 'venn_card', 'common_mistake', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card', 'image_grid', 'custom_card'],
+        'aspect' => ['single_focus', 'cinematic_card', 'split_side_by_side', 'animated_chart', 'icon_grid', 'phone_mockup', 'labeled_diagram', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'math_steps', 'venn_card', 'common_mistake', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card', 'image_grid', 'custom_card'],
         'payoff' => ['single_focus', 'practice_card', 'icon_grid', 'checklist_card', 'full_bleed_with_banner', 'image_grid', 'custom_card'],
 
         // The `demo` shape. A walkthrough is a SCREEN video: its natural cards
@@ -107,6 +107,7 @@ class GenericStoryboardComposerService
         'phone_mockup' => 'slot_screen: {content_type:"image", asset_request:{description: the SCREEN content}, frame:"phone"|"browser"} — the card for ANY screen: a website, an app, a dashboard, a settings page, a progress bar. Use "browser" for a desktop/web UI and "phone" for a mobile app. A walkthrough may use it for several consecutive steps (up to 6 per video), but break up long runs with split_side_by_side or full_bleed_with_side_panel so the framing changes',
         'step_flow' => 'slot_steps: {content_type:"steps", items:[3-5 {label: <=4 words naming the action, icon?: a lucide name}], heading?} — a one-way process drawn as connected nodes; use it ONCE to preview or recap a multi-action walkthrough, never in place of showing the actions themselves',
         'custom_card' => 'slot_custom: {content_type:"custom_html", html: a SELF-CONTAINED fragment (inline <svg> allowed, no <script>, no <img>, no links, no external anything), css?: a few plain rules — class selectors only, no @media/@keyframes/@import, heading?: <=60, caption?: <=90} — THE LAST RESORT. Use it ONLY when the beat needs a specific THING drawn that no other card can express: a boarding pass, a chat exchange, a scoreboard, a nutrition label, a keyboard layout, a parking ticket, a periodic-table cell. If ANY other card fits the beat, that card is better — it is already typeset, animated and tested, and this one is not. REACH FOR IT, THOUGH, whenever the near-miss card would need a PICTURE of the thing. A text-message exchange is this card, NOT phone_mockup: a phone_mockup needs a real screenshot, and a generated one comes back with garbled text. Same for a printed ticket, a form, a receipt from a named shop, a scoreboard, a label, a certificate, a search-results page — if the beat is about what the OBJECT SAYS, draw it here rather than asking for a photograph of it. Never use it for a chart (animated_chart), a comparison (versus_card/split_side_by_side), a list (checklist_card/icon_grid), a process (step_flow/cycle_diagram), an equation (formula_anatomy/math_steps) or a photo (single_focus). STYLE: colour with var(--accent), var(--text), var(--muted), var(--panel), var(--line) and type with var(--font-display), var(--font-body), var(--font-mono) so the card matches the video; flat only — shadows, gradients and blurs are stripped. BUILD IT WITH HTML AND CSS, not SVG: an svg <text> element does not wrap, so any sentence in one runs straight off the edge. Use <div>/<p>/<table> with flex or grid for anything containing WORDS, and drop to inline <svg> only for shapes — a line, an arrow, a ring, a bar. SIZE: author against a 1000px-wide canvas and let the height be whatever the content needs — never set a fixed pixel height, and never author a tall canvas for a wide video. The card is scaled to fit the frame, so a fragment that is much taller than it is wide renders small in 16:9. MOTION: never write css animations (they are stripped — the renderer drives the clock). Instead put data-at="0.35" (a 0..1 point in the scene) or data-word="gate" (land when the narrator says that word) on the elements that should arrive one at a time, optionally with data-anim="fade|rise|pop|slide|grow". An element with no cue is visible from the start, so give at least two elements a cue — a card that arrives all at once in a video that runs for eight seconds is a still image. At most 2 per video',
+        'cinematic_card' => 'slot_cinematic: {content_type:"cinematic", brief: ONE sentence naming what the viewer must understand and the 3-5 pieces involved, in the order the narration introduces them ("how a vaccine trains the body: the virus, a harmless copy of its spike, the antibodies, the memory cells"), heading?: <=60} — THE VIDEO\'S KEY EXPLAINING BEATS, staged like a film: a later pass puts every piece on its own 3D layer, each arrives out of focus as the narrator names it while the camera pushes in and the rest of the picture blurs, and the beat ends on a wide, sharp view of the whole thing. Use it where the video actually EXPLAINS — the beat that ANSWERS the question: how the mechanism works, why the result happens, how the pieces relate. Never on the setup of the problem (that is context), a hook, a transition, a list of tips or a lone number. Write that beat\'s narration to NAME each piece in turn, as a TEACHING beat of 9-14 seconds. Cast it on the one to three beats that carry the core idea; together they must stay under 30% of the runtime and never sit next to each other — the calm cards around a cinematic beat are what make it land',
         'photo_stack' => 'slot_photo_1, slot_photo_2 (+ optional slot_photo_3, slot_photo_4): each {content_type:"image", asset_request:{description}} — 2-4 related shots flipped through like prints, ONE at a time. At most 1 per video',
         'image_grid' => 'slot_image_1, slot_image_2, slot_image_3 (+ optional slot_image_4, slot_image_5, slot_image_6): each {content_type:"image", asset_request:{description: a DIFFERENT concrete photographable subject}, label: a 1-3 word caption <=24 chars}, and slot_image_1 may carry heading?: <=40 — 3-6 pictures on screen AT ONCE, landing one at a time as the narration names them and all staying visible. ONLY when the beat genuinely needs several pictures TOGETHER so the viewer compares them (four examples, the six variants, the three species, what these places have in common) and the narration actually walks through them. Every cell must be a DIFFERENT subject — repeating one picture with different words is the failure this card invites, and a repeated cell is dropped. One picture is single_focus, two is split_side_by_side, a sequence shown one at a time is photo_stack. At most 1 per video',
         'labeled_diagram' => 'slot_diagram: {content_type:"image", asset_request:{description: ONE clean centered subject on a plain background, no text}, heading?: <=40 chars, callout_suggestions:[2-4 short part names, <=4 words each]} — use for "how X works"/parts-of-X beats; the labels are drawn natively over the image',
@@ -268,6 +269,8 @@ class GenericStoryboardComposerService
         if ($best === null || count($best) < max(3, (int) ceil(count($skeleton) * 0.6))) {
             return null; // the model skipped too much — giant call does better
         }
+
+        $best = $this->ensureCinematic($best, $skeleton);
 
         Log::info('GenericStoryboardComposer: storyboard composed by the tree', [
             'scenes' => count($best),
@@ -694,7 +697,245 @@ PROMPT;
             $faults[] = $nudge;
         }
 
+        foreach ($this->critiqueCinematic($scenes, $skeleton) as $fault) {
+            $faults[] = $fault;
+        }
+
         return $faults;
+    }
+
+    /**
+     * cinematic_card is the video's key explanation, so the critique holds it
+     * to the user's three rules while there is still time to rewrite:
+     *
+     * - it must EXIST in a video that explains something (a phase offers it
+     *   and the video is long enough to have a core beat): named once, by
+     *   phase, like the custom_card nudge — the model may still decline;
+     * - never two in a row;
+     * - together at most 30% of the runtime, measured the way the validator
+     *   paces scenes (the model's seconds or its words, whichever is longer).
+     *
+     * The validator enforces the last two anyway; saying them here means the
+     * model moves a beat instead of having one demoted to a text card.
+     *
+     * @return string[]
+     */
+    private function critiqueCinematic(array $scenes, array $skeleton): array
+    {
+        $faults = [];
+        $cine = [];
+        $total = 0.0;
+        $cineSeconds = 0.0;
+        foreach (array_values($scenes) as $i => $s) {
+            $words = str_word_count((string) ($s['narration']['text'] ?? ''));
+            $secs = min(14.0, max(3.0, (float) $s['duration_seconds'], $words / 2.5));
+            $total += $secs;
+            if (($s['layout_template'] ?? '') === 'cinematic_card') {
+                $cine[] = $i;
+                $cineSeconds += $secs;
+            }
+        }
+
+        if ($cine === []) {
+            $offering = [];
+            foreach (array_values($skeleton) as $i => $p) {
+                if (in_array('cinematic_card', self::menuFor((string) ($p['intent'] ?? '')), true)) {
+                    $offering[] = $i + 1;
+                }
+            }
+            if ($offering !== [] && count($scenes) >= 5) {
+                $faults[] = '- No beat uses "cinematic_card". Stage the video\'s CORE explanation as one (phase '
+                    . implode(' or ', array_slice($offering, 0, 3)) . ' offers it): pick the beat where the viewer '
+                    . 'must understand how the pieces relate, give it a brief naming those 3-5 pieces in order, '
+                    . 'and write its narration to name each one over 9-14 seconds. If no beat really explains '
+                    . 'anything, leave it out.';
+            }
+
+            return $faults;
+        }
+
+        for ($k = 1; $k < count($cine); $k++) {
+            if ($cine[$k] === $cine[$k - 1] + 1) {
+                $faults[] = '- Phases ' . ($cine[$k - 1] + 1) . ' and ' . ($cine[$k] + 1) . ' are both '
+                    . '"cinematic_card". Never put two next to each other — keep the stronger one and give the '
+                    . 'other an ordinary card from its menu.';
+                break;
+            }
+        }
+
+        if ($total > 0 && $cineSeconds > $total * 0.3) {
+            $faults[] = sprintf(
+                '- The cinematic_card beats take %d%% of the runtime; the limit is 30%%. Keep only the beat(s) '
+                . 'carrying the core explanation as cinematic_card and give the rest ordinary cards.',
+                (int) round(100 * $cineSeconds / $total)
+            );
+        }
+
+        // The staging lands each piece on the word that NAMES it, so a
+        // cinematic beat whose narration never says its pieces has nothing to
+        // land on. The first live run shipped exactly that: a brief naming the
+        // virus, the spike protein, the antibodies and the T cells over a
+        // 19-word narration that mentioned none of them.
+        $list = array_values($scenes);
+        foreach ($cine as $i) {
+            $missing = self::unspokenPieces($list[$i]);
+            if ($missing !== []) {
+                $faults[] = '- Phase ' . ($i + 1) . '\'s cinematic_card brief names ' . implode(', ', $missing)
+                    . ' but its narration never says them. Rewrite that narration (25-35 words) so it names each '
+                    . 'piece of the brief, in order — the picture brings each piece in on its name.';
+            }
+        }
+
+        return $faults;
+    }
+
+    /**
+     * Pieces a cinematic brief names that the beat's narration never says.
+     * The pieces are the brief's list after the colon ("how X works: a, b and
+     * c"); a piece counts as said when any of its words of 4+ letters is.
+     *
+     * @return string[]
+     */
+    public static function unspokenPieces(array $scene): array
+    {
+        $brief = (string) ($scene['slots']['slot_cinematic']['brief'] ?? '');
+        $colon = strpos($brief, ':');
+        $list = $colon === false ? $brief : substr($brief, $colon + 1);
+        $pieces = array_filter(array_map('trim', preg_split('/,|;|\band\b/i', $list) ?: []));
+        $narr = ' ' . strtolower(preg_replace('/[^a-z0-9 ]+/i', ' ', (string) ($scene['narration']['text'] ?? ''))) . ' ';
+
+        $missing = [];
+        foreach ($pieces as $piece) {
+            $words = array_filter(
+                preg_split('/\s+/', strtolower(preg_replace('/[^a-z0-9 ]+/i', ' ', $piece))) ?: [],
+                fn ($w) => strlen($w) >= 4 && !in_array($w, ['that', 'this', 'with', 'from', 'into', 'their', 'your'], true)
+            );
+            if ($words === []) {
+                continue;
+            }
+            $said = false;
+            foreach ($words as $w) {
+                // Prefix match so "antibody" is said by "antibodies".
+                if (preg_match('/ ' . preg_quote(substr($w, 0, max(4, strlen($w) - 2)), '/') . '/', $narr) === 1) {
+                    $said = true;
+                    break;
+                }
+            }
+            if (!$said) {
+                $missing[] = '"' . $piece . '"';
+            }
+        }
+
+        return count($missing) >= 2 ? array_slice($missing, 0, 4) : [];
+    }
+
+    /** Cards whose content is words, so a cinematic staging loses nothing by
+     *  replacing them. Data cards (charts, pictograms, formulas, figures) and
+     *  anything carrying a picture keep their own visual. */
+    private const CINEMATIC_PROMOTABLE = ['single_focus', 'quote_card', 'step_flow', 'icon_grid', 'checklist_card', 'stat_spotlight', 'term_card'];
+
+    /**
+     * The guarantee behind the nudge. The user asked for the video's best
+     * explaining part to be cinematic; casting at temperature 0.4 is a coin
+     * toss (the headphones script came back without one even after the
+     * critique named it). So when the final draft has none, the longest
+     * text-led beat in a phase that offers the card is promoted: its heading
+     * and items become the brief, its narration is kept, and the staging pass
+     * stages it from that narration. Only for videos long enough to have a
+     * core beat, and only when the promoted beat keeps the budget.
+     */
+    private function ensureCinematic(array $scenes, array $skeleton): array
+    {
+        if (count($scenes) < 5 || in_array('cinematic_card', array_column($scenes, 'layout_template'), true)) {
+            return $scenes;
+        }
+
+        $total = 0.0;
+        $secs = [];
+        foreach ($scenes as $k => $s) {
+            $words = str_word_count((string) ($s['narration']['text'] ?? ''));
+            $secs[$k] = min(14.0, max(3.0, (float) $s['duration_seconds'], $words / 2.5));
+            $total += $secs[$k];
+        }
+
+        $best = null;
+        $bestWords = 0;
+        $skeleton = array_values($skeleton);
+        foreach (array_values($scenes) as $k => $s) {
+            $intent = (string) ($skeleton[$k]['intent'] ?? '');
+            if (!in_array('cinematic_card', self::menuFor($intent), true)
+                || !in_array($s['layout_template'], self::CINEMATIC_PROMOTABLE, true)) {
+                continue;
+            }
+            $hasMedia = false;
+            foreach ((array) $s['slots'] as $slot) {
+                if (is_array($slot) && in_array((string) ($slot['content_type'] ?? ''), ['image', 'video', 'vector_motif'], true)) {
+                    $hasMedia = true;
+                }
+            }
+            $words = str_word_count((string) ($s['narration']['text'] ?? ''));
+            if ($hasMedia || $words < 18 || $secs[$k] > $total * 0.3) {
+                continue;
+            }
+            if ($words > $bestWords) {
+                $best = $k;
+                $bestWords = $words;
+            }
+        }
+        if ($best === null) {
+            return $scenes;
+        }
+
+        $scene = array_values($scenes)[$best];
+        [$heading, $pieces] = self::piecesOf($scene);
+        $brief = ($heading !== '' ? $heading : 'what this beat explains')
+            . ($pieces !== [] ? ': ' . implode(', ', $pieces) : ': ' . mb_substr((string) ($scene['narration']['text'] ?? ''), 0, 160));
+        $scene['layout_template'] = 'cinematic_card';
+        $scene['slots'] = ['slot_cinematic' => array_filter([
+            'content_type' => 'cinematic',
+            'heading' => $heading !== '' ? mb_substr($heading, 0, 60) : null,
+            'brief' => mb_substr($brief, 0, 200),
+        ], fn ($v) => $v !== null)];
+
+        $keys = array_keys($scenes);
+        $scenes[$keys[$best]] = $scene;
+        Log::info('GenericStoryboardComposer: promoted a beat to cinematic_card', [
+            'scene' => $scene['scene_id'] ?? $best,
+            'brief' => $brief,
+        ]);
+
+        return $scenes;
+    }
+
+    /**
+     * A promotable card's heading and its named items, whatever its shape.
+     *
+     * @return array{0: string, 1: string[]}
+     */
+    private static function piecesOf(array $scene): array
+    {
+        $heading = '';
+        $pieces = [];
+        foreach ((array) $scene['slots'] as $slot) {
+            if (!is_array($slot)) {
+                continue;
+            }
+            $heading = $heading !== '' ? $heading : trim((string) ($slot['heading'] ?? $slot['term'] ?? ''));
+            foreach ((array) ($slot['bullets'] ?? []) as $b) {
+                $pieces[] = trim((string) $b);
+            }
+            foreach ((array) ($slot['items'] ?? []) as $it) {
+                $pieces[] = trim((string) (is_array($it) ? ($it['label'] ?? '') : $it));
+            }
+            foreach (['pros', 'cons'] as $side) {
+                foreach ((array) ($slot[$side] ?? []) as $b) {
+                    $pieces[] = trim((string) $b);
+                }
+            }
+        }
+        $pieces = array_slice(array_values(array_filter($pieces, fn ($p) => $p !== '')), 0, 5);
+
+        return [$heading, array_map(fn ($p) => mb_substr($p, 0, 40), $pieces)];
     }
 
     /**

@@ -1,0 +1,104 @@
+[
+    {
+        "scene_id": "scene_3-noise-cancelling-headphones",
+        "narration": "The chip inside reads that sound thousands of times a second and builds its mirror image, a wave that rises exactly where the noise falls and falls where it rises.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "How noise-cancelling headphones work",
+            "brief": "how noise-cancelling headphones create a mirror image of sound: the chip, the wave, the noise",
+            "elements": [
+                {
+                    "id": "chip",
+                    "kind": "icon",
+                    "icon": "cpu",
+                    "text": "Sound Chip",
+                    "sub": "reads sound thousands of times",
+                    "place": "top_left",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "chip"
+                },
+                {
+                    "id": "wave",
+                    "kind": "text",
+                    "place": "top",
+                    "depth": "mid",
+                    "camera": "angle",
+                    "word": "wave",
+                    "text": "mirror image wave"
+                },
+                {
+                    "id": "noise",
+                    "kind": "text",
+                    "text": "Noise",
+                    "sub": "the sound being cancelled",
+                    "place": "top_right",
+                    "depth": "far",
+                    "camera": "rack",
+                    "word": "noise"
+                },
+                {
+                    "id": "rise",
+                    "kind": "text",
+                    "text": "Rises",
+                    "sub": "where the noise falls",
+                    "place": "bottom_left",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "rises"
+                },
+                {
+                    "id": "fall",
+                    "kind": "text",
+                    "text": "Falls",
+                    "sub": "where the noise rises",
+                    "place": "bottom_right",
+                    "depth": "mid",
+                    "camera": "rack",
+                    "word": "falls"
+                }
+            ]
+        }
+    },
+    {
+        "scene_id": "scene_3-how-vaccines-train-the-body",
+        "narration": "Vaccines teach your immune system in advance: the virus, a harmless spike protein, the antibodies, and the memory cells.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "How vaccines train the immune system",
+            "brief": "how a vaccine trains the body: the virus, a harmless copy of its spike, the antibodies, the memory cells",
+            "elements": [
+                {
+                    "id": "virus",
+                    "kind": "text",
+                    "text": "Virus",
+                    "place": "top_left",
+                    "depth": "far",
+                    "camera": "push",
+                    "word": "virus"
+                },
+                {
+                    "id": "spike",
+                    "kind": "text",
+                    "text": "Harmless spike protein",
+                    "sub": "a copy of the virus",
+                    "place": "top",
+                    "depth": "mid",
+                    "camera": "angle",
+                    "word": "spike"
+                },
+                {
+                    "id": "memory-cells",
+                    "kind": "icon",
+                    "icon": "brain",
+                    "text": "Memory cells",
+                    "sub": "remember the virus",
+                    "place": "bottom",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "cells"
+                }
+            ]
+        }
+    }
+]

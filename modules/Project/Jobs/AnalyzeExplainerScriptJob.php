@@ -232,6 +232,26 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                 }
             }
 
+            // Cinematic cards: the composer named the key explanation beats and
+            // what each must make clear; a focused pass stages each one (parts,
+            // grid places, depths, cue words, shots). Same convergence point
+            // and the same reason as the motifs above. A beat whose staging
+            // fails stays pending and the validator degrades it to text.
+            if (is_array($raw) && !empty($raw['scenes'])) {
+                try {
+                    $raw = (new \Modules\Project\Services\CinematicSceneService())->designAll(
+                        $raw,
+                        (string) $this->project->title,
+                        (string) ($this->project->aspect_ratio ?? '16:9')
+                    );
+                } catch (Throwable $e) {
+                    Log::info('AnalyzeExplainerScriptJob: cinematic staging unavailable', [
+                        'project_id' => $this->project->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // Geometry figure synthesis (iter 40): rebuild any geometry_diagram
             // whose slot came back thin — a bare shape name that would draw as
             // an unlabelled default while the narration describes a labelled

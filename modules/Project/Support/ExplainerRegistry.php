@@ -364,6 +364,18 @@ class ExplainerRegistry
         return (int) (self::all()['vector_motif']['max_per_video'] ?? 3);
     }
 
+    /**
+     * The most of a video's runtime cinematic cards may take together (the
+     * user's rule: "maximum 3/10th of the video"). Clamped so a bad registry
+     * edit can never turn the whole video into camera moves.
+     */
+    public static function cinematicMaxShare(): float
+    {
+        $share = (float) (self::all()['cinematic']['max_runtime_share'] ?? 0.3);
+
+        return max(0.0, min(0.5, $share));
+    }
+
     /** Per-video cap on auto-fetched stock b-roll slots (§8). */
     public static function maxStockVideos(): int
     {
