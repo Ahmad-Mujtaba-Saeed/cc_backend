@@ -491,6 +491,27 @@ class ExplainerController extends Controller
                 $request_['instruction'] = $instruction;
             }
         }
+        // The description IS the prompt, and the planner's version of it is
+        // often a label ("An image of a network diagram"). When the user has
+        // not written their own subject, turn that label into a real SHOT read
+        // from this beat's narration — then keep it on the slot, so the panel
+        // shows what was actually drawn and the render generates from the same
+        // words instead of re-billing a different prompt.
+        if (!$request->filled('description') && \Modules\Project\Services\SlotImageBriefService::isThin($slot)) {
+            try {
+                $shot = (new \Modules\Project\Services\SlotImageBriefService())->brief(
+                    (string) ($request_['description'] ?? ''),
+                    (string) $scene->narration,
+                    (string) ($slot['heading'] ?? $slot['label'] ?? ''),
+                    (string) $project->title
+                );
+                if ($shot !== null && $shot !== '') {
+                    $request_['description'] = $shot;
+                }
+            } catch (\Throwable $e) {
+                Log::info('generateSlotImage: image brief unavailable', ['error' => $e->getMessage()]);
+            }
+        }
         $slot['asset_request'] = $request_;
 
         $built = \Modules\Project\Support\ExplainerImagePrompt::forSlot(

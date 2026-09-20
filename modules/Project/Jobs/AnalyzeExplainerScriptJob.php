@@ -350,6 +350,28 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                 }
             }
 
+            // Picture briefs: `asset_request.description` IS the image prompt
+            // (and the prompt the user edits in the storyboard's Generate
+            // panel), but the composer writes it in passing — "An image of a
+            // network diagram" — and the validator's own fallback is worse.
+            // One cheap pass rewrites the thin ones as a real SHOT, read from
+            // that beat's narration. Never fatal: a slot whose brief does not
+            // come back keeps the words it had.
+            if ((bool) config('services.openai.explainer_image_briefs', true)) {
+                try {
+                    $briefed = (new \Modules\Project\Services\SlotImageBriefService())
+                        ->enrichAll(['scenes' => $scenes], (string) $this->project->title);
+                    if (is_array($briefed['scenes'] ?? null)) {
+                        $scenes = $briefed['scenes'];
+                    }
+                } catch (Throwable $e) {
+                    Log::info('AnalyzeExplainerScriptJob: image briefs unavailable', [
+                        'project_id' => $this->project->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             // Replacing the prior storyboard is deferred to persistence below
             // (after the chapter planner may have inserted act-break covers,
             // §5.5) — and it is a DIFF, not a wipe: idempotent re-analysis

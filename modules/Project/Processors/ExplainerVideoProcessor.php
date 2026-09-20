@@ -854,6 +854,15 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
             $assets = ExplainerAsset::where('project_id', $this->project->id)->get()
                 ->keyBy(fn ($a) => $a->scene_id . '::' . $a->slot_key);
 
+            // Every picture this pass draws is drawn from the slot's
+            // description, so the description has to be a SHOT and not the
+            // planner's label. The analyser writes those, but a project made
+            // before that pass existed — or a slot it skipped — would fall
+            // back to "An image of a network diagram" here. Written once,
+            // saved on the scene, so the prompt (and its cache hash) is the
+            // same one the storyboard shows and the next render reuses.
+            $this->briefEmptySlots($assets);
+
             $budget = ExplainerRegistry::maxSlotFills();
             $pending = [];
             foreach ($this->project->explainerScenes()->orderBy('order')->get() as $scene) {
@@ -925,14 +934,11 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
                 ]
             );
 
-            if (empty($images) || !is_array($images)) {
-                Log::info('ExplainerVideoProcessor: no slot fills generated (non-fatal)');
-                return true;
-            }
-
+            $missed = [];
             foreach ($pending as $i => $entry) {
-                $absolute = $images[$i] ?? null;
+                $absolute = is_array($images) ? ($images[$i] ?? null) : null;
                 if (!$absolute) {
+                    $missed[] = $entry['scene_id'] . ' / ' . $entry['slot_key'];
                     continue;
                 }
                 ExplainerAsset::updateOrCreate(
@@ -943,14 +949,141 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
 
             Log::info('ExplainerVideoProcessor: slot fills generated', [
                 'project_id' => $this->project->id,
-                'count' => count($pending),
+                'asked' => count($pending),
+                'made' => count($pending) - count($missed),
             ]);
+
+            // A slot that could not be filled renders its placeholder box, and
+            // the user has no way of knowing why their pictures are missing
+            // unless we say so — the whole pass is non-fatal by design, which
+            // is exactly what made a network wobble look like a silent bug.
+            $this->reportUnfilledSlots($missed);
 
             return true;
         } catch (\Throwable $e) {
             // Decorative fill — the missing-gate exemption keeps the render alive.
             Log::warning('ExplainerVideoProcessor: slot fill failed (non-fatal): ' . $e->getMessage());
             return true;
+        }
+    }
+
+    /**
+     * Write a real shot for every EMPTY image slot whose description is still
+     * the planner's label ({@see SlotImageBriefService}).
+     *
+     * Only empty ones: a slot that already holds a picture keeps the prompt it
+     * was generated from, because changing that text would re-bill an image
+     * the user has already seen and accepted.
+     *
+     * @param \Illuminate\Support\Collection $assets  keyed scene_id::slot_key
+     */
+    private function briefEmptySlots($assets): void
+    {
+        try {
+            $service = new \Modules\Project\Services\SlotImageBriefService();
+            if (!$service->available()) {
+                return;
+            }
+
+            $scenes = $this->project->explainerScenes()->orderBy('order')->get();
+            $draft = ['scenes' => []];
+            foreach ($scenes as $scene) {
+                $slots = $scene->slots ?? [];
+                foreach ($slots as $slotKey => $slot) {
+                    if (!is_array($slot) || ($slot['content_type'] ?? '') !== 'image') {
+                        continue;
+                    }
+                    $existing = $assets->get($scene->scene_id . '::' . $slotKey);
+                    if ($existing && Storage::disk('public')->exists($existing->path)) {
+                        // Marked as already having a picture, which is what
+                        // enrichAll() skips — it keeps the prompt that made
+                        // what is on screen.
+                        $slots[$slotKey]['asset_ref'] = ['path' => $existing->path, 'type' => $existing->type];
+                    }
+                }
+                $draft['scenes'][(string) $scene->scene_id] = [
+                    'scene_id' => (string) $scene->scene_id,
+                    'narration' => ['text' => (string) $scene->narration],
+                    'slots' => $slots,
+                ];
+            }
+
+            $briefed = $service->enrichAll($draft, (string) $this->project->title);
+            foreach ($scenes as $scene) {
+                $written = $briefed['scenes'][(string) $scene->scene_id]['slots'] ?? null;
+                if (!is_array($written)) {
+                    continue;
+                }
+                $slots = $scene->slots ?? [];
+                $changed = false;
+                foreach ($slots as $slotKey => $slot) {
+                    $shot = $written[$slotKey]['asset_request']['description'] ?? null;
+                    if (!is_string($shot) || $shot === '' || !empty($written[$slotKey]['asset_ref'])) {
+                        continue;
+                    }
+                    if ($shot !== (string) ($slot['asset_request']['description'] ?? '')) {
+                        $slots[$slotKey]['asset_request']['description'] = $shot;
+                        $changed = true;
+                    }
+                }
+                if ($changed) {
+                    $scene->update(['slots' => $slots]);
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::info('ExplainerVideoProcessor: image briefs unavailable at render: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Say which slots came back without a picture, on the project itself.
+     *
+     * The message lands in the storyboard's lint report (where the editor
+     * already shows warnings) and in the log. It is cleared on a render where
+     * nothing was missed, so a fixed video stops complaining.
+     *
+     * @param string[] $missed  "scene_id / slot_key" for each empty slot
+     */
+    private function reportUnfilledSlots(array $missed): void
+    {
+        try {
+            $settings = $this->project->settings ?? [];
+            $report = is_array($settings['lint_report'] ?? null) ? $settings['lint_report'] : ['items' => [], 'counts' => []];
+            $items = array_values(array_filter(
+                (array) ($report['items'] ?? []),
+                fn ($item) => ($item['code'] ?? '') !== 'ai_visual_missing'
+            ));
+
+            foreach ($missed as $slot) {
+                [$sceneId] = array_pad(explode(' / ', $slot, 2), 2, null);
+                $items[] = [
+                    'code' => 'ai_visual_missing',
+                    'message' => "The AI picture for {$slot} could not be generated — that slot rendered its placeholder. "
+                        . 'Render again to retry it, or drop your own image on the slot.',
+                    'scene_id' => $sceneId,
+                    'severity' => 'warn',
+                ];
+            }
+
+            $counts = ['error' => 0, 'warn' => 0, 'info' => 0];
+            foreach ($items as $item) {
+                $sev = (string) ($item['severity'] ?? 'info');
+                $counts[$sev] = ($counts[$sev] ?? 0) + 1;
+            }
+
+            $report['items'] = $items;
+            $report['counts'] = $counts;
+            $settings['lint_report'] = $report;
+            $this->project->update(['settings' => $settings]);
+
+            if ($missed !== []) {
+                Log::warning('ExplainerVideoProcessor: slots left without a picture', [
+                    'project_id' => $this->project->id,
+                    'slots' => $missed,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::info('ExplainerVideoProcessor: could not record unfilled slots: ' . $e->getMessage());
         }
     }
 

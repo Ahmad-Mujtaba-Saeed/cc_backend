@@ -453,6 +453,9 @@ class PythonAIService
             }
 
             $jobs = [];
+            // Scenes that could not be generated, by index. They come back as
+            // nulls so the caller can see exactly which slots have no picture.
+            $failed = [];
             $endpointUrl = $this->falEndpoint . $this->imageGenerationEndpoint;
 
             $projectId = $options['project_id'] ?? 'temp';
@@ -502,24 +505,37 @@ class PythonAIService
                     'prompt_preview' => substr($finalPrompt, 0, 150)
                 ]);
 
-                $response = Http::withHeaders($headers)
-                    ->timeout(30)
-                    ->post($endpointUrl, $payload);
+                // One flaky connection must not cost the whole batch. The
+                // default connect timeout is 10s, which this laptop's link to
+                // fal exceeded on a cold TCP handshake (cURL 28) — every image
+                // of the render was then dropped and the video went out with
+                // placeholder boxes. Retried, with room to connect, and any
+                // scene that still fails is skipped rather than thrown.
+                $data = null;
+                try {
+                    $response = Http::withHeaders($headers)
+                        ->connectTimeout(20)
+                        ->timeout(60)
+                        ->retry(3, 1200, throw: false)
+                        ->post($endpointUrl, $payload);
 
-                if (!$response->successful()) {
-                    Log::error("Failed to submit scene " . ($index + 1) . " to Fal AI queue", [
-                        'endpoint' => $endpointUrl,
-                        'status' => $response->status(),
-                        'body' => $response->body()
-                    ]);
-                    throw new \Exception("Fal AI queue submission failed for scene " . ($index + 1));
+                    if ($response->successful()) {
+                        $data = $response->json();
+                    } else {
+                        Log::error("Failed to submit scene " . ($index + 1) . " to Fal AI queue", [
+                            'endpoint' => $endpointUrl,
+                            'status' => $response->status(),
+                            'body' => substr($response->body(), 0, 300),
+                        ]);
+                    }
+                } catch (\Throwable $e) {
+                    Log::error("Fal AI submit threw for scene " . ($index + 1) . ': ' . $e->getMessage());
                 }
 
-                $data = $response->json();
-                $requestId = $data['request_id'] ?? null;
+                $requestId = is_array($data) ? ($data['request_id'] ?? null) : null;
                 if (empty($requestId)) {
-                    Log::error("Fal AI queue submission did not return request_id for scene " . ($index + 1), ['response' => $data]);
-                    throw new \Exception("Fal AI queue submission failed: no request_id returned");
+                    $failed[$index] = 'submit';
+                    continue;
                 }
 
                 $jobs[$index] = [
@@ -548,7 +564,20 @@ class PythonAIService
 
                     $allCompleted = false; // At least one job is not completed yet
 
-                    $statusResponse = Http::withHeaders($headers)->get($job['status_url']);
+                    // A dropped poll is not a dead job: the picture is still
+                    // being made on fal's side, so retry it on the next tick
+                    // instead of throwing out the whole batch (which is what a
+                    // 10s connect timeout used to do, twice, to real renders).
+                    try {
+                        $statusResponse = Http::withHeaders($headers)
+                            ->connectTimeout(20)
+                            ->timeout(30)
+                            ->retry(2, 800, throw: false)
+                            ->get($job['status_url']);
+                    } catch (\Throwable $e) {
+                        Log::warning("Poll threw for Fal AI job " . $job['request_id'] . ': ' . $e->getMessage());
+                        continue;
+                    }
                     if (!$statusResponse->successful()) {
                         Log::warning("Failed to poll status for Fal AI job " . $job['request_id'] . ", status code: " . $statusResponse->status());
                         continue;
@@ -576,7 +605,21 @@ class PythonAIService
                             $fetchAttempts = 3;
                             $resultResponse = null;
                             for ($fetchTry = 1; $fetchTry <= $fetchAttempts; $fetchTry++) {
-                                $resultResponse = Http::withHeaders($headers)->timeout(30)->get($job['response_url']);
+                                try {
+                                    $resultResponse = Http::withHeaders($headers)
+                                        ->connectTimeout(20)
+                                        ->timeout(30)
+                                        ->get($job['response_url']);
+                                } catch (\Throwable $e) {
+                                    Log::warning("Fetch threw for scene " . ($index + 1) . ': ' . $e->getMessage());
+                                    $resultResponse = null;
+                                }
+                                if ($resultResponse === null) {
+                                    if ($fetchTry < $fetchAttempts) {
+                                        sleep(2);
+                                    }
+                                    continue;
+                                }
                                 if ($resultResponse->successful()) {
                                     break;
                                 }
@@ -594,9 +637,10 @@ class PythonAIService
                                 Log::error("All attempts to fetch Fal AI response payload failed for job " . $job['request_id'], [
                                     'response_url' => $job['response_url'],
                                     'final_http_status' => $resultResponse ? $resultResponse->status() : 'no_response',
-                                    'final_body' => $resultResponse ? substr($resultResponse->body(), 0, 500) : 'no_response',
                                 ]);
-                                throw new \Exception("Failed to fetch response payload for scene " . ($index + 1));
+                                $failed[$index] = 'fetch';
+                                $job['completed'] = true;
+                                continue;
                             }
 
                             $resultData = $resultResponse->json();
@@ -604,8 +648,10 @@ class PythonAIService
 
                         $images = $resultData['images'] ?? [];
                         if (empty($images) || empty($images[0]['url'])) {
-                            Log::error("Completed Fal AI job did not return any image URLs", ['response' => $resultData]);
-                            throw new \Exception("No image URL returned from Fal AI for scene " . ($index + 1));
+                            Log::error("Completed Fal AI job did not return any image URLs", ['scene' => $index + 1]);
+                            $failed[$index] = 'no_url';
+                            $job['completed'] = true;
+                            continue;
                         }
 
                         $cdnUrl = $images[0]['url'];
@@ -613,21 +659,33 @@ class PythonAIService
 
                         $localPath = $this->downloadCdnImage($cdnUrl, $index, $options['project_id'] ?? 'temp');
                         if (!$localPath) {
-                            throw new \Exception("Failed to download generated image for scene " . ($index + 1));
+                            $failed[$index] = 'download';
                         }
 
                         $job['local_path'] = $localPath;
                         $job['completed'] = true;
 
                     } elseif ($status === 'FAILED') {
-                        Log::error("Fal AI job failed for scene " . ($index + 1), ['response' => $statusData]);
-                        throw new \Exception("Fal AI image generation failed for scene " . ($index + 1) . ": " . ($statusData['error'] ?? 'Unknown Fal AI error'));
+                        Log::error("Fal AI job failed for scene " . ($index + 1), ['error' => $statusData['error'] ?? 'unknown']);
+                        $failed[$index] = 'generation';
+                        $job['completed'] = true;
                     }
                 }
             }
 
             if (!$allCompleted) {
-                throw new \Exception("Image generation timed out after {$timeoutLimit} seconds");
+                // Whatever did land is still worth having: the slots that got
+                // an image keep it, and the rest fall back to their
+                // placeholder instead of the whole video losing its pictures.
+                foreach ($jobs as $index => $job) {
+                    if (empty($job['local_path'])) {
+                        $failed[$index] = 'timeout';
+                    }
+                }
+                Log::warning("Image generation timed out after {$timeoutLimit}s; keeping what completed", [
+                    'missing' => count($failed),
+                    'of' => count($jobs),
+                ]);
             }
 
             // Ensure deterministic order by scene index (jobs keys were created from prompt order)
@@ -646,9 +704,21 @@ class PythonAIService
                 (string) ($options['cost_label'] ?? 'image_generation')
             );
 
+            $made = count(array_filter($localPaths));
+            if ($made === 0) {
+                return ['success' => false, 'error' => 'No images could be generated (' . count($failed) . ' failed)'];
+            }
+            if ($failed !== []) {
+                Log::warning('Image generation finished with gaps', [
+                    'generated' => $made,
+                    'failed' => $failed,
+                ]);
+            }
+
             return [
                 'success' => true,
-                'images' => $localPaths
+                'images' => $localPaths,
+                'failed' => $failed,
             ];
 
         } catch (Exception $e) {
@@ -663,7 +733,13 @@ class PythonAIService
     private function downloadCdnImage(string $url, int $index, string $projectId): ?string
     {
         try {
-            $imageContent = Http::timeout(30)->get($url)->body();
+            // The CDN is the last hop and the cheapest one to retry: a dropped
+            // download used to throw away an image that was already paid for.
+            $imageContent = Http::connectTimeout(20)
+                ->timeout(60)
+                ->retry(3, 1000, throw: false)
+                ->get($url)
+                ->body();
             if (empty($imageContent)) {
                 Log::error("Failed to download image contents from CDN: " . $url);
                 return null;
