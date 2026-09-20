@@ -1,0 +1,104 @@
+[
+    {
+        "scene_id": "example-1",
+        "narration": "The boat glides into the lock, and the lower gate closes behind it. Water pours in from the upper river, and the level in the chamber rises until it matches the river ahead. The upper gate opens and the boat sails on, twenty feet higher than it started.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "How a canal lock lifts a boat",
+            "elements": [
+                {
+                    "id": "boat",
+                    "kind": "html",
+                    "html": "<div class=\"part\"><div class=\"lbl\">Boat</div><svg viewbox=\"0 0 120 44\" width=\"220\"><path class=\"hull\" d=\"M4 22 H116 L100 40 H20 Z\"></path><rect class=\"cab\" x=\"44\" y=\"6\" width=\"32\" height=\"16\" rx=\"2\"></rect></svg></div>",
+                    "place": "left",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "boat"
+                },
+                {
+                    "id": "gate",
+                    "kind": "html",
+                    "html": "<div class=\"part\" style=\"width: 200px\"><div class=\"lbl\">Lower gate</div><svg viewbox=\"0 0 60 80\" width=\"80\"><g data-until=\"closes\"><line class=\"post\" x1=\"10\" y1=\"8\" x2=\"10\" y2=\"76\"></line><line class=\"post\" x1=\"50\" y1=\"8\" x2=\"50\" y2=\"76\"></line></g><g data-word=\"closes\" data-anim=\"fade\"><rect class=\"door\" x=\"8\" y=\"8\" width=\"44\" height=\"68\" rx=\"3\"></rect></g></svg><div class=\"st\" data-until=\"closes\">OPEN</div><div class=\"st bad\" data-word=\"closes\" data-anim=\"pop\">SHUT</div></div>",
+                    "place": "center",
+                    "depth": "near",
+                    "camera": "angle",
+                    "word": "gate"
+                },
+                {
+                    "id": "chamber",
+                    "kind": "html",
+                    "html": "<div class=\"part\"><div class=\"lbl\">Chamber</div><div class=\"tank\"><div class=\"water low\" data-until=\"rises\"></div><div class=\"water high\" data-word=\"rises\" data-anim=\"rise\"></div></div><div class=\"st\" data-word=\"matches\" data-anim=\"pop\">LEVEL MATCHED</div></div>",
+                    "place": "right",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "chamber"
+                }
+            ],
+            "links": [
+                {
+                    "from": "boat",
+                    "to": "gate",
+                    "flow": true
+                },
+                {
+                    "from": "gate",
+                    "to": "chamber",
+                    "label": "water in",
+                    "flow": true
+                }
+            ],
+            "css": ".cc-scope .part { width: 260px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); font-family: var(--font-mono); color: var(--text) }\n.cc-scope .lbl { font-size: 15px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase }\n.cc-scope .st { margin-top: 10px; font-size: 13px; font-weight: 700; letter-spacing: 2px; color: var(--accent) }\n.cc-scope .st.bad { color: var(--bad) }\n.cc-scope .hull { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 2 }\n.cc-scope .cab { fill: none; stroke: var(--text); stroke-width: 2 }\n.cc-scope .post { stroke: var(--muted); stroke-width: 4 }\n.cc-scope .door { fill: var(--panel-2); stroke: var(--text); stroke-width: 3 }\n.cc-scope .tank { height: 130px; margin-top: 10px; border: 2px solid var(--line); border-top: 0; border-radius: 0 0 8px 8px; display: flex; align-items: flex-end }\n.cc-scope .water { width: 100%; background: var(--accent-soft); border-top: 2px solid var(--accent) }\n.cc-scope .low { height: 28% }\n.cc-scope .high { height: 86% }"
+        }
+    },
+    {
+        "scene_id": "example-2",
+        "narration": "When you open a profile, your request goes to the server. The server checks the cache first. The first time, the cache misses, so the database does the slow work, and the answer is put in the cache on the way back. The next request is instant.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "Why the second request is instant",
+            "elements": [
+                {
+                    "id": "req",
+                    "kind": "html",
+                    "html": "<div class=\"pill\">GET /john <b class=\"ok\">FREE</b></div>",
+                    "place": "left",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "request"
+                },
+                {
+                    "id": "cache",
+                    "kind": "html",
+                    "html": "<div class=\"card\"><div class=\"hd\">Cache <span class=\"no\" data-until=\"put\">MISS</span><span class=\"ok\" data-word=\"put\" data-anim=\"pop\">SET</span></div><div class=\"row\"><span>@john</span><span class=\"no\" data-until=\"put\">empty</span><span class=\"ok\" data-word=\"put\" data-anim=\"fade\">2,041,388</span></div></div>",
+                    "place": "center",
+                    "depth": "near",
+                    "camera": "angle",
+                    "word": "cache"
+                },
+                {
+                    "id": "db",
+                    "kind": "html",
+                    "html": "<div class=\"card\" style=\"width: 220px\"><div class=\"hd\">Database <span class=\"no\">240 MS</span></div><svg viewbox=\"0 0 100 70\" width=\"120\"><path class=\"cyl\" d=\"M10 12 V58 A40 9 0 0 0 90 58 V12\"></path><ellipse class=\"rim\" cx=\"50\" cy=\"12\" rx=\"40\" ry=\"9\"></ellipse><path class=\"rim\" d=\"M10 30 A40 9 0 0 0 90 30 M10 45 A40 9 0 0 0 90 45\"></path></svg></div>",
+                    "place": "bottom",
+                    "depth": "far",
+                    "camera": "push",
+                    "word": "database"
+                }
+            ],
+            "links": [
+                {
+                    "from": "req",
+                    "to": "cache",
+                    "flow": true
+                },
+                {
+                    "from": "cache",
+                    "to": "db",
+                    "label": "on a miss",
+                    "tone": "muted"
+                }
+            ],
+            "css": ".cc-scope .card { width: 300px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); font-family: var(--font-mono); color: var(--text) }\n.cc-scope .hd { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase }\n.cc-scope .ok { color: var(--accent) }\n.cc-scope .no { color: var(--bad) }\n.cc-scope .row { display: flex; justify-content: space-between; margin-top: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel-2); font-size: 13px; letter-spacing: 1px }\n.cc-scope .pill { padding: 14px 22px; border: 1px solid var(--line); border-radius: 40px; background: var(--panel); font-family: var(--font-mono); font-size: 17px; color: var(--text) }\n.cc-scope .cyl { fill: var(--panel); stroke: var(--line); stroke-width: 2 }\n.cc-scope .rim { fill: none; stroke: var(--muted); stroke-width: 2 }"
+        }
+    }
+]

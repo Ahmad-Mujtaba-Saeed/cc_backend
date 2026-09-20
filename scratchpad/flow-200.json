@@ -1,0 +1,292 @@
+[
+    {
+        "scene_id": "scene_8",
+        "narration": "Your bank checks if the card is real, if there's enough funds, and if the purchase looks like you. If approved, it holds the amount.",
+        "slot": {
+            "brief": "How your bank verifies a transaction: the card, funds availability, and identity check.",
+            "links": [
+                {
+                    "to": "funds",
+                    "flow": true,
+                    "from": "card"
+                },
+                {
+                    "to": "identity",
+                    "flow": true,
+                    "from": "funds"
+                },
+                {
+                    "to": "hold",
+                    "flow": true,
+                    "from": "identity"
+                }
+            ],
+            "heading": "How your bank verifies a card payment",
+            "elements": [
+                {
+                    "id": "card",
+                    "kind": "visual",
+                    "note": "is verified",
+                    "then": [
+                        {
+                            "tone": "bad",
+                            "word": "enough",
+                            "status": "INVALID"
+                        }
+                    ],
+                    "tone": "accent",
+                    "word": "card",
+                    "depth": "mid",
+                    "place": "left",
+                    "title": "Card",
+                    "camera": "push",
+                    "prompt": "a credit card with a chip and magnetic strip",
+                    "status": "REAL",
+                    "image_path": "explainer/flow/scene-8-card-6e82830d6c7e.png",
+                    "image_url": "flow/scene-8-card-6e82830d6c7e.png"
+                },
+                {
+                    "id": "funds",
+                    "kind": "visual",
+                    "note": "are checked",
+                    "then": [
+                        {
+                            "tone": "bad",
+                            "word": "enough",
+                            "status": "LOW"
+                        }
+                    ],
+                    "tone": "accent",
+                    "word": "funds",
+                    "depth": "near",
+                    "place": "center",
+                    "title": "Funds",
+                    "camera": "angle",
+                    "prompt": "a bank statement with a balance line showing sufficient funds",
+                    "status": "AVAILABLE",
+                    "image_path": "explainer/flow/scene-8-funds-f716de014100.png",
+                    "image_url": "flow/scene-8-funds-f716de014100.png"
+                },
+                {
+                    "id": "identity",
+                    "kind": "visual",
+                    "note": "is confirmed",
+                    "then": [
+                        {
+                            "tone": "bad",
+                            "word": "looks",
+                            "status": "MISMATCH"
+                        }
+                    ],
+                    "tone": "accent",
+                    "word": "purchase",
+                    "depth": "mid",
+                    "place": "right",
+                    "title": "Identity",
+                    "camera": "rack",
+                    "prompt": "a person silhouette with a checkmark overlay",
+                    "status": "MATCH",
+                    "image_path": "explainer/flow/scene-8-identity-63ce24252561.png",
+                    "image_url": "flow/scene-8-identity-63ce24252561.png"
+                },
+                {
+                    "id": "hold",
+                    "kind": "visual",
+                    "note": "amount is secured",
+                    "tone": "accent",
+                    "word": "approved",
+                    "depth": "far",
+                    "place": "bottom",
+                    "title": "Hold",
+                    "camera": "push",
+                    "prompt": "a digital vault with a locked door",
+                    "status": "HELD"
+                }
+            ],
+            "content_type": "cinematic"
+        }
+    },
+    {
+        "scene_id": "scene_13",
+        "narration": "The money moves through the chain: your bank pays the network, the network pays the acquirer, and the acquirer pays the shop. This happens the next working day.",
+        "slot": {
+            "brief": "The flow of money: your bank, the network, the acquirer, and finally the shop.",
+            "links": [
+                {
+                    "to": "network",
+                    "flow": true,
+                    "from": "bank",
+                    "label": "pays"
+                },
+                {
+                    "to": "acquirer",
+                    "flow": true,
+                    "from": "network",
+                    "label": "pays"
+                },
+                {
+                    "to": "shop",
+                    "flow": true,
+                    "from": "acquirer",
+                    "label": "pays"
+                }
+            ],
+            "heading": "The flow of money in a card payment",
+            "elements": [
+                {
+                    "id": "bank",
+                    "kind": "visual",
+                    "note": "initiates payment",
+                    "word": "bank",
+                    "depth": "mid",
+                    "place": "left",
+                    "title": "Your bank",
+                    "camera": "push",
+                    "prompt": "a traditional bank building with columns and a large entrance",
+                    "image_path": "explainer/flow/scene-13-bank-c24eca158dc3.png",
+                    "image_url": "flow/scene-13-bank-c24eca158dc3.png"
+                },
+                {
+                    "id": "network",
+                    "kind": "visual",
+                    "note": "processes transaction",
+                    "word": "network",
+                    "depth": "near",
+                    "place": "center",
+                    "title": "Network",
+                    "camera": "angle",
+                    "prompt": "a network symbol with interconnected nodes and lines",
+                    "image_path": "explainer/flow/scene-13-network-ada4c4a2cbec.png",
+                    "image_url": "flow/scene-13-network-ada4c4a2cbec.png"
+                },
+                {
+                    "id": "acquirer",
+                    "kind": "visual",
+                    "note": "receives funds",
+                    "word": "acquirer",
+                    "depth": "mid",
+                    "place": "right",
+                    "title": "Acquirer",
+                    "camera": "push",
+                    "prompt": "a financial institution building with a modern design",
+                    "image_path": "explainer/flow/scene-13-acquirer-2a76889a087c.png",
+                    "image_url": "flow/scene-13-acquirer-2a76889a087c.png"
+                },
+                {
+                    "id": "shop",
+                    "kind": "visual",
+                    "note": "receives payment",
+                    "then": [
+                        {
+                            "note": "payment confirmed",
+                            "word": "next",
+                            "status": "working day"
+                        }
+                    ],
+                    "word": "shop",
+                    "depth": "far",
+                    "place": "bottom_right",
+                    "title": "Shop",
+                    "camera": "rack",
+                    "prompt": "a small retail shop with a sign and window displays",
+                    "image_path": "explainer/flow/scene-13-shop-a2ab96008c81.png",
+                    "image_url": "flow/scene-13-shop-a2ab96008c81.png"
+                }
+            ],
+            "content_type": "cinematic"
+        }
+    },
+    {
+        "scene_id": "scene_18",
+        "narration": "In the payment process, holds are created by the merchant's terminal, sent to your bank, and reserved until the final amount is confirmed. This involves the terminal, the acquirer, the network, and your bank, ensuring security and accuracy in transactions.",
+        "slot": {
+            "links": [
+                {
+                    "to": "acquirer",
+                    "flow": true,
+                    "from": "terminal",
+                    "label": "holds created"
+                },
+                {
+                    "to": "network",
+                    "flow": true,
+                    "from": "acquirer",
+                    "label": "sent to"
+                },
+                {
+                    "to": "bank",
+                    "flow": true,
+                    "from": "network",
+                    "label": "reserved until"
+                }
+            ],
+            "heading": "How a card payment reaches the shop",
+            "elements": [
+                {
+                    "id": "terminal",
+                    "kind": "visual",
+                    "note": "holds are created",
+                    "word": "terminal",
+                    "depth": "near",
+                    "place": "left",
+                    "title": "Merchant's terminal",
+                    "camera": "push",
+                    "prompt": "a payment terminal with a screen and card reader",
+                    "status": "CREATING",
+                    "image_path": "explainer/flow/scene-18-terminal-e72d72b901d0.png",
+                    "image_url": "flow/scene-18-terminal-e72d72b901d0.png"
+                },
+                {
+                    "id": "acquirer",
+                    "kind": "visual",
+                    "note": "holds sent",
+                    "then": [
+                        {
+                            "tone": "accent",
+                            "word": "reserved",
+                            "status": "HOLDING"
+                        }
+                    ],
+                    "word": "acquirer",
+                    "depth": "mid",
+                    "place": "center",
+                    "title": "Acquirer",
+                    "camera": "angle",
+                    "prompt": "a bank building with a sign indicating acquirer services",
+                    "status": "RECEIVING",
+                    "image_path": "explainer/flow/scene-18-acquirer-5826d38cf5b7.png",
+                    "image_url": "flow/scene-18-acquirer-5826d38cf5b7.png"
+                },
+                {
+                    "id": "network",
+                    "kind": "visual",
+                    "note": "secure transaction",
+                    "word": "network",
+                    "depth": "mid",
+                    "place": "right",
+                    "title": "Network",
+                    "camera": "rack",
+                    "prompt": "a network diagram with interconnected nodes representing data flow",
+                    "status": "CONNECTING",
+                    "image_path": "explainer/flow/scene-18-network-1fd1f9f8085b.png",
+                    "image_url": "flow/scene-18-network-1fd1f9f8085b.png"
+                },
+                {
+                    "id": "bank",
+                    "kind": "visual",
+                    "note": "final amount confirmed",
+                    "word": "bank",
+                    "depth": "far",
+                    "place": "bottom",
+                    "title": "Your bank",
+                    "camera": "push",
+                    "prompt": "a bank vault door with a large lock",
+                    "status": "CONFIRMING",
+                    "image_path": "explainer/flow/scene-18-bank-29931b555cf0.png",
+                    "image_url": "flow/scene-18-bank-29931b555cf0.png"
+                }
+            ],
+            "content_type": "cinematic"
+        }
+    }
+]

@@ -43,6 +43,13 @@ That head start is the whole trick. A vaccine does not fight the disease. It reh
 TXT,
 ];
 
+$scripts['logged out when you scale'] = <<<'TXT'
+Your app is growing, so you add two more servers behind a load balancer. The next morning, users start complaining that they keep getting logged out.
+Here is why. When Bob logs in, the server that handles him writes his session into its own memory. It knows Bob. The other two servers have never heard of him.
+The load balancer does not care. It sends each click to whichever server is least busy, so two out of three of Bob's clicks land on a server with no session, and he is asked to log in again.
+The fix is to stop keeping sessions in the servers at all. Put them in one shared store, like Redis, and every server looks Bob up in the same place. Now any server can answer any click, and Bob stays logged in.
+TXT;
+
 $out = $argv[1] ?? __DIR__ . '/cinematic-live-out.json';
 $specs = [];
 
@@ -93,16 +100,18 @@ foreach ($scripts as $name => $script) {
         echo "\n  -- {$s['scene_id']} ({$s['duration_seconds']}s): " . ($slot['heading'] ?? '') . "\n";
         echo '     narration: ' . $s['narration']['text'] . "\n";
         foreach ($slot['elements'] as $el) {
-            printf(
-                "     %-8s %-12s %-5s %-6s word=%-12s %s%s\n",
-                $el['kind'],
-                $el['place'],
-                $el['depth'],
-                $el['camera'],
-                $el['word'] ?? '-',
-                $el['text'] ?? $el['formula'] ?? (isset($el['html']) ? '[html ' . strlen($el['html']) . 'b]' : ''),
-                isset($el['sub']) ? '  (' . $el['sub'] . ')' : ''
-            );
+            $label = $el['title'] ?? $el['text'] ?? $el['formula'] ?? (isset($el['prompt']) ? 'draw: ' . mb_substr($el['prompt'], 0, 44) : '');
+            $body = isset($el['rows']) ? 'rows ' . implode(', ', array_map(fn ($r) => $r['label'] . '=' . $r['value'], $el['rows']))
+                : (isset($el['bars']) ? 'bars ' . implode(', ', array_map(fn ($b) => $b['label'] . ' ' . round($b['value'] * 100) . '%', $el['bars']))
+                : (isset($el['lines']) ? 'lines ' . count($el['lines']) : (isset($el['skeleton']) ? 'skeleton ' . $el['skeleton'] : '')));
+            $then = isset($el['then']) ? ' THEN ' . implode(' ; ', array_map(fn ($p) => ($p['word'] ?? '?') . ':' . json_encode(array_diff_key($p, ['word' => 1, 'at' => 1])), $el['then'])) : '';
+            printf("     %-7s %-12s %-4s %-6s w=%-11s %s%s %s%s
+", $el['kind'], $el['place'], $el['depth'], $el['camera'], $el['word'] ?? '-',
+                $label, isset($el['status']) ? ' [' . $el['status'] . ']' : '', $body, $then);
+        }
+        foreach ($slot['links'] ?? [] as $l) {
+            printf("     link %s -> %s%s%s
+", $l['from'], $l['to'], isset($l['label']) ? ' "' . $l['label'] . '"' : '', !empty($l['flow']) ? ' (flow)' : '');
         }
         $specs[] = ['scene_id' => $s['scene_id'] . '-' . preg_replace('/[^a-z]+/', '-', $name), 'narration' => $s['narration']['text'], 'slot' => $slot];
     }

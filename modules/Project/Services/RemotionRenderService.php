@@ -535,6 +535,16 @@ class RemotionRenderService
                     }
                 }
             }
+            // Flow card: each part is a drawing stored as an alpha stencil,
+            // which the renderer paints in the theme's ink.
+            if (($slot['content_type'] ?? null) === 'cinematic') {
+                foreach ((array) ($slot['elements'] ?? []) as $i => $element) {
+                    $drawnPath = is_array($element) ? ($element['image_path'] ?? null) : null;
+                    if ($drawnPath) {
+                        $slot['elements'][$i]['image_url'] = $this->publicUrl((string) $drawnPath);
+                    }
+                }
+            }
             if (in_array($slot['content_type'] ?? null, ['image', 'video'], true)) {
                 $ref = $slot['asset_ref'] ?? null;
                 $path = is_array($ref) ? ($ref['path'] ?? null) : $ref;

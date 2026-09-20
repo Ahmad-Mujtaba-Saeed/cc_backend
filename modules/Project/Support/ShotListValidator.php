@@ -4149,8 +4149,17 @@ class ShotListValidator
             $kind = (string) ($el['kind'] ?? '');
             $sub = trim((string) ($el['sub'] ?? ''));
             // A formula does not read as a bullet (it would print as raw
-            // notation); its sub line says what it gives.
-            $main = $kind === 'formula' ? $sub : trim((string) ($el['text'] ?? ''));
+            // notation); its sub line says what it gives. A drawn part reads
+            // as its title and its state ("Cache — SET"). The picture itself
+            // cannot come along: this is the plain-text degrade.
+            $main = match ($kind) {
+                'formula' => $sub,
+                'visual' => trim((string) ($el['title'] ?? $el['note'] ?? '')),
+                default => trim((string) ($el['text'] ?? '')),
+            };
+            if ($kind === 'visual' && $main !== '' && trim((string) ($el['status'] ?? '')) !== '') {
+                $main .= ' — ' . trim((string) $el['status']);
+            }
             if ($kind === 'stat' && $main !== '' && $sub !== '') {
                 $main .= ' — ' . $sub;
             }

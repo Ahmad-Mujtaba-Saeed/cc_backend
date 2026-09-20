@@ -635,6 +635,8 @@ class ReviseExplainerStoryboardJob implements ShouldQueue
                 (string) $this->project->title,
                 $aspect
             );
+            $staged = (new \Modules\Project\Services\FlowVisualService())
+                ->drawAll($staged, (string) $this->project->title);
 
             return is_array($staged['scenes'] ?? null) ? $staged['scenes'] : $drafts;
         } catch (\Throwable $e) {

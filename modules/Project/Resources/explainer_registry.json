@@ -1,5 +1,5 @@
 {
-  "version": 48,
+  "version": 49,
   "motion_styles": {
     "default": "auto",
     "styles": {
@@ -172,11 +172,11 @@
     "min_parts": 2,
     "max_parts": 6,
     "kinds": [
+      "visual",
       "text",
       "stat",
       "formula",
-      "icon",
-      "html"
+      "icon"
     ],
     "places": [
       "top_left",
@@ -199,7 +199,7 @@
       "angle",
       "rack"
     ],
-    "use_when": "the video's key explaining beats (at most 30% of the runtime, never two in a row): each part on its own 3D layer (Flute), arriving out of focus on its cue word while the camera pushes in and the rest blurs, ending on a wide sharp view \u2014 the one card exempt from the flat-design no-blur rule"
+    "use_when": "the video's key explaining beats (at most 30% of the runtime, never two in a row): a flow diagram whose every piece is DRAWN for this script by the image model and painted in the video's ink, each part on its own 3D layer (Flute), arriving out of focus on its cue word while the camera pushes in and the rest blurs, with links drawn between the parts, ending on a wide sharp view — the one card exempt from the flat-design no-blur rule"
   },
   "default_scene_seconds": 6,
   "composition_modes": [
@@ -247,7 +247,7 @@
     ],
     "default_journey_pattern": "zigzag",
     "treatments": {
-      "same_frame": "NO FLIGHT. The next card simply takes the frame this one is in \u2014 a cut, not a journey. THE DEFAULT between beats of the same thread: the card's own reveal carries the change, and the camera stays put. Most scenes in a video should be this.",
+      "same_frame": "NO FLIGHT. The next card simply takes the frame this one is in — a cut, not a journey. THE DEFAULT between beats of the same thread: the card's own reveal carries the change, and the camera stays put. Most scenes in a video should be this.",
       "hero_open": "Opening beat: the camera starts tight inside this scene's visual and settles back to frame it. Use ONLY for scene 1.",
       "canvas_hop": "The camera lifts off the previous scene and flies across the canvas to this one. The default move between distinct ideas.",
       "zoom_nest": "This scene physically lives INSIDE a focal point of the previous scene's visual, tiny until the camera dives straight into it. Use when this scene is a detail, consequence, or 'inside' the previous idea. Needs nest.fx / nest.fy (0..1 focal point in the previous region).",
@@ -641,7 +641,7 @@
         "html"
       ],
       "supports_camera_move": false,
-      "description": "A visual you AUTHOR yourself in a small fragment of HTML (inline SVG allowed) plus optional css, for the one beat in a video that no other card can express \u2014 a boarding pass, a chat thread, a scoreboard, a nutrition label, a keyboard, a receipt printer. LAST RESORT ONLY: if any other card fits, that card is better, because it is designed, typeset and animated for you. The fragment is sanitised (no script, no network, no shadows or gradients) and its css is scoped to the card. Animate it ONLY with data-at (0..1 through the scene), data-word (land on that narration word) and data-anim (fade|rise|pop|slide|grow) \u2014 never with css animations. Use the theme variables var(--accent), var(--text), var(--muted), var(--panel), var(--bg) for colour and var(--font-display), var(--font-body), var(--font-mono) for type, so the card matches the video."
+      "description": "A visual you AUTHOR yourself in a small fragment of HTML (inline SVG allowed) plus optional css, for the one beat in a video that no other card can express — a boarding pass, a chat thread, a scoreboard, a nutrition label, a keyboard, a receipt printer. LAST RESORT ONLY: if any other card fits, that card is better, because it is designed, typeset and animated for you. The fragment is sanitised (no script, no network, no shadows or gradients) and its css is scoped to the card. Animate it ONLY with data-at (0..1 through the scene), data-word (land on that narration word) and data-anim (fade|rise|pop|slide|grow) — never with css animations. Use the theme variables var(--accent), var(--text), var(--muted), var(--panel), var(--bg) for colour and var(--font-display), var(--font-body), var(--font-mono) for type, so the card matches the video."
     },
     "cinematic": {
       "label": "Cinematic Explanation",
@@ -945,7 +945,7 @@
             "video",
             "text_block",
             "vector_motif"
-]
+          ]
         }
       }
     },
@@ -960,7 +960,7 @@
             "video",
             "text_block",
             "vector_motif"
-]
+          ]
         },
         "slot_right": {
           "label": "Right",
@@ -969,7 +969,7 @@
             "video",
             "text_block",
             "vector_motif"
-]
+          ]
         }
       }
     },
@@ -984,7 +984,7 @@
             "video",
             "text_block",
             "vector_motif"
-]
+          ]
         },
         "slot_bottom": {
           "label": "Bottom",
@@ -993,7 +993,7 @@
             "video",
             "text_block",
             "vector_motif"
-]
+          ]
         }
       }
     },
@@ -1468,7 +1468,7 @@
     },
     "custom_card": {
       "label": "Custom Card",
-      "description": "A visual authored as a small HTML/SVG fragment, for the beat no other card fits. use_when: the script needs a specific THING drawn \u2014 a boarding pass, a chat exchange, a scoreboard, a nutrition label, a keyboard layout \u2014 and no registry card can express it. Always prefer a real card when one fits. At most 2 per video.",
+      "description": "A visual authored as a small HTML/SVG fragment, for the beat no other card fits. use_when: the script needs a specific THING drawn — a boarding pass, a chat exchange, a scoreboard, a nutrition label, a keyboard layout — and no registry card can express it. Always prefer a real card when one fits. At most 2 per video.",
       "max_per_video": 2,
       "slots": {
         "slot_custom": {
@@ -1481,7 +1481,7 @@
     },
     "cinematic_card": {
       "label": "Cinematic Explanation",
-      "description": "The video's key explaining beat, staged in depth with a moving camera and focus pulls. use_when: the beat that carries the CORE explanation \u2014 how the mechanism works, why the result happens, how the pieces relate \u2014 and names 3-5 pieces the viewer must see together. Several per video are fine, but together at most 30% of the runtime and never two in a row; never for a hook, a transition, a list of tips or a lone statistic.",
+      "description": "The video's key explaining beat, staged in depth with a moving camera and focus pulls. use_when: the beat that carries the CORE explanation — how the mechanism works, why the result happens, how the pieces relate — and names 3-5 pieces the viewer must see together. Several per video are fine, but together at most 30% of the runtime and never two in a row; never for a hook, a transition, a list of tips or a lone statistic.",
       "slots": {
         "slot_cinematic": {
           "label": "Cinematic",
@@ -1493,7 +1493,7 @@
     },
     "image_grid": {
       "label": "Image Grid",
-      "description": "3-6 pictures on screen AT ONCE in a grid, each with a short caption, landing one at a time as the narration names them and all staying visible. use_when: a beat needs SEVERAL pictures together so the viewer compares them \u2014 four examples of the same thing, the six variants, the three species, what these cities have in common. The difference from photo_stack: a stack shows one print at a time, this shows them all. At most 1 per video.",
+      "description": "3-6 pictures on screen AT ONCE in a grid, each with a short caption, landing one at a time as the narration names them and all staying visible. use_when: a beat needs SEVERAL pictures together so the viewer compares them — four examples of the same thing, the six variants, the three species, what these cities have in common. The difference from photo_stack: a stack shows one print at a time, this shows them all. At most 1 per video.",
       "max_per_video": 1,
       "slots": {
         "slot_image_1": {

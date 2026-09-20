@@ -1,0 +1,403 @@
+[
+    {
+        "scene_id": "scene_3",
+        "narration": "The two chambers on top are the atria, the receiving rooms. The two on the bottom are the ventricles, the pumping rooms.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "Heart anatomy: atria and ventricles",
+            "brief": "The heart's anatomy: the atria on top, the ventricles below, working together to pump blood.",
+            "elements": [
+                {
+                    "id": "atria",
+                    "kind": "visual",
+                    "prompt": "a heart showing the left atrium and right atrium chambers at the top",
+                    "title": "Atria",
+                    "note": "the receiving rooms",
+                    "then": [
+                        {
+                            "status": "ACTIVE",
+                            "note": "receiving blood",
+                            "word": "pumping"
+                        }
+                    ],
+                    "place": "top",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "chambers",
+                    "image_path": "explainer/flow/scene-3-atria-c660c77a85dc.png",
+                    "image_url": "flow/scene-3-atria-c660c77a85dc.png"
+                },
+                {
+                    "id": "ventricles",
+                    "kind": "visual",
+                    "prompt": "a heart showing the left ventricle and right ventricle chambers at the bottom",
+                    "title": "Ventricles",
+                    "note": "the pumping rooms",
+                    "then": [
+                        {
+                            "status": "ACTIVE",
+                            "note": "pumping blood",
+                            "word": "pumping"
+                        }
+                    ],
+                    "place": "bottom",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "bottom",
+                    "image_path": "explainer/flow/scene-3-ventricles-729ddcd47389.png",
+                    "image_url": "flow/scene-3-ventricles-729ddcd47389.png"
+                },
+                {
+                    "id": "blood",
+                    "kind": "visual",
+                    "prompt": "a flowing stream of red liquid representing blood",
+                    "title": "Blood Flow",
+                    "note": "moving from atria to ventricles",
+                    "place": "center",
+                    "depth": "mid",
+                    "camera": "rack",
+                    "word": "rooms",
+                    "image_path": "explainer/flow/scene-3-blood-d1b2097ceef2.png",
+                    "image_url": "flow/scene-3-blood-d1b2097ceef2.png"
+                }
+            ],
+            "links": [
+                {
+                    "from": "atria",
+                    "to": "blood",
+                    "label": "receives",
+                    "flow": true
+                },
+                {
+                    "from": "blood",
+                    "to": "ventricles",
+                    "label": "flows to",
+                    "flow": true
+                },
+                {
+                    "from": "ventricles",
+                    "to": "atria",
+                    "label": "pumps back",
+                    "flow": true
+                }
+            ]
+        }
+    },
+    {
+        "scene_id": "scene_7",
+        "narration": "It enters the right atrium, drops into the right ventricle, and is squeezed out to the lungs.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "Blood flow through the heart chambers",
+            "brief": "Blood enters the right atrium, drops to the right ventricle, and is sent to the lungs for oxygenation.",
+            "elements": [
+                {
+                    "id": "atrium",
+                    "kind": "visual",
+                    "prompt": "a heart showing the right atrium",
+                    "title": "Right Atrium",
+                    "status": "full",
+                    "note": "receiving blood",
+                    "place": "left",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "enters",
+                    "image_path": "explainer/flow/scene-7-atrium-ea4d2450fb02.png",
+                    "image_url": "flow/scene-7-atrium-ea4d2450fb02.png"
+                },
+                {
+                    "id": "ventricle",
+                    "kind": "visual",
+                    "prompt": "a heart showing the right ventricle",
+                    "title": "Right Ventricle",
+                    "status": "empty",
+                    "note": "waiting for blood",
+                    "tone": "muted",
+                    "then": [
+                        {
+                            "status": "full",
+                            "tone": "accent",
+                            "word": "squeezed"
+                        }
+                    ],
+                    "place": "center",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "drops",
+                    "image_path": "explainer/flow/scene-7-ventricle-5b4b16ca3243.png",
+                    "image_url": "flow/scene-7-ventricle-5b4b16ca3243.png"
+                },
+                {
+                    "id": "lungs",
+                    "kind": "visual",
+                    "prompt": "a pair of lungs with branching bronchi",
+                    "title": "Lungs",
+                    "status": "waiting",
+                    "note": "for oxygenation",
+                    "place": "right",
+                    "depth": "far",
+                    "camera": "push",
+                    "word": "lungs",
+                    "image_path": "explainer/flow/scene-7-lungs-839de647179c.png",
+                    "image_url": "flow/scene-7-lungs-839de647179c.png"
+                }
+            ],
+            "links": [
+                {
+                    "from": "atrium",
+                    "to": "ventricle",
+                    "flow": true
+                },
+                {
+                    "from": "ventricle",
+                    "to": "lungs",
+                    "flow": true
+                }
+            ]
+        }
+    },
+    {
+        "scene_id": "scene_9",
+        "narration": "It flows back into the left atrium, down into the left ventricle, and the left ventricle squeezes it out through the aorta to every part of your body.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "How blood flows from the heart",
+            "brief": "The blood returns to the left atrium, flows into the left ventricle, and is pumped through the aorta to the body.",
+            "elements": [
+                {
+                    "id": "valve",
+                    "kind": "visual",
+                    "prompt": "a one-way flap valve allowing flow in one direction",
+                    "title": "Valve",
+                    "status": "OPEN",
+                    "note": "letting blood in",
+                    "then": [
+                        {
+                            "status": "CLOSED",
+                            "tone": "bad",
+                            "note": "preventing backflow",
+                            "word": "down"
+                        }
+                    ],
+                    "place": "left",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "flows",
+                    "image_path": "explainer/flow/scene-9-valve-a59f29c230c3.png",
+                    "image_url": "flow/scene-9-valve-a59f29c230c3.png"
+                },
+                {
+                    "id": "chamber",
+                    "kind": "visual",
+                    "prompt": "a muscular chamber with a thick wall, representing the left ventricle",
+                    "title": "Chamber",
+                    "status": "filled",
+                    "note": "holding blood",
+                    "then": [
+                        {
+                            "status": "empty",
+                            "tone": "accent",
+                            "note": "pumping out",
+                            "word": "squeezes"
+                        }
+                    ],
+                    "place": "center",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "down"
+                },
+                {
+                    "id": "pipe",
+                    "kind": "visual",
+                    "prompt": "a large artery representing the aorta, branching out",
+                    "title": "Aorta",
+                    "status": "ready",
+                    "note": "distributing blood",
+                    "then": [
+                        {
+                            "status": "active",
+                            "note": "sending to the body"
+                        }
+                    ],
+                    "place": "right",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "through",
+                    "image_path": "explainer/flow/scene-9-pipe-d9526ad7d507.png",
+                    "image_url": "flow/scene-9-pipe-d9526ad7d507.png"
+                }
+            ],
+            "links": [
+                {
+                    "from": "valve",
+                    "to": "chamber",
+                    "label": "blood flows",
+                    "flow": true
+                },
+                {
+                    "from": "chamber",
+                    "to": "pipe",
+                    "label": "blood pumped",
+                    "flow": true
+                }
+            ]
+        }
+    },
+    {
+        "scene_id": "scene_17",
+        "narration": "The whole trip takes about a minute: blood returns from the body to the right atrium, flows into the right ventricle, then to the lungs for oxygen, back to the left atrium, and finally pumped out by the left ventricle through the aorta.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "The journey of a drop of blood",
+            "brief": "the journey of a drop of blood: right atrium, right ventricle, lungs, left atrium, left ventricle, aorta",
+            "elements": [
+                {
+                    "id": "ra",
+                    "kind": "visual",
+                    "prompt": "a hollow muscular chamber with one opening",
+                    "title": "Right Atrium",
+                    "status": "FILLING",
+                    "note": "receiving blood",
+                    "then": [
+                        {
+                            "status": "EMPTY",
+                            "note": "into the right ventricle",
+                            "word": "flows"
+                        }
+                    ],
+                    "place": "left",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "returns",
+                    "image_path": "explainer/flow/scene-17-ra-c573f8b19048.png",
+                    "image_url": "flow/scene-17-ra-c573f8b19048.png"
+                },
+                {
+                    "id": "rv",
+                    "kind": "visual",
+                    "prompt": "a hollow muscular chamber with two openings",
+                    "title": "Right Ventricle",
+                    "status": "FILLING",
+                    "note": "pumping to the lungs",
+                    "then": [
+                        {
+                            "status": "EMPTY",
+                            "note": "sending blood for oxygen",
+                            "word": "lungs"
+                        }
+                    ],
+                    "place": "center",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "flows",
+                    "image_path": "explainer/flow/scene-17-rv-a32dd4f56d77.png",
+                    "image_url": "flow/scene-17-rv-a32dd4f56d77.png"
+                },
+                {
+                    "id": "pipe1",
+                    "kind": "visual",
+                    "prompt": "a length of pipe representing the pulmonary artery",
+                    "title": "Pulmonary Artery",
+                    "status": "FLOWING",
+                    "note": "carrying blood to lungs",
+                    "then": [
+                        {
+                            "status": "OXYGENATED",
+                            "note": "to the left atrium",
+                            "word": "back"
+                        }
+                    ],
+                    "place": "right",
+                    "depth": "mid",
+                    "camera": "rack",
+                    "word": "lungs",
+                    "image_path": "explainer/flow/scene-17-pipe1-84d068162979.png",
+                    "image_url": "flow/scene-17-pipe1-84d068162979.png"
+                },
+                {
+                    "id": "la",
+                    "kind": "visual",
+                    "prompt": "a hollow muscular chamber with one opening",
+                    "title": "Left Atrium",
+                    "status": "FILLING",
+                    "note": "receiving oxygenated blood",
+                    "then": [
+                        {
+                            "status": "EMPTY",
+                            "note": "into the left ventricle",
+                            "word": "pumped"
+                        }
+                    ],
+                    "place": "right",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "back",
+                    "image_path": "explainer/flow/scene-17-la-c573f8b19048.png",
+                    "image_url": "flow/scene-17-la-c573f8b19048.png"
+                },
+                {
+                    "id": "lv",
+                    "kind": "visual",
+                    "prompt": "a hollow muscular chamber with two openings",
+                    "title": "Left Ventricle",
+                    "status": "PUMPING",
+                    "note": "sending blood out",
+                    "then": [
+                        {
+                            "status": "EMPTY",
+                            "note": "through the aorta",
+                            "word": "aorta"
+                        }
+                    ],
+                    "place": "center",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "finally",
+                    "image_path": "explainer/flow/scene-17-lv-a32dd4f56d77.png",
+                    "image_url": "flow/scene-17-lv-a32dd4f56d77.png"
+                },
+                {
+                    "id": "pipe2",
+                    "kind": "visual",
+                    "prompt": "a large pipe representing the aorta",
+                    "title": "Aorta",
+                    "status": "FLOWING",
+                    "note": "distributing blood",
+                    "place": "center",
+                    "depth": "mid",
+                    "camera": "rack",
+                    "word": "aorta",
+                    "image_path": "explainer/flow/scene-17-pipe2-7d371c269e6f.png",
+                    "image_url": "flow/scene-17-pipe2-7d371c269e6f.png"
+                }
+            ],
+            "links": [
+                {
+                    "from": "ra",
+                    "to": "rv",
+                    "flow": true
+                },
+                {
+                    "from": "rv",
+                    "to": "pipe1",
+                    "flow": true
+                },
+                {
+                    "from": "pipe1",
+                    "to": "la",
+                    "flow": true
+                },
+                {
+                    "from": "la",
+                    "to": "lv",
+                    "flow": true
+                },
+                {
+                    "from": "lv",
+                    "to": "pipe2",
+                    "flow": true
+                }
+            ]
+        }
+    }
+]

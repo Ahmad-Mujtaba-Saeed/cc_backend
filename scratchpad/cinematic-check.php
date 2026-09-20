@@ -122,25 +122,37 @@ $r = CinematicScene::sanitize(['elements' => [
 ]], $exists, 'Sound moves at 340 metres every second.');
 check('a formula sharing a spoken number is kept', $r['slot']['elements'][0]['kind'] === 'formula');
 
-echo "\n== 5. html parts are sanitised like custom_card ==\n";
+echo "\n== 5. a drawn part carries a subject, not markup ==\n";
 $r = CinematicScene::sanitize(['elements' => [
-    ['kind' => 'html', 'html' => '<div class="cell" onclick="x()">Nucleus<script>alert(1)</script><img src="https://evil/x.png"></div>'],
-    ['kind' => 'text', 'text' => 'Other'],
-], 'css' => '.cell{box-shadow:0 0 9px red;color:var(--accent)} @import url(x.css);'], $exists, '');
-$html = $r['slot']['elements'][0]['html'] ?? '';
-check('script is gone', !str_contains($html, 'script') && !str_contains($html, 'alert'), $html);
-check('handlers are gone', !str_contains($html, 'onclick'));
-check('img is gone', !str_contains($html, '<img'));
-check('the text survives', str_contains($html, 'Nucleus'));
-$css = $r['slot']['css'] ?? '';
-check('css is scoped to the card', str_contains($css, '.cc-scope'), $css);
-check('the flat-law strip still applies to shadows', !str_contains($css, 'box-shadow'), $css);
-check('@import is gone', !str_contains($css, '@import'));
-$r = CinematicScene::sanitize(['elements' => [
-    ['kind' => 'text', 'text' => 'One'],
-    ['kind' => 'text', 'text' => 'Two'],
+    ['id' => 'tap', 'kind' => 'visual', 'prompt' => str_repeat('a kitchen tap with a curved spout ', 12),
+        'title' => 'The tap that is far too long to print', 'status' => 'CLOSED-FOR-EVER', 'note' => str_repeat('drips ', 20), 'tone' => 'glittery'],
+    ['id' => 'nothing', 'kind' => 'visual', 'title' => 'No subject'],
+    ['id' => 'pipe', 'kind' => 'visual', 'prompt' => 'a length of copper pipe', 'text' => 'Pipe', 'sub' => 'ignored',
+        'image_path' => 'explainer/flow/pipe-abc123.png'],
+    ['id' => 'evil', 'kind' => 'visual', 'prompt' => 'a valve', 'image_path' => '../../etc/passwd.png'],
 ], 'css' => '.x{color:red}'], $exists, '');
-check('css is not kept when no part is html', !isset($r['slot']['css']));
+$by = array_column($r['slot']['elements'], null, 'id');
+check('a subject is kept and capped', mb_strlen($by['tap']['prompt'] ?? '') <= 180 && str_starts_with($by['tap']['prompt'] ?? '', 'a kitchen tap'));
+check('title, status and note are capped', mb_strlen($by['tap']['title'] ?? '') <= 20 && mb_strlen($by['tap']['status'] ?? '') <= 12 && mb_strlen($by['tap']['note'] ?? '') <= 40);
+check('an unknown tone is dropped', !isset($by['tap']['tone']));
+check('a visual with nothing to draw is dropped', !isset($by['nothing']));
+check('a title falls back to the part text', ($by['pipe']['title'] ?? '') === 'Pipe');
+check('drawn parts carry no sub line', !isset($by['pipe']['sub']));
+check('an already drawn part keeps its picture', ($by['pipe']['image_path'] ?? '') === 'explainer/flow/pipe-abc123.png');
+check('a path that climbs out of the disk is refused', !isset($by['evil']['image_path']));
+check('css is not kept (no part writes markup any more)', !isset($r['slot']['css']));
+$r = CinematicScene::sanitize(['elements' => [
+    ['id' => 'a', 'kind' => 'visual', 'prompt' => 'a human heart with two upper chambers labeled atria', 'title' => 'Atria'],
+    ['id' => 'b', 'kind' => 'visual', 'prompt' => 'a server rack with the word server on the front', 'title' => 'Server'],
+    ['id' => 'c', 'kind' => 'visual', 'prompt' => 'a pair of human lungs seen from the front', 'title' => 'Lungs'],
+]], $exists, '');
+$by = array_column($r['slot']['elements'], null, 'id');
+check('a subject may not ask for writing the image model cannot do',
+    ($by['a']['prompt'] ?? '') === 'a human heart with two upper chambers' && ($by['b']['prompt'] ?? '') === 'a server rack',
+    json_encode(array_column($r['slot']['elements'], 'prompt')));
+check('a clean subject is left exactly as it was', ($by['c']['prompt'] ?? '') === 'a pair of human lungs seen from the front');
+$again = CinematicScene::sanitize($r['slot'], $exists, '');
+check('drawn parts are idempotent through a second sanitize', $again['slot'] == $r['slot']);
 
 echo "\n== 6. depth, counts, rejection ==\n";
 $flat = ['elements' => array_map(fn ($i) => ['kind' => 'text', 'text' => "Part {$i}", 'depth' => 'mid'], range(1, 4))];
@@ -155,9 +167,10 @@ check('isPending: staged is not pending', !CinematicScene::isPending($good));
 
 echo "\n== 7. registry ==\n";
 $reg = ExplainerRegistry::all();
-check('registry version bumped to 48', (int) $reg['version'] === 48);
+check('registry version bumped to 49', (int) $reg['version'] === 49);
 check('cinematic_card template exists with slot_cinematic', isset($reg['templates']['cinematic_card']['slots']['slot_cinematic']));
 check('slot accepts the cinematic content type', ExplainerRegistry::allowedContentTypes('cinematic_card', 'slot_cinematic') === ['cinematic']);
+check('the registry lists the drawn kind first', ($reg['cinematic']['kinds'][0] ?? '') === 'visual', json_encode($reg['cinematic']['kinds'] ?? []));
 check('runtime share is 30%', abs(ExplainerRegistry::cinematicMaxShare() - 0.3) < 1e-9);
 
 echo "\n== 8. validator: keeps, degrades, budgets ==\n";
@@ -264,8 +277,33 @@ check('two in a row -> named', (bool) array_filter($faults, fn ($f) => str_conta
 $heavy = [$mk('single_focus', 4), $mk('cinematic_card', 14), $mk('single_focus', 4), $mk('cinematic_card', 14), $mk('single_focus', 4), $mk('single_focus', 4)];
 $faults = $m->invoke($composer, $heavy, $sk);
 check('over 30% -> named with the share', (bool) array_filter($faults, fn ($f) => str_contains($f, 'the limit is 30%')), implode(' | ', $faults));
-$fine = [$mk('single_focus', 8), $mk('cinematic_card', 12), $mk('single_focus', 8), $mk('single_focus', 8), $mk('single_focus', 8), $mk('single_focus', 8)];
-check('one well-placed card under budget -> no fault', $m->invoke($composer, $fine, $sk) === []);
+$teaching = $mk('cinematic_card', 12);
+$teaching['narration']['text'] = 'Your request reaches the server, the server checks the cache first, and when the cache is empty the database does the slow work and hands the answer back to be kept.';
+$fine = [$mk('single_focus', 8), $teaching, $mk('single_focus', 8), $mk('single_focus', 8), $mk('single_focus', 8), $mk('single_focus', 8)];
+check('one well-placed card under budget -> no fault', $m->invoke($composer, $fine, $sk) === [], implode(' | ', $m->invoke($composer, $fine, $sk)));
+$faults = $m->invoke($composer, [$mk('single_focus', 8), $mk('cinematic_card', 12), $mk('single_focus', 8), $mk('single_focus', 8), $mk('single_focus', 8), $mk('single_focus', 8)], $sk);
+check('a one-line cinematic narration is sent back to teach', (bool) array_filter($faults, fn ($f) => str_contains($f, '25-35 words')));
+
+echo "\n== 10b. the core phase is cast on purpose ==\n";
+$skel = [
+    ['intent' => 'hook', 'brief' => 'Users keep getting logged out'],
+    ['intent' => 'context', 'brief' => 'The app added two servers behind a load balancer'],
+    ['intent' => 'point', 'brief' => 'A striking number about outages'],
+    ['intent' => 'point', 'brief' => 'Why it happens: how each server keeps sessions in its own memory and the balancer sends clicks anywhere'],
+    ['intent' => 'point', 'brief' => 'What users say about it'],
+    ['intent' => 'resolution', 'brief' => 'A shared session store fixes it'],
+    ['intent' => 'payoff', 'brief' => 'Stay logged in'],
+];
+check('the mechanism phase is the core', GenericStoryboardComposerService::corePhase($skel) === 3, (string) GenericStoryboardComposerService::corePhase($skel));
+check('no explaining phase -> no core', GenericStoryboardComposerService::corePhase([['intent' => 'hook', 'brief' => 'x'], ['intent' => 'payoff', 'brief' => 'y']]) === null);
+$phaseMenu = new ReflectionMethod($composer, 'menuForPhase');
+$phaseMenu->setAccessible(true);
+$coreProp = new ReflectionProperty($composer, 'corePhase');
+$coreProp->setAccessible(true);
+$coreProp->setValue($composer, 3);
+check('the core phase offers only cinematic_card', $phaseMenu->invoke($composer, 3, 'point') === ['cinematic_card']);
+check('other phases keep their menus', $phaseMenu->invoke($composer, 2, 'point') === GenericStoryboardComposerService::menuFor('point'));
+$coreProp->setValue($composer, null);
 $short = array_map(fn () => $mk('single_focus'), range(1, 4));
 check('a very short video is not nudged', $m->invoke($composer, $short, array_slice($sk, 0, 4)) === []);
 
@@ -309,12 +347,224 @@ check('nothing is promoted when one was already cast', $ensure->invoke($composer
 check('a short video is left alone', $ensure->invoke($composer, array_slice($board, 0, 4), array_slice($sk, 0, 4))[3]['layout_template'] === 'single_focus');
 
 echo "\n== 13. weak stagings earn one retry ==\n";
-$weak = Modules\Project\Services\CinematicSceneService::weaknesses(['elements' => [
-    ['kind' => 'text', 'place' => 'top_left'], ['kind' => 'text', 'place' => 'top'], ['kind' => 'text', 'place' => 'top_right'],
+$svc = Modules\Project\Services\CinematicSceneService::class;
+$weak = $svc::weaknesses(['elements' => [
+    ['kind' => 'text', 'place' => 'top_left'], ['kind' => 'text', 'place' => 'top'], ['kind' => 'text', 'place' => 'top_right'], ['kind' => 'text', 'place' => 'top'],
 ]]);
-check('all text is named', (bool) array_filter($weak, fn ($w) => str_contains($w, 'plain text')));
+check('all text is named (too little drawn)', (bool) array_filter($weak, fn ($w) => str_contains($w, 'DRAWN')));
+check('no links is named', (bool) array_filter($weak, fn ($w) => str_contains($w, 'nothing is connected')));
 check('one row is named', (bool) array_filter($weak, fn ($w) => str_contains($w, 'one row')));
-check('a varied two-row staging is not weak', Modules\Project\Services\CinematicSceneService::weaknesses($good) === []);
+$diagram = ['elements' => [
+    ['id' => 'a', 'kind' => 'visual', 'place' => 'left'], ['id' => 'b', 'kind' => 'visual', 'place' => 'center', 'then' => [['status' => 'SET']]], ['id' => 'c', 'kind' => 'visual', 'place' => 'bottom_right'],
+], 'links' => [['from' => 'a', 'to' => 'b'], ['from' => 'b', 'to' => 'c']]];
+check('a drawn, linked, two-row staging is not weak', $svc::weaknesses($diagram) === [], implode(' | ', $svc::weaknesses($diagram)));
+
+echo "\n== 14. the diagram language: every piece is drawn ==\n";
+$narr = 'Everyone hits the same server, and it is drowning at ninety percent. So you put a load balancer in front, '
+    . 'and it picks one of three servers for every request, so the load spreads out evenly.';
+$flow = ['heading' => 'What a load balancer does', 'elements' => [
+    ['id' => 'crowd', 'kind' => 'visual', 'prompt' => 'a group of three simple standing person figures side by side',
+        'title' => 'Everyone', 'note' => 'every visitor', 'place' => 'left', 'depth' => 'far', 'word' => 'everyone', 'camera' => 'push'],
+    ['id' => 's1', 'kind' => 'visual', 'prompt' => 'a tall server rack cabinet with stacked slots',
+        'title' => 'Server 1', 'status' => '90%', 'tone' => 'bad', 'place' => 'top_right', 'depth' => 'mid', 'word' => 'drowning', 'camera' => 'push',
+        'then' => [['word' => 'evenly', 'status' => '34%', 'tone' => 'accent']]],
+    ['id' => 'lb', 'kind' => 'visual', 'prompt' => 'a network router box with three short antennas on top',
+        'title' => 'Balancer', 'note' => 'picks one', 'place' => 'center', 'depth' => 'near', 'word' => 'balancer', 'camera' => 'angle'],
+    ['id' => 's2', 'kind' => 'visual', 'prompt' => 'a tall server rack cabinet with stacked slots',
+        'title' => 'Server 2', 'status' => '5%', 'tone' => 'muted', 'place' => 'right', 'depth' => 'mid', 'word' => 'three', 'camera' => 'rack',
+        'then' => [['word' => 'evenly', 'status' => '33%', 'tone' => 'accent']]],
+], 'links' => [
+    ['from' => 'crowd', 'to' => 'lb', 'flow' => true],
+    ['from' => 'lb', 'to' => 's1', 'flow' => true],
+    ['from' => 'lb', 'to' => 's2', 'flow' => true],
+]];
+$r = CinematicScene::sanitize($flow, $exists, $narr);
+check('the reference flow survives whole', $r['ok'] && count($r['slot']['elements']) === 4, implode('; ', $r['warnings']));
+check('every part is drawn', array_column($r['slot']['elements'], 'kind') === ['visual', 'visual', 'visual', 'visual']);
+check('the repeated component keeps the SAME subject word for word',
+    $r['slot']['elements'][1]['prompt'] === $r['slot']['elements'][3]['prompt']);
+check('tones survive', ($r['slot']['elements'][1]['tone'] ?? '') === 'bad' && ($r['slot']['elements'][3]['tone'] ?? '') === 'muted');
+check('the fan-out links survive', count($r['slot']['links']) === 3);
+$again = CinematicScene::sanitize($r['slot'], $exists, $narr);
+check('the whole flow is idempotent', $again['slot'] == $r['slot']);
+
+echo "\n== 15. state changes ==\n";
+$r = CinematicScene::sanitize(['elements' => [
+    ['id' => 'cache', 'kind' => 'visual', 'prompt' => 'a metal storage box with a hinged lid', 'title' => 'Cache', 'status' => 'MISS', 'tone' => 'bad', 'then' => [
+        ['word' => 'put', 'status' => 'SET', 'tone' => 'accent', 'note' => 'answer kept for next time'],
+        ['word' => 'xylophone', 'status' => 'STALE'],
+        ['word' => 'server', 'status' => 'THIRD'],
+    ]],
+    ['id' => 'b', 'kind' => 'visual', 'prompt' => 'a paper envelope', 'title' => 'B', 'then' => [['word' => 'server']]],
+    ['id' => 'c', 'kind' => 'visual', 'prompt' => 'a filing cabinet', 'title' => 'C'],
+]], $exists, 'Your request goes to the server, the cache misses, and the answer is put in the cache on the way back.');
+$by = array_column($r['slot']['elements'], null, 'id');
+check('a change keeps its cue and its fields', ($by['cache']['then'][0]['word'] ?? '') === 'put' && ($by['cache']['then'][0]['status'] ?? '') === 'SET');
+check('a change carries a new note', ($by['cache']['then'][0]['note'] ?? '') === 'answer kept for next time');
+check('at most two changes per part', count($by['cache']['then']) === 2);
+check('a change whose cue is never spoken keeps its fields, loses its word', !isset($by['cache']['then'][1]['word']) && ($by['cache']['then'][1]['status'] ?? '') === 'STALE');
+check('a change that changes nothing is dropped', !isset($by['b']['then']));
+
+echo "\n== 16. links ==\n";
+$r = CinematicScene::sanitize(['elements' => [
+    ['id' => 'a', 'kind' => 'visual', 'prompt' => 'a paper envelope', 'title' => 'A'],
+    ['id' => 'a', 'kind' => 'visual', 'prompt' => 'a second envelope', 'title' => 'Second A'],
+    ['id' => 'Cache Box', 'kind' => 'visual', 'prompt' => 'a metal storage box', 'title' => 'Cache'],
+], 'links' => [
+    ['from' => 'a', 'to' => 'Cache Box', 'label' => 'goes to the cache every single time', 'style' => 'elbow', 'tone' => 'accent', 'flow' => 1],
+    ['from' => 'a', 'to' => 'cache-box'],
+    ['from' => 'a', 'to' => 'a'],
+    ['from' => 'a', 'to' => 'ghost'],
+    ['from' => 'a-2', 'to' => 'cache-box', 'style' => 'zigzag', 'tone' => 'rainbow'],
+]], $exists, '');
+$links = $r['slot']['links'] ?? [];
+check('links resolve the model ids (and slugged ones)', ($links[0]['from'] ?? '') === 'a' && ($links[0]['to'] ?? '') === 'cache-box');
+check('a duplicate pair is dropped', count(array_filter($links, fn ($l) => $l['from'] === 'a' && $l['to'] === 'cache-box')) === 1);
+check('a self-link and a link to a missing part are dropped', count($links) === 2, json_encode($links));
+check('the renamed duplicate part can still be linked by its final id', ($links[1]['from'] ?? '') === 'a-2');
+check('labels are capped, styles/tones enumerated, flow is boolean', mb_strlen($links[0]['label']) <= 24 && $links[0]['style'] === 'elbow' && $links[0]['flow'] === true && !isset($links[1]['style']) && !isset($links[1]['tone']));
+$again = CinematicScene::sanitize($r['slot'], $exists, '');
+check('links survive a second sanitize (idempotent)', ($again['slot']['links'] ?? null) == $links);
+$many = ['elements' => array_map(fn ($i) => ['id' => "p{$i}", 'kind' => 'visual', 'prompt' => "object {$i}", 'title' => "P{$i}"], range(0, 5)), 'links' => []];
+foreach (range(0, 5) as $a) {
+    foreach (range(0, 5) as $b) {
+        $many['links'][] = ['from' => "p{$a}", 'to' => "p{$b}"];
+    }
+}
+check('links are capped at eight', count(CinematicScene::sanitize($many, $exists, '')['slot']['links']) === 8);
+
+echo "\n== 17. demotion reads drawn parts ==\n";
+$demote = new ReflectionMethod(ShotListValidator::class, 'cinematicAsText');
+$demote->setAccessible(true);
+[$h, $bullets] = $demote->invoke(new ShotListValidator(), ['heading' => 'Why caching helps', 'elements' => [
+    ['kind' => 'visual', 'prompt' => 'a metal storage box', 'title' => 'Cache', 'status' => 'SET'],
+    ['kind' => 'visual', 'prompt' => 'three person figures', 'title' => 'Everyone'],
+    ['kind' => 'stat', 'text' => '240 ms', 'sub' => 'saved on every hit'],
+]]);
+check('a drawn part becomes "Cache — SET"', in_array('Cache — SET', $bullets, true), json_encode($bullets));
+check('a drawn part with no state becomes its title', in_array('Everyone', $bullets, true));
+check('a stat keeps its sub line', in_array('240 ms — saved on every hit', $bullets, true));
+
+echo "\n== 18. the staging gate asks for drawings that change and connect ==\n";
+check('the reference flow is not weak', $svc::weaknesses($r2 = CinematicScene::sanitize($flow, $exists, $narr)['slot']) === [], implode(' | ', $svc::weaknesses($r2)));
+$static = $r2;
+unset($static['elements'][1]['then'], $static['elements'][3]['then']);
+check('a diagram that never changes is sent back', (bool) array_filter($svc::weaknesses($static), fn ($w) => str_contains($w, 'nothing changes')));
+$loose = $r2;
+$loose['links'] = [];
+check('a diagram with nothing connected is sent back', (bool) array_filter($svc::weaknesses($loose), fn ($w) => str_contains($w, 'connected')));
+$words = ['elements' => [['kind' => 'stat', 'place' => 'left'], ['kind' => 'text', 'place' => 'center'], ['kind' => 'icon', 'place' => 'bottom']], 'links' => [['from' => 'a', 'to' => 'b']]];
+check('a staging of labels and numbers is sent back to draw', (bool) array_filter($svc::weaknesses($words), fn ($w) => str_contains($w, 'DRAWN')));
+$sameThing = ['elements' => [
+    ['kind' => 'visual', 'prompt' => 'a human heart showing the right atrium', 'place' => 'left', 'then' => [['status' => 'FULL']]],
+    ['kind' => 'visual', 'prompt' => 'a human heart showing the left atrium', 'place' => 'center'],
+    ['kind' => 'visual', 'prompt' => 'a human heart with the aorta', 'place' => 'bottom'],
+], 'links' => [['from' => 'a', 'to' => 'b']]];
+check('the same object drawn three ways is sent back', (bool) array_filter($svc::weaknesses($sameThing), fn ($w) => str_contains($w, 'same object')), implode(' | ', $svc::weaknesses($sameThing)));
+$repeats = ['elements' => [
+    ['kind' => 'visual', 'prompt' => 'a tall server rack cabinet', 'place' => 'left', 'then' => [['status' => '34%']]],
+    ['kind' => 'visual', 'prompt' => 'a tall server rack cabinet', 'place' => 'center'],
+    ['kind' => 'visual', 'prompt' => 'a tall server rack cabinet', 'place' => 'bottom'],
+    ['kind' => 'visual', 'prompt' => 'a network router box', 'place' => 'top'],
+], 'links' => [['from' => 'a', 'to' => 'b']]];
+check('three of ONE component (identical subjects) is fine', $svc::weaknesses($repeats) === [], implode(' | ', $svc::weaknesses($repeats)));
+
+echo "\n== 18b. the drawings: prompt, cache key, keying ==\n";
+$flowSvc = new Modules\Project\Services\FlowVisualService();
+$prompt = Modules\Project\Services\FlowVisualService::prompt('a tall server rack cabinet');
+check('the drawing prompt names the subject and forbids text',
+    str_contains($prompt, 'a tall server rack cabinet') && str_contains($prompt, 'no text') && str_contains($prompt, 'white background'));
+check('the same subject gives the same prompt (so it is drawn once)',
+    $prompt === Modules\Project\Services\FlowVisualService::prompt('  a tall server rack cabinet  '));
+$stencil = new ReflectionMethod(Modules\Project\Services\FlowVisualService::class, 'stencil');
+$stencil->setAccessible(true);
+// A drawing the model might hand back: a grey page, a lighter panel behind
+// the object, and the object itself in black.
+$page = imagecreatetruecolor(200, 200);
+imagefill($page, 0, 0, imagecolorallocate($page, 226, 226, 226));
+imagefilledrectangle($page, 30, 30, 170, 170, imagecolorallocate($page, 214, 214, 214));
+imagefilledrectangle($page, 80, 60, 120, 140, imagecolorallocate($page, 8, 8, 8));
+ob_start();
+imagepng($page);
+$pageBytes = (string) ob_get_clean();
+$keyed = $stencil->invoke($flowSvc, $pageBytes);
+check('a drawing keys to a png', is_string($keyed) && str_starts_with($keyed, "\x89PNG"));
+$out = imagecreatefromstring((string) $keyed);
+check('the stencil is cropped to the drawing, not the page',
+    imagesx($out) < 60 && imagesy($out) < 100, imagesx($out) . 'x' . imagesy($out));
+$corner = imagecolorsforindex($out, imagecolorat($out, 1, 1));
+$middle = imagecolorsforindex($out, imagecolorat($out, (int) (imagesx($out) / 2), (int) (imagesy($out) / 2)));
+check('the panel behind the object is keyed away', $corner['alpha'] > 100, json_encode($corner));
+check('the object itself is solid ink', $middle['alpha'] < 12, json_encode($middle));
+// A texture is refused rather than rendered as a smudge.
+$noise = imagecreatetruecolor(120, 120);
+imagefill($noise, 0, 0, imagecolorallocate($noise, 255, 255, 255));
+for ($y = 0; $y < 120; $y++) {
+    for ($x = 0; $x < 120; $x++) {
+        if (($x + $y) % 2 === 0) {
+            imagesetpixel($noise, $x, $y, imagecolorallocate($noise, 0, 0, 0));
+        }
+    }
+}
+ob_start();
+imagepng($noise);
+$noiseBytes = (string) ob_get_clean();
+check('a texture is refused', $stencil->invoke($flowSvc, $noiseBytes) === null);
+// The model's favourite mistake: the object inside a drawn box.
+$framed = imagecreatetruecolor(200, 200);
+imagefill($framed, 0, 0, imagecolorallocate($framed, 252, 252, 252));
+$ink = imagecolorallocate($framed, 10, 10, 10);
+imagesetthickness($framed, 4);
+imagerectangle($framed, 10, 10, 189, 189, $ink);
+imageellipse($framed, 100, 100, 70, 70, $ink);
+ob_start();
+imagepng($framed);
+$boxed = $stencil->invoke($flowSvc, (string) ob_get_clean());
+check('a frame drawn around the object is stripped', is_string($boxed));
+if (is_string($boxed)) {
+    $im = imagecreatefromstring($boxed);
+    // The circle is 70px of a 200px page; at half scale with padding the
+    // stencil must be far smaller than the framed page it came in.
+    check('...and what is left is the object, not the box', imagesx($im) < 60 && imagesy($im) < 60, imagesx($im) . 'x' . imagesy($im));
+}
+$dark = imagecreatetruecolor(120, 120);
+imagefill($dark, 0, 0, imagecolorallocate($dark, 12, 12, 12));
+imagefilledrectangle($dark, 40, 40, 80, 80, imagecolorallocate($dark, 250, 250, 250));
+ob_start();
+imagepng($dark);
+$inverted = $stencil->invoke($flowSvc, (string) ob_get_clean());
+check('a drawing made white-on-black is INVERTED, not thrown away', is_string($inverted));
+if (is_string($inverted)) {
+    $flipped = imagecreatefromstring($inverted);
+    $mid = imagecolorsforindex($flipped, imagecolorat($flipped, (int) (imagesx($flipped) / 2), (int) (imagesy($flipped) / 2)));
+    check('...and the white shape becomes the ink', $mid['alpha'] < 12, json_encode($mid));
+}
+$bleed = imagecreatetruecolor(120, 120);
+imagefill($bleed, 0, 0, imagecolorallocate($bleed, 250, 250, 250));
+$black = imagecolorallocate($bleed, 0, 0, 0);
+imagesetthickness($bleed, 3);
+imagerectangle($bleed, 1, 1, 118, 118, $black);
+imageline($bleed, 1, 1, 118, 118, $black);
+ob_start();
+imagepng($bleed);
+check('a drawing with no margin is refused', $stencil->invoke($flowSvc, (string) ob_get_clean()) === null);
+$blank = imagecreatetruecolor(80, 80);
+imagefill($blank, 0, 0, imagecolorallocate($blank, 255, 255, 255));
+ob_start();
+imagepng($blank);
+check('a blank page is refused', $stencil->invoke($flowSvc, (string) ob_get_clean()) === null);
+
+echo "\n== 18c. the drawing pass fills a storyboard ==\n";
+$board = ['scenes' => ['s3' => ['scene_id' => 's3', 'layout_template' => 'cinematic_card', 'slots' => ['slot_cinematic' => $r2]]]];
+$filled = $flowSvc->drawAll($board, 'load balancing');
+check('scene keys are preserved (revisions hand over keyed drafts)', array_keys($filled['scenes']) === ['s3']);
+check('parts already drawn are never redrawn',
+    ($flowSvc->available() ? true : $filled['scenes']['s3']['slots']['slot_cinematic'] == $r2));
+
+echo "\n== 19. staging runs on the ordinary model ==\n";
+$staging = (new ReflectionProperty(Modules\Project\Services\CinematicSceneService::class, 'model'));
+$staging->setAccessible(true);
+check('the staging pass uses the explainer model (gpt-4o-mini everywhere)', $staging->getValue(new Modules\Project\Services\CinematicSceneService()) === Modules\Project\Support\LlmModels::for('explainer'));
 
 echo "\n{$pass} passed, {$fail} failed\n";
 exit($fail === 0 ? 0 : 1);

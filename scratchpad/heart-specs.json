@@ -1,0 +1,399 @@
+[
+    {
+        "scene_id": "scene_3",
+        "narration": "The two chambers on top are the atria, the receiving rooms. The two on the bottom are the ventricles, the pumping rooms.",
+        "slot": {
+            "brief": "The heart's anatomy: the atria on top, the ventricles below, working together to pump blood.",
+            "links": [
+                {
+                    "to": "heart",
+                    "flow": true,
+                    "from": "atria",
+                    "label": "part of"
+                },
+                {
+                    "to": "heart",
+                    "flow": true,
+                    "from": "ventricles",
+                    "label": "part of"
+                },
+                {
+                    "to": "ventricles",
+                    "flow": true,
+                    "from": "atria",
+                    "label": "work together"
+                }
+            ],
+            "heading": "Heart anatomy: atria and ventricles",
+            "elements": [
+                {
+                    "id": "atria",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "rows": [
+                        {
+                            "tone": "accent",
+                            "label": "function",
+                            "value": "receive blood"
+                        }
+                    ],
+                    "tone": "accent",
+                    "word": "atria",
+                    "depth": "near",
+                    "place": "top_left",
+                    "title": "Atria",
+                    "camera": "push",
+                    "status": "READY",
+                    "subtitle": "receiving rooms"
+                },
+                {
+                    "id": "ventricles",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "rows": [
+                        {
+                            "tone": "accent",
+                            "label": "function",
+                            "value": "pump blood"
+                        }
+                    ],
+                    "then": [
+                        {
+                            "tone": "accent",
+                            "word": "pumping",
+                            "status": "ACTIVE"
+                        }
+                    ],
+                    "tone": "accent",
+                    "word": "ventricles",
+                    "depth": "near",
+                    "place": "bottom_left",
+                    "title": "Ventricles",
+                    "camera": "push",
+                    "status": "READY",
+                    "subtitle": "pumping rooms"
+                },
+                {
+                    "id": "heart",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "rows": [
+                        {
+                            "tone": "accent",
+                            "label": "chambers",
+                            "value": "4 total"
+                        }
+                    ],
+                    "tone": "accent",
+                    "depth": "mid",
+                    "place": "center",
+                    "title": "Heart",
+                    "camera": "rack",
+                    "status": "FUNCTIONING",
+                    "subtitle": "anatomy"
+                }
+            ],
+            "content_type": "cinematic"
+        }
+    },
+    {
+        "scene_id": "scene_7",
+        "narration": "It enters the right atrium, drops into the right ventricle, and is squeezed out to the lungs.",
+        "slot": {
+            "brief": "Blood enters the right atrium, drops to the right ventricle, and is sent to the lungs for oxygenation.",
+            "links": [
+                {
+                    "to": "ventricle",
+                    "flow": true,
+                    "from": "atrium"
+                },
+                {
+                    "to": "lungs",
+                    "flow": true,
+                    "from": "ventricle"
+                }
+            ],
+            "heading": "Blood Journey Begins",
+            "elements": [
+                {
+                    "id": "atrium",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "tone": "muted",
+                    "word": "enters",
+                    "depth": "near",
+                    "place": "left",
+                    "title": "Right Atrium",
+                    "camera": "push",
+                    "status": "EMPTY",
+                    "subtitle": "receiving chamber"
+                },
+                {
+                    "id": "ventricle",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "then": [
+                        {
+                            "tone": "accent",
+                            "status": "FILLED"
+                        }
+                    ],
+                    "tone": "muted",
+                    "word": "drops",
+                    "depth": "mid",
+                    "place": "center",
+                    "title": "Right Ventricle",
+                    "camera": "angle",
+                    "status": "EMPTY",
+                    "subtitle": "pumping chamber"
+                },
+                {
+                    "id": "lungs",
+                    "kind": "panel",
+                    "tone": "muted",
+                    "word": "squeezed",
+                    "depth": "near",
+                    "place": "right",
+                    "title": "Lungs",
+                    "camera": "push",
+                    "status": "WAITING",
+                    "subtitle": "oxygenation"
+                }
+            ],
+            "content_type": "cinematic"
+        }
+    },
+    {
+        "scene_id": "scene_9",
+        "narration": "It flows back into the left atrium, down into the left ventricle, and the left ventricle squeezes it out through the aorta to every part of your body.",
+        "slot": {
+            "brief": "The blood returns to the left atrium, flows into the left ventricle, and is pumped through the aorta to the body.",
+            "links": [
+                {
+                    "to": "ventricle",
+                    "flow": true,
+                    "from": "atrium",
+                    "label": "flows down"
+                },
+                {
+                    "to": "aorta",
+                    "flow": true,
+                    "from": "ventricle",
+                    "label": "squeezes out"
+                }
+            ],
+            "heading": "How blood flows from the heart",
+            "elements": [
+                {
+                    "id": "atrium",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "rows": [
+                        {
+                            "tone": "accent",
+                            "label": "blood",
+                            "value": "oxygenated"
+                        }
+                    ],
+                    "tone": "accent",
+                    "word": "atrium",
+                    "depth": "near",
+                    "place": "left",
+                    "title": "Left Atrium",
+                    "camera": "push",
+                    "status": "FULL",
+                    "subtitle": "receiving blood"
+                },
+                {
+                    "id": "ventricle",
+                    "bars": [
+                        {
+                            "tone": "accent",
+                            "label": "pressure",
+                            "value": 0.8
+                        }
+                    ],
+                    "icon": "heart",
+                    "kind": "panel",
+                    "then": [
+                        {
+                            "bars": [
+                                {
+                                    "tone": "accent",
+                                    "label": "pressure",
+                                    "value": 1
+                                }
+                            ],
+                            "tone": "accent",
+                            "word": "squeeze",
+                            "status": "PUMPING"
+                        }
+                    ],
+                    "tone": "accent",
+                    "word": "ventricle",
+                    "depth": "mid",
+                    "place": "center",
+                    "title": "Left Ventricle",
+                    "camera": "angle",
+                    "status": "READY",
+                    "subtitle": "pumping chamber"
+                },
+                {
+                    "id": "aorta",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "rows": [
+                        {
+                            "tone": "accent",
+                            "label": "blood flow",
+                            "value": "to body"
+                        }
+                    ],
+                    "tone": "accent",
+                    "word": "aorta",
+                    "depth": "mid",
+                    "place": "right",
+                    "title": "Aorta",
+                    "camera": "push",
+                    "status": "EXPANDING",
+                    "subtitle": "main artery"
+                }
+            ],
+            "content_type": "cinematic"
+        }
+    },
+    {
+        "scene_id": "scene_17",
+        "narration": "The whole trip takes about a minute: blood returns from the body to the right atrium, flows into the right ventricle, then to the lungs for oxygen, back to the left atrium, and finally pumped out by the left ventricle through the aorta.",
+        "slot": {
+            "brief": "the journey of a drop of blood: right atrium, right ventricle, lungs, left atrium, left ventricle, aorta",
+            "links": [
+                {
+                    "to": "right-ventricle",
+                    "flow": true,
+                    "from": "right-atrium",
+                    "label": "flows into"
+                },
+                {
+                    "to": "lungs",
+                    "flow": true,
+                    "from": "right-ventricle",
+                    "label": "to lungs"
+                },
+                {
+                    "to": "left-atrium",
+                    "flow": true,
+                    "from": "lungs",
+                    "label": "back to"
+                },
+                {
+                    "to": "left-ventricle",
+                    "flow": true,
+                    "from": "left-atrium",
+                    "label": "flows into"
+                },
+                {
+                    "to": "aorta",
+                    "flow": true,
+                    "from": "left-ventricle",
+                    "label": "pumped out by"
+                }
+            ],
+            "heading": "The journey of a drop of blood",
+            "elements": [
+                {
+                    "id": "right-atrium",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "tone": "muted",
+                    "word": "returns",
+                    "depth": "near",
+                    "place": "left",
+                    "title": "Right Atrium",
+                    "camera": "push",
+                    "status": "EMPTY",
+                    "subtitle": "receives blood"
+                },
+                {
+                    "id": "right-ventricle",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "then": [
+                        {
+                            "tone": "accent",
+                            "word": "pumped",
+                            "status": "FILLED"
+                        }
+                    ],
+                    "tone": "accent",
+                    "word": "flows",
+                    "depth": "mid",
+                    "place": "center",
+                    "title": "Right Ventricle",
+                    "camera": "rack",
+                    "status": "FILLING",
+                    "subtitle": "pumps to lungs"
+                },
+                {
+                    "id": "lungs",
+                    "icon": "cloud",
+                    "kind": "panel",
+                    "tone": "accent",
+                    "word": "oxygen",
+                    "depth": "near",
+                    "place": "right",
+                    "title": "Lungs",
+                    "camera": "push",
+                    "status": "OXYGENATED",
+                    "subtitle": "oxygen exchange"
+                },
+                {
+                    "id": "left-atrium",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "then": [
+                        {
+                            "tone": "accent",
+                            "status": "FILLED"
+                        }
+                    ],
+                    "tone": "accent",
+                    "word": "back",
+                    "depth": "mid",
+                    "place": "bottom_left",
+                    "title": "Left Atrium",
+                    "camera": "rack",
+                    "status": "FILLING",
+                    "subtitle": "receives oxygenated bloo"
+                },
+                {
+                    "id": "left-ventricle",
+                    "icon": "heart",
+                    "kind": "panel",
+                    "tone": "accent",
+                    "word": "pumped",
+                    "depth": "near",
+                    "place": "bottom",
+                    "title": "Left Ventricle",
+                    "camera": "push",
+                    "status": "READY",
+                    "subtitle": "pumps blood"
+                },
+                {
+                    "id": "aorta",
+                    "icon": "arrow-up",
+                    "kind": "panel",
+                    "tone": "accent",
+                    "word": "through",
+                    "depth": "far",
+                    "place": "bottom_right",
+                    "title": "Aorta",
+                    "camera": "rack",
+                    "status": "FLOWING",
+                    "subtitle": "distributes blood"
+                }
+            ],
+            "content_type": "cinematic"
+        }
+    }
+]

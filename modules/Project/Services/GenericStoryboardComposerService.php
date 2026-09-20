@@ -45,7 +45,7 @@ class GenericStoryboardComposerService
         // are the device mockup, the split with the screenshot beside the
         // instruction, and the photo stack for a set of results — not the wall
         // of bullets a demo used to become.
-        'problem' => ['single_focus', 'stat_spotlight', 'myth_fact', 'common_mistake', 'icon_grid', 'pictogram_percent', 'animated_chart', 'checklist_card', 'image_grid', 'custom_card'],
+        'problem' => ['single_focus', 'stat_spotlight', 'myth_fact', 'common_mistake', 'icon_grid', 'pictogram_percent', 'animated_chart', 'checklist_card', 'image_grid', 'custom_card', 'cinematic_card'],
         'product_intro' => ['full_bleed_with_banner', 'single_focus', 'phone_mockup', 'term_card', 'icon_grid', 'split_side_by_side'],
         // single_focus sits LAST here on purpose. A walkthrough step is a
         // screen, and a screen belongs in a frame — offered first, the plain
@@ -107,7 +107,7 @@ class GenericStoryboardComposerService
         'phone_mockup' => 'slot_screen: {content_type:"image", asset_request:{description: the SCREEN content}, frame:"phone"|"browser"} — the card for ANY screen: a website, an app, a dashboard, a settings page, a progress bar. Use "browser" for a desktop/web UI and "phone" for a mobile app. A walkthrough may use it for several consecutive steps (up to 6 per video), but break up long runs with split_side_by_side or full_bleed_with_side_panel so the framing changes',
         'step_flow' => 'slot_steps: {content_type:"steps", items:[3-5 {label: <=4 words naming the action, icon?: a lucide name}], heading?} — a one-way process drawn as connected nodes; use it ONCE to preview or recap a multi-action walkthrough, never in place of showing the actions themselves',
         'custom_card' => 'slot_custom: {content_type:"custom_html", html: a SELF-CONTAINED fragment (inline <svg> allowed, no <script>, no <img>, no links, no external anything), css?: a few plain rules — class selectors only, no @media/@keyframes/@import, heading?: <=60, caption?: <=90} — THE LAST RESORT. Use it ONLY when the beat needs a specific THING drawn that no other card can express: a boarding pass, a chat exchange, a scoreboard, a nutrition label, a keyboard layout, a parking ticket, a periodic-table cell. If ANY other card fits the beat, that card is better — it is already typeset, animated and tested, and this one is not. REACH FOR IT, THOUGH, whenever the near-miss card would need a PICTURE of the thing. A text-message exchange is this card, NOT phone_mockup: a phone_mockup needs a real screenshot, and a generated one comes back with garbled text. Same for a printed ticket, a form, a receipt from a named shop, a scoreboard, a label, a certificate, a search-results page — if the beat is about what the OBJECT SAYS, draw it here rather than asking for a photograph of it. Never use it for a chart (animated_chart), a comparison (versus_card/split_side_by_side), a list (checklist_card/icon_grid), a process (step_flow/cycle_diagram), an equation (formula_anatomy/math_steps) or a photo (single_focus). STYLE: colour with var(--accent), var(--text), var(--muted), var(--panel), var(--line) and type with var(--font-display), var(--font-body), var(--font-mono) so the card matches the video; flat only — shadows, gradients and blurs are stripped. BUILD IT WITH HTML AND CSS, not SVG: an svg <text> element does not wrap, so any sentence in one runs straight off the edge. Use <div>/<p>/<table> with flex or grid for anything containing WORDS, and drop to inline <svg> only for shapes — a line, an arrow, a ring, a bar. SIZE: author against a 1000px-wide canvas and let the height be whatever the content needs — never set a fixed pixel height, and never author a tall canvas for a wide video. The card is scaled to fit the frame, so a fragment that is much taller than it is wide renders small in 16:9. MOTION: never write css animations (they are stripped — the renderer drives the clock). Instead put data-at="0.35" (a 0..1 point in the scene) or data-word="gate" (land when the narrator says that word) on the elements that should arrive one at a time, optionally with data-anim="fade|rise|pop|slide|grow". An element with no cue is visible from the start, so give at least two elements a cue — a card that arrives all at once in a video that runs for eight seconds is a still image. At most 2 per video',
-        'cinematic_card' => 'slot_cinematic: {content_type:"cinematic", brief: ONE sentence naming what the viewer must understand and the 3-5 pieces involved, in the order the narration introduces them ("how a vaccine trains the body: the virus, a harmless copy of its spike, the antibodies, the memory cells"), heading?: <=60} — THE VIDEO\'S KEY EXPLAINING BEATS, staged like a film: a later pass puts every piece on its own 3D layer, each arrives out of focus as the narrator names it while the camera pushes in and the rest of the picture blurs, and the beat ends on a wide, sharp view of the whole thing. Use it where the video actually EXPLAINS — the beat that ANSWERS the question: how the mechanism works, why the result happens, how the pieces relate. Never on the setup of the problem (that is context), a hook, a transition, a list of tips or a lone number. Write that beat\'s narration to NAME each piece in turn, as a TEACHING beat of 9-14 seconds. Cast it on the one to three beats that carry the core idea; together they must stay under 30% of the runtime and never sit next to each other — the calm cards around a cinematic beat are what make it land',
+        'cinematic_card' => 'slot_cinematic: {content_type:"cinematic", brief: ONE sentence naming what the viewer must understand and the 3-5 pieces involved, in the order the narration introduces them ("how a vaccine trains the body: the virus, a harmless copy of its spike, the antibodies, the memory cells"), heading?: <=60} — THE VIDEO\'S KEY EXPLAINING BEATS, staged as a FLOW DIAGRAM THAT BUILDS ITSELF: a later pass has every piece DRAWN for this script (the server, the valve, the parcel — a picture of the thing itself, in the video\'s own ink), puts each on its own 3D layer with the connections between them, and brings each in out of focus as the narrator names it while the camera pushes in and the rest of the picture blurs — the beat ends on a wide, sharp view of the finished diagram. Use it where the video actually EXPLAINS — the beat that ANSWERS the question: how the mechanism works, why the result happens, how the pieces relate. Never on the setup of the problem (that is context), a hook, a transition, a list of tips or a lone number. Write that beat\'s narration to NAME each piece in turn, as a TEACHING beat of 9-14 seconds. Cast it on the one to three beats that carry the core idea; together they must stay under 30% of the runtime and never sit next to each other — the calm cards around a cinematic beat are what make it land',
         'photo_stack' => 'slot_photo_1, slot_photo_2 (+ optional slot_photo_3, slot_photo_4): each {content_type:"image", asset_request:{description}} — 2-4 related shots flipped through like prints, ONE at a time. At most 1 per video',
         'image_grid' => 'slot_image_1, slot_image_2, slot_image_3 (+ optional slot_image_4, slot_image_5, slot_image_6): each {content_type:"image", asset_request:{description: a DIFFERENT concrete photographable subject}, label: a 1-3 word caption <=24 chars}, and slot_image_1 may carry heading?: <=40 — 3-6 pictures on screen AT ONCE, landing one at a time as the narration names them and all staying visible. ONLY when the beat genuinely needs several pictures TOGETHER so the viewer compares them (four examples, the six variants, the three species, what these places have in common) and the narration actually walks through them. Every cell must be a DIFFERENT subject — repeating one picture with different words is the failure this card invites, and a repeated cell is dropped. One picture is single_focus, two is split_side_by_side, a sequence shown one at a time is photo_stack. At most 1 per video',
         'labeled_diagram' => 'slot_diagram: {content_type:"image", asset_request:{description: ONE clean centered subject on a plain background, no text}, heading?: <=40 chars, callout_suggestions:[2-4 short part names, <=4 words each]} — use for "how X works"/parts-of-X beats; the labels are drawn natively over the image',
@@ -188,6 +188,20 @@ class GenericStoryboardComposerService
     private string $model;
     private int $attempts = 0;
 
+    /**
+     * The phase that MUST be the cinematic card — the video's core
+     * explanation, chosen from the skeleton before composing (see corePhase).
+     * Null for short videos and skeletons with no explaining phase.
+     */
+    private ?int $corePhase = null;
+
+    /**
+     * Is the script a process (a chain of steps) rather than a chronology?
+     * Set with {@see $corePhase}, read by {@see menuForPhase()} so the step
+     * phases of a process may cast a flow card of their own.
+     */
+    private bool $processShape = false;
+
     /** The video's target length — the script window is sized from it. */
     private int $targetSeconds = 60;
 
@@ -231,6 +245,8 @@ class GenericStoryboardComposerService
 
         $skeleton = array_values($skeleton);
         $this->targetSeconds = max(10, $targetSeconds);
+        $this->processShape = self::processLike($skeleton);
+        $this->corePhase = count($skeleton) >= 5 ? self::corePhase($skeleton) : null;
 
         // One focused retry against a CRITIQUE of the model's own draft.
         //
@@ -341,11 +357,15 @@ class GenericStoryboardComposerService
         $phaseLines = '';
         foreach ($window as $i => $p) {
             $intent = (string) ($p['intent'] ?? '');
-            $menu = self::menuFor($intent);
+            $menu = $this->menuForPhase((int) $i, $intent);
             $offered = array_merge($offered, $menu);
             $phaseLines .= '  ' . ($i + 1) . '. ' . strtoupper($intent)
                 . ' — ' . (string) ($p['brief'] ?? '')
-                . ' | choose layout_template from: ' . implode(' | ', $menu) . "\n";
+                . ' | choose layout_template from: ' . implode(' | ', $menu)
+                . ($i === $this->corePhase
+                    ? ' | THIS IS THE VIDEO\'S CORE EXPLANATION: stage it as cinematic_card, with 25-35 words of narration that name each piece and what passes between them (12-14 seconds)'
+                    : '')
+                . "\n";
         }
         $docs = '';
         foreach (array_unique($offered) as $tpl) {
@@ -394,6 +414,7 @@ PACING — the single biggest quality lever. A video whose every scene is the sa
 - Write EVERY scene's narration to the length that beat deserves, then set "seconds" to match (~2.5 spoken words per second).
 - PUNCHY beats — a turn, a reveal, a one-liner, a name, a single action being performed — get ONE SHORT SENTENCE and 3-5 seconds.
 - TEACHING beats — the explanation, the payoff, a beat carrying 3+ bullets — get 2-4 sentences and 9-14 seconds.
+- A cinematic_card beat is the LONGEST teaching beat in the video: 2-3 sentences, 25-35 words, naming each piece of its brief in turn and what passes between them — pay for it with shorter beats elsewhere.
 - Deliberately alternate. Never give three consecutive scenes the same length.
 - BUDGET: {$phaseCount} scenes must total about {$targetSeconds}s, so they average {$avgSeconds}s each — roughly {$avgWords} spoken words per scene. Spend the time unevenly across that budget, but do not blow through it: if you want a 13s teaching beat, pay for it with 4s beats elsewhere.
 
@@ -494,7 +515,7 @@ PROMPT;
         $scenes = [];
         $n = 0;
         foreach (array_values($skeleton) as $i => $p) {
-            $menu = self::menuFor((string) ($p['intent'] ?? ''));
+            $menu = $this->menuForPhase($i, (string) ($p['intent'] ?? ''));
             // Find the model's scene for this phase (by index, tolerant of
             // its own numbering).
             $cand = null;
@@ -705,6 +726,127 @@ PROMPT;
     }
 
     /**
+     * The menu one phase casts from: the core phase casts only the flow card,
+     * and on a PROCESS video the step phases may cast one too (see
+     * {@see processLike()}) — the flow card is the card for a chain of things,
+     * and a chain is exactly what `era` phases hold there.
+     */
+    private function menuForPhase(int $i, string $intent): array
+    {
+        if ($i === $this->corePhase) {
+            return ['cinematic_card'];
+        }
+        $menu = self::menuFor($intent);
+        if ($this->processShape && in_array($intent, self::PROCESS_INTENTS, true) && !in_array('cinematic_card', $menu, true)) {
+            $menu[] = 'cinematic_card';
+        }
+
+        return $menu;
+    }
+
+    /**
+     * Phases that hold the STEPS of something happening. Their menus are
+     * timeline-shaped, so they do not offer the flow card by default — a
+     * history video's eras are not mechanisms. On a process video they are the
+     * only phases there are, which is why `processLike()` opens them up.
+     */
+    private const PROCESS_INTENTS = ['era'];
+
+    /** Verbs a step brief uses when something is DONE to something else. */
+    private const PROCESS_VERBS = [
+        'sorts', 'sorted', 'separates', 'separated', 'routes', 'routed', 'sends', 'sent', 'passes', 'passed',
+        'checks', 'checked', 'melts', 'melted', 'washed', 'dried', 'shredded', 'squashed', 'compressed',
+        'filters', 'filtered', 'blows', 'blown', 'lifts', 'lifted', 'removes', 'removed', 'identifies',
+        'identified', 'enters', 'travels', 'carries', 'carried', 'converts', 'converted', 'formed', 'opened',
+        'arrives', 'reaches', 'leaves', 'feeds', 'pushes', 'pulls', 'squeezes', 'settled', 'approved',
+    ];
+
+    /**
+     * Is this skeleton a PROCESS (how a thing happens, step by step) rather
+     * than a CHRONOLOGY (what happened, year by year)?
+     *
+     * Both come out of the L1 planner as a run of `era` phases, and only one
+     * of them wants the flow card. Two live projects showed the cost of not
+     * telling them apart: a recycling script (18 `era` phases) could not cast
+     * a single flow card, and a card-payment script only cast one, on its last
+     * phase, because `turning_point` was the one phase whose menu offered it.
+     *
+     * Dates decide it. A chronology names years, centuries or decades in its
+     * briefs; a process names things being done to things.
+     */
+    public static function processLike(array $skeleton): bool
+    {
+        $phases = array_values($skeleton);
+        if (count($phases) < 5) {
+            return false;
+        }
+
+        $dated = 0;
+        $doing = 0;
+        foreach ($phases as $phase) {
+            $brief = mb_strtolower((string) ($phase['brief'] ?? ''));
+            if (preg_match('/\b(1[0-9]{3}|20[0-9]{2}|centur|decade|ancient|medieval|dynasty|b\.?c\.?|a\.?d\.?)\b/', $brief) === 1) {
+                $dated++;
+            }
+            $words = preg_split('/[^a-z]+/', $brief) ?: [];
+            if (array_intersect($words, self::MECHANISM_WORDS) !== [] || array_intersect($words, self::PROCESS_VERBS) !== []) {
+                $doing++;
+            }
+        }
+
+        return $dated < 2 && $doing >= 3;
+    }
+
+    /** May this phase cast the flow card at all? */
+    private static function offersCinematic(array $skeleton, string $intent): bool
+    {
+        return in_array('cinematic_card', self::menuFor($intent), true)
+            || (in_array($intent, self::PROCESS_INTENTS, true) && self::processLike($skeleton));
+    }
+
+    /** Words in a phase brief that say "this beat explains how/why something works". */
+    private const MECHANISM_WORDS = [
+        'how', 'why', 'work', 'works', 'working', 'because', 'process', 'mechanism', 'inside',
+        'happen', 'happens', 'cause', 'causes', 'reason', 'explain', 'explains', 'step', 'steps',
+        'flow', 'flows', 'system', 'turns', 'makes', 'builds', 'travels', 'moves', 'into',
+    ];
+
+    /**
+     * Which phase is the video's CORE explanation: the explaining phase
+     * (point / aspect / resolution / turning_point) whose brief reads most
+     * like a mechanism — how or why something works — preferring the body of
+     * the argument over its resolution, then the longer brief, then the
+     * earlier phase. Deterministic, so the same skeleton always stages the
+     * same beat.
+     *
+     * The user asked for the cinematic card to be the best explaining part of
+     * the video and never random; casting it by prompt alone was a coin toss
+     * (three live runs: one video in three got none). This makes one beat per
+     * video certain, and the menus still allow a second where it fits.
+     */
+    public static function corePhase(array $skeleton): ?int
+    {
+        $best = null;
+        $bestScore = -1.0;
+        foreach (array_values($skeleton) as $i => $p) {
+            $intent = (string) ($p['intent'] ?? '');
+            if (!self::offersCinematic($skeleton, $intent)) {
+                continue;
+            }
+            $brief = strtolower((string) ($p['brief'] ?? ''));
+            $words = preg_split('/[^a-z]+/', $brief) ?: [];
+            $hits = count(array_intersect($words, self::MECHANISM_WORDS));
+            $score = $hits * 10 + min(8.0, strlen($brief) / 40) + (in_array($intent, ['point', 'aspect'], true) ? 5 : 0);
+            if ($score > $bestScore) {
+                $best = $i;
+                $bestScore = $score;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
      * cinematic_card is the video's key explanation, so the critique holds it
      * to the user's three rules while there is still time to rewrite:
      *
@@ -739,7 +881,7 @@ PROMPT;
         if ($cine === []) {
             $offering = [];
             foreach (array_values($skeleton) as $i => $p) {
-                if (in_array('cinematic_card', self::menuFor((string) ($p['intent'] ?? '')), true)) {
+                if (self::offersCinematic($skeleton, (string) ($p['intent'] ?? ''))) {
                     $offering[] = $i + 1;
                 }
             }
@@ -778,6 +920,15 @@ PROMPT;
         // 19-word narration that mentioned none of them.
         $list = array_values($scenes);
         foreach ($cine as $i) {
+            // A cinematic beat is a teaching beat: every piece needs its own
+            // moment. Three live runs wrote it as one sentence, which left the
+            // staging three words to land three parts on.
+            $said = str_word_count((string) ($list[$i]['narration']['text'] ?? ''));
+            if ($said < 25) {
+                $faults[] = '- Phase ' . ($i + 1) . "'s cinematic_card narration is only {$said} words. It is the video's "
+                    . 'core explanation: write 25-35 words that name each piece of the brief in turn and say what '
+                    . 'passes between them.';
+            }
             $missing = self::unspokenPieces($list[$i]);
             if ($missing !== []) {
                 $faults[] = '- Phase ' . ($i + 1) . '\'s cinematic_card brief names ' . implode(', ', $missing)
@@ -863,7 +1014,7 @@ PROMPT;
         $skeleton = array_values($skeleton);
         foreach (array_values($scenes) as $k => $s) {
             $intent = (string) ($skeleton[$k]['intent'] ?? '');
-            if (!in_array('cinematic_card', self::menuFor($intent), true)
+            if (!self::offersCinematic($skeleton, $intent)
                 || !in_array($s['layout_template'], self::CINEMATIC_PROMOTABLE, true)) {
                 continue;
             }

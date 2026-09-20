@@ -1,102 +1,286 @@
 [
     {
-        "scene_id": "scene_3-noise-cancelling-headphones",
-        "narration": "The chip inside reads that sound thousands of times a second and builds its mirror image, a wave that rises exactly where the noise falls and falls where it rises.",
+        "scene_id": "scene_5-noise-cancelling-headphones",
+        "narration": "Inverted waves are played through the speakers into your ear, meeting the incoming sound. This interaction leads to cancellation of noise, creating a near-silent experience.",
         "slot": {
             "content_type": "cinematic",
-            "heading": "How noise-cancelling headphones work",
-            "brief": "how noise-cancelling headphones create a mirror image of sound: the chip, the wave, the noise",
+            "heading": "How noise cancellation works",
+            "brief": "How noise cancellation works: the incoming sound, the inverted wave, and the resulting silence.",
             "elements": [
                 {
-                    "id": "chip",
-                    "kind": "icon",
-                    "icon": "cpu",
-                    "text": "Sound Chip",
-                    "sub": "reads sound thousands of times",
-                    "place": "top_left",
+                    "id": "incoming",
+                    "kind": "pill",
+                    "text": "incoming sound",
+                    "status": "ACTIVE",
+                    "tone": "bad",
+                    "place": "left",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "incoming"
+                },
+                {
+                    "id": "inverted",
+                    "kind": "pill",
+                    "text": "inverted wave",
+                    "status": "PLAYING",
+                    "tone": "accent",
+                    "then": [
+                        {
+                            "status": "CANCELLED",
+                            "tone": "accent",
+                            "word": "cancel"
+                        }
+                    ],
+                    "place": "center",
                     "depth": "near",
-                    "camera": "push",
-                    "word": "chip"
-                },
-                {
-                    "id": "wave",
-                    "kind": "text",
-                    "place": "top",
-                    "depth": "mid",
                     "camera": "angle",
-                    "word": "wave",
-                    "text": "mirror image wave"
+                    "word": "inverted"
                 },
                 {
-                    "id": "noise",
-                    "kind": "text",
-                    "text": "Noise",
-                    "sub": "the sound being cancelled",
-                    "place": "top_right",
-                    "depth": "far",
-                    "camera": "rack",
-                    "word": "noise"
-                },
-                {
-                    "id": "rise",
-                    "kind": "text",
-                    "text": "Rises",
-                    "sub": "where the noise falls",
-                    "place": "bottom_left",
+                    "id": "result",
+                    "kind": "panel",
+                    "title": "Resulting Silence",
+                    "subtitle": "near-silent experience",
+                    "status": "SILENT",
+                    "tone": "accent",
+                    "place": "right",
                     "depth": "mid",
-                    "camera": "push",
-                    "word": "rises"
+                    "camera": "push"
+                }
+            ],
+            "links": [
+                {
+                    "from": "incoming",
+                    "to": "inverted",
+                    "label": "meets",
+                    "flow": true
                 },
                 {
-                    "id": "fall",
-                    "kind": "text",
-                    "text": "Falls",
-                    "sub": "where the noise rises",
-                    "place": "bottom_right",
-                    "depth": "mid",
-                    "camera": "rack",
-                    "word": "falls"
+                    "from": "inverted",
+                    "to": "result",
+                    "label": "leads to",
+                    "flow": true
                 }
             ]
         }
     },
     {
         "scene_id": "scene_3-how-vaccines-train-the-body",
-        "narration": "Vaccines teach your immune system in advance: the virus, a harmless spike protein, the antibodies, and the memory cells.",
+        "narration": "Vaccines teach your immune system about viruses in advance: the harmless piece, the spike protein, the B cells making antibodies, and the T cells identifying infected cells.",
         "slot": {
             "content_type": "cinematic",
             "heading": "How vaccines train the immune system",
-            "brief": "how a vaccine trains the body: the virus, a harmless copy of its spike, the antibodies, the memory cells",
+            "brief": "how a vaccine trains the body: the harmless piece, the spike protein, the antibodies, the T cells",
             "elements": [
                 {
-                    "id": "virus",
-                    "kind": "text",
-                    "text": "Virus",
-                    "place": "top_left",
-                    "depth": "far",
+                    "id": "vaccine",
+                    "kind": "pill",
+                    "text": "harmless piece",
+                    "icon": "pill",
+                    "status": "COPY",
+                    "tone": "accent",
+                    "place": "left",
+                    "depth": "mid",
                     "camera": "push",
-                    "word": "virus"
+                    "word": "harmless"
                 },
                 {
                     "id": "spike",
-                    "kind": "text",
-                    "text": "Harmless spike protein",
-                    "sub": "a copy of the virus",
-                    "place": "top",
-                    "depth": "mid",
+                    "kind": "panel",
+                    "title": "Spike Protein",
+                    "icon": "atom",
+                    "subtitle": "virus feature",
+                    "status": "IDENTIFIED",
+                    "tone": "accent",
+                    "place": "center",
+                    "depth": "near",
                     "camera": "angle",
                     "word": "spike"
                 },
                 {
-                    "id": "memory-cells",
-                    "kind": "icon",
-                    "icon": "brain",
-                    "text": "Memory cells",
-                    "sub": "remember the virus",
-                    "place": "bottom",
-                    "depth": "near",
+                    "id": "bcells",
+                    "kind": "panel",
+                    "title": "B Cells",
+                    "icon": "dna",
+                    "subtitle": "making antibodies",
+                    "status": "ACTIVE",
+                    "tone": "accent",
+                    "bars": [
+                        {
+                            "label": "antibodies",
+                            "value": 0.5,
+                            "tone": "accent"
+                        }
+                    ],
+                    "then": [
+                        {
+                            "status": "READY",
+                            "tone": "accent",
+                            "bars": [
+                                {
+                                    "label": "antibodies",
+                                    "value": 0.9,
+                                    "tone": "accent"
+                                }
+                            ]
+                        }
+                    ],
+                    "place": "right",
+                    "depth": "mid",
                     "camera": "push",
                     "word": "cells"
+                },
+                {
+                    "id": "tcells",
+                    "kind": "panel",
+                    "title": "T Cells",
+                    "icon": "shield",
+                    "subtitle": "identifying threats",
+                    "status": "SCANNING",
+                    "tone": "accent",
+                    "place": "bottom_right",
+                    "depth": "far",
+                    "camera": "rack",
+                    "word": "cells"
+                }
+            ],
+            "links": [
+                {
+                    "from": "vaccine",
+                    "to": "spike",
+                    "label": "teaches about",
+                    "flow": true
+                },
+                {
+                    "from": "spike",
+                    "to": "bcells",
+                    "label": "activates",
+                    "flow": true
+                },
+                {
+                    "from": "bcells",
+                    "to": "tcells",
+                    "label": "informs",
+                    "flow": true
+                }
+            ]
+        }
+    },
+    {
+        "scene_id": "scene_4-logged-out-when-you-scale",
+        "narration": "When Bob logs in, his session is stored in one server's memory. The load balancer sends his clicks to different servers. Two out of three clicks land on servers that don't recognize him, causing logouts.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "Understanding session handling",
+            "brief": "Understanding session handling: Bob, server memory, load balancer, user clicks, logout issue.",
+            "elements": [
+                {
+                    "id": "bob",
+                    "kind": "panel",
+                    "title": "Bob",
+                    "icon": "users",
+                    "subtitle": "the user",
+                    "status": "LOGGED IN",
+                    "tone": "accent",
+                    "rows": [
+                        {
+                            "label": "session",
+                            "value": "stored",
+                            "tone": "accent"
+                        }
+                    ],
+                    "place": "left",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "bob"
+                },
+                {
+                    "id": "server",
+                    "kind": "panel",
+                    "title": "Server",
+                    "icon": "server",
+                    "subtitle": "memory",
+                    "status": "ACTIVE",
+                    "tone": "accent",
+                    "rows": [
+                        {
+                            "label": "session data",
+                            "value": "Bob's info",
+                            "tone": "accent"
+                        }
+                    ],
+                    "place": "center",
+                    "depth": "near",
+                    "camera": "angle",
+                    "word": "server"
+                },
+                {
+                    "id": "balancer",
+                    "kind": "panel",
+                    "title": "Load Balancer",
+                    "icon": "cog",
+                    "subtitle": "distributes clicks",
+                    "status": "ACTIVE",
+                    "tone": "accent",
+                    "place": "right",
+                    "depth": "mid",
+                    "camera": "rack",
+                    "word": "balancer"
+                },
+                {
+                    "id": "clicks",
+                    "kind": "crowd",
+                    "text": "User clicks",
+                    "lit": 0.8,
+                    "tone": "accent",
+                    "then": [
+                        {
+                            "lit": 0.3,
+                            "word": "land"
+                        }
+                    ],
+                    "place": "bottom",
+                    "depth": "far",
+                    "camera": "rack",
+                    "word": "clicks"
+                },
+                {
+                    "id": "logout",
+                    "kind": "pill",
+                    "text": "Logout",
+                    "icon": "x",
+                    "status": "TRIGGERED",
+                    "tone": "bad",
+                    "place": "bottom_right",
+                    "depth": "far",
+                    "camera": "push",
+                    "word": "logout"
+                }
+            ],
+            "links": [
+                {
+                    "from": "bob",
+                    "to": "server",
+                    "label": "session stored",
+                    "flow": true
+                },
+                {
+                    "from": "balancer",
+                    "to": "clicks",
+                    "label": "sends clicks",
+                    "flow": true
+                },
+                {
+                    "from": "clicks",
+                    "to": "server",
+                    "label": "land on servers",
+                    "flow": true
+                },
+                {
+                    "from": "clicks",
+                    "to": "logout",
+                    "label": "causing logouts",
+                    "tone": "bad"
                 }
             ]
         }

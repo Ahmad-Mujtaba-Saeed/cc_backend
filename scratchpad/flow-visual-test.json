@@ -1,0 +1,123 @@
+[
+    {
+        "scene_id": "flow-balancer",
+        "narration": "Everyone hits the same server, and it is drowning at ninety percent. So you put a load balancer in front. It picks one of three servers for every request, and the load spreads out evenly.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "What a load balancer does",
+            "elements": [
+                {
+                    "id": "crowd",
+                    "kind": "visual",
+                    "prompt": "a group of three simple standing person figures side by side",
+                    "title": "Everyone",
+                    "note": "every visitor",
+                    "image_path": "explainer/flow/test-crowd-45a285d4edad.png",
+                    "place": "left",
+                    "depth": "far",
+                    "camera": "push",
+                    "word": "everyone",
+                    "image_url": "flow/test-crowd-45a285d4edad.png"
+                },
+                {
+                    "id": "server1",
+                    "kind": "visual",
+                    "prompt": "a tall server rack cabinet with stacked slots",
+                    "title": "Server 1",
+                    "status": "90%",
+                    "tone": "bad",
+                    "image_path": "explainer/flow/test-server1-97d7c241b9fe.png",
+                    "then": [
+                        {
+                            "status": "34%",
+                            "tone": "accent",
+                            "word": "evenly"
+                        }
+                    ],
+                    "place": "top_right",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "drowning",
+                    "image_url": "flow/test-server1-97d7c241b9fe.png"
+                },
+                {
+                    "id": "balancer",
+                    "kind": "visual",
+                    "prompt": "a network router box with one input cable and three output cables fanning out",
+                    "title": "Balancer",
+                    "note": "picks one",
+                    "image_path": "explainer/flow/test-balancer-2174eace81a0.png",
+                    "place": "center",
+                    "depth": "near",
+                    "camera": "angle",
+                    "word": "balancer",
+                    "image_url": "flow/test-balancer-2174eace81a0.png"
+                },
+                {
+                    "id": "server2",
+                    "kind": "visual",
+                    "prompt": "a tall server rack cabinet with stacked slots",
+                    "title": "Server 2",
+                    "status": "5%",
+                    "tone": "muted",
+                    "image_path": "explainer/flow/test-server2-97d7c241b9fe.png",
+                    "then": [
+                        {
+                            "status": "33%",
+                            "tone": "accent",
+                            "word": "evenly"
+                        }
+                    ],
+                    "place": "right",
+                    "depth": "mid",
+                    "camera": "rack",
+                    "word": "three",
+                    "image_url": "flow/test-server2-97d7c241b9fe.png"
+                },
+                {
+                    "id": "server3",
+                    "kind": "visual",
+                    "prompt": "a tall server rack cabinet with stacked slots",
+                    "title": "Server 3",
+                    "status": "5%",
+                    "tone": "muted",
+                    "image_path": "explainer/flow/test-server3-97d7c241b9fe.png",
+                    "then": [
+                        {
+                            "status": "33%",
+                            "tone": "accent",
+                            "word": "evenly"
+                        }
+                    ],
+                    "place": "bottom_right",
+                    "depth": "mid",
+                    "camera": "rack",
+                    "word": "servers",
+                    "image_url": "flow/test-server3-97d7c241b9fe.png"
+                }
+            ],
+            "links": [
+                {
+                    "from": "crowd",
+                    "to": "balancer",
+                    "flow": true
+                },
+                {
+                    "from": "balancer",
+                    "to": "server1",
+                    "flow": true
+                },
+                {
+                    "from": "balancer",
+                    "to": "server2",
+                    "flow": true
+                },
+                {
+                    "from": "balancer",
+                    "to": "server3",
+                    "flow": true
+                }
+            ]
+        }
+    }
+]

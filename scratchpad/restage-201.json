@@ -1,0 +1,221 @@
+[
+    {
+        "scene_id": "scene_5",
+        "narration": "Next, a magnet removes steel cans from the mix, while a spinning drum handles aluminum, making it jump into its own bin.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "How metals are sorted in recycling",
+            "brief": "How metals are sorted: a magnet lifts steel cans, and a spinning drum makes aluminum cans jump off the belt.",
+            "elements": [
+                {
+                    "id": "magnet",
+                    "kind": "visual",
+                    "prompt": "a large rectangular magnet with a handle",
+                    "title": "Magnet",
+                    "note": "removing steel cans",
+                    "place": "left",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "magnet",
+                    "image_path": "explainer/flow/scene-5-magnet-d070e56e8c19.png",
+                    "image_url": "flow/scene-5-magnet-d070e56e8c19.png"
+                },
+                {
+                    "id": "steel-cans",
+                    "kind": "visual",
+                    "prompt": "a group of three steel cans stacked together",
+                    "title": "Steel cans",
+                    "status": "mixed",
+                    "tone": "muted",
+                    "then": [
+                        {
+                            "status": "none",
+                            "tone": "bad"
+                        }
+                    ],
+                    "place": "center",
+                    "depth": "mid",
+                    "camera": "rack",
+                    "word": "cans",
+                    "image_path": "explainer/flow/scene-5-steel-cans-cd4a4886c8f8.png",
+                    "image_url": "flow/scene-5-steel-cans-cd4a4886c8f8.png"
+                },
+                {
+                    "id": "drum",
+                    "kind": "visual",
+                    "prompt": "a large spinning drum with a textured surface",
+                    "title": "Spinning drum",
+                    "note": "handles aluminum",
+                    "place": "right",
+                    "depth": "near",
+                    "camera": "angle",
+                    "word": "drum",
+                    "image_path": "explainer/flow/scene-5-drum-21227ce2ca1f.png",
+                    "image_url": "flow/scene-5-drum-21227ce2ca1f.png"
+                },
+                {
+                    "id": "aluminum-cans",
+                    "kind": "visual",
+                    "prompt": "a group of three aluminum cans bouncing off the ground",
+                    "title": "Aluminum cans",
+                    "status": "jumping",
+                    "tone": "accent",
+                    "then": [
+                        {
+                            "status": "collected",
+                            "tone": "accent",
+                            "word": "bin"
+                        }
+                    ],
+                    "place": "bottom_right",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "aluminum",
+                    "image_path": "explainer/flow/scene-5-aluminum-cans-53e06a51823f.png",
+                    "image_url": "flow/scene-5-aluminum-cans-53e06a51823f.png"
+                }
+            ],
+            "links": [
+                {
+                    "from": "magnet",
+                    "to": "steel-cans",
+                    "flow": true
+                },
+                {
+                    "from": "drum",
+                    "to": "aluminum-cans",
+                    "flow": true
+                }
+            ]
+        }
+    },
+    {
+        "scene_id": "scene_8",
+        "narration": "At the reprocessing plant, bales are shredded into flakes, separating labels and caps. Flakes sink or float in water, sorted by density. Finally, they are washed, dried, and melted into pellets.",
+        "slot": {
+            "content_type": "cinematic",
+            "heading": "The reprocessing journey of plastic bottles",
+            "brief": "The reprocessing journey: bales shredded into flakes, labels removed, separated by density in water, washed, dried, and melted into pellets.",
+            "elements": [
+                {
+                    "id": "bales",
+                    "kind": "visual",
+                    "prompt": "a large compressed bale of plastic bottles wrapped in plastic strapping",
+                    "title": "Bales",
+                    "note": "waiting to be processed",
+                    "place": "left",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "bales",
+                    "image_path": "explainer/flow/scene-8-bales-87c4efa885be.png",
+                    "image_url": "flow/scene-8-bales-87c4efa885be.png"
+                },
+                {
+                    "id": "shredder",
+                    "kind": "visual",
+                    "prompt": "a mechanical shredder with sharp blades and a funnel for input",
+                    "title": "Shredder",
+                    "status": "ACTIVE",
+                    "note": "shredding into flakes",
+                    "place": "center",
+                    "depth": "near",
+                    "camera": "angle",
+                    "word": "shredded",
+                    "image_path": "explainer/flow/scene-8-shredder-aff673fc8524.png",
+                    "image_url": "flow/scene-8-shredder-aff673fc8524.png"
+                },
+                {
+                    "id": "flakes",
+                    "kind": "visual",
+                    "prompt": "a pile of small plastic flakes in various colors",
+                    "title": "Flakes",
+                    "status": "SEPARATED",
+                    "note": "labels and caps removed",
+                    "then": [
+                        {
+                            "status": "SORTED",
+                            "tone": "accent",
+                            "note": "by density",
+                            "word": "sorted"
+                        }
+                    ],
+                    "place": "right",
+                    "depth": "mid",
+                    "camera": "push",
+                    "word": "flakes",
+                    "image_path": "explainer/flow/scene-8-flakes-7f1a917a94b5.png",
+                    "image_url": "flow/scene-8-flakes-7f1a917a94b5.png"
+                },
+                {
+                    "id": "water",
+                    "kind": "visual",
+                    "prompt": "a large tank filled with water, showing floating and sinking flakes",
+                    "title": "Water tank",
+                    "status": "ACTIVE",
+                    "note": "sorting by density",
+                    "place": "bottom_right",
+                    "depth": "mid",
+                    "camera": "rack",
+                    "word": "water",
+                    "image_path": "explainer/flow/scene-8-water-3446a88243f7.png",
+                    "image_url": "flow/scene-8-water-3446a88243f7.png"
+                },
+                {
+                    "id": "washing",
+                    "kind": "visual",
+                    "prompt": "a washing machine designed for plastic flakes, with water spraying inside",
+                    "title": "Washing",
+                    "status": "CLEANING",
+                    "note": "washed and dried",
+                    "place": "bottom",
+                    "depth": "near",
+                    "camera": "push",
+                    "word": "washed",
+                    "image_path": "explainer/flow/scene-8-washing-f7194119b206.png",
+                    "image_url": "flow/scene-8-washing-f7194119b206.png"
+                },
+                {
+                    "id": "pellets",
+                    "kind": "visual",
+                    "prompt": "a pile of small plastic pellets in various colors",
+                    "title": "Pellets",
+                    "status": "FINAL",
+                    "note": "melted into pellets",
+                    "place": "bottom_left",
+                    "depth": "far",
+                    "camera": "rack",
+                    "word": "pellets",
+                    "image_path": "explainer/flow/scene-8-pellets-9d964a56eaed.png",
+                    "image_url": "flow/scene-8-pellets-9d964a56eaed.png"
+                }
+            ],
+            "links": [
+                {
+                    "from": "bales",
+                    "to": "shredder",
+                    "flow": true
+                },
+                {
+                    "from": "shredder",
+                    "to": "flakes",
+                    "flow": true
+                },
+                {
+                    "from": "flakes",
+                    "to": "water",
+                    "flow": true
+                },
+                {
+                    "from": "water",
+                    "to": "washing",
+                    "flow": true
+                },
+                {
+                    "from": "washing",
+                    "to": "pellets",
+                    "flow": true
+                }
+            ]
+        }
+    }
+]

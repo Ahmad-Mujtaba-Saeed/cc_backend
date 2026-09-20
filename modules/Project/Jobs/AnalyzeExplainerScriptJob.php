@@ -250,6 +250,20 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                         'error' => $e->getMessage(),
                     ]);
                 }
+
+                // Then DRAW the parts those beats named: one image-model
+                // drawing per subject, keyed to an alpha stencil the renderer
+                // paints in the video's ink. A part that cannot be drawn keeps
+                // its words and its links.
+                try {
+                    $raw = (new \Modules\Project\Services\FlowVisualService())
+                        ->drawAll($raw, (string) $this->project->title);
+                } catch (Throwable $e) {
+                    Log::info('AnalyzeExplainerScriptJob: flow drawings unavailable', [
+                        'project_id' => $this->project->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
 
             // Geometry figure synthesis (iter 40): rebuild any geometry_diagram
