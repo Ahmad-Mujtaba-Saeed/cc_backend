@@ -1,5 +1,5 @@
 {
-  "version": 49,
+  "version": 51,
   "motion_styles": {
     "default": "auto",
     "styles": {
@@ -941,8 +941,6 @@
         "slot_main": {
           "label": "Main",
           "allowed": [
-            "image",
-            "video",
             "text_block",
             "vector_motif"
           ]
@@ -1838,5 +1836,14 @@
       "x",
       "zap"
     ]
+  },
+  "motion_depth": {
+    "default": "subtle",
+    "levels": {
+      "off": "Flat. Cards fade and scale the way they did before the depth rig — nothing arrives out of the frame, no cut travels in z.",
+      "subtle": "The house setting. Every card arrives out of depth and holds on a slow dolly; rows come forward as they land; cuts happen in z. Enough to feel, never enough to notice.",
+      "full": "The flow card's rig on the whole video: longer travel, a real focus resolve on every arrival, punchier cuts. For a video that is mostly talk and needs the camera to carry it."
+    },
+    "applies_to": "slides and the slides half of hybrid; the canvas journey racks with its own luminance wash instead (a CSS filter inside the camera-scaled world softens text)"
   }
 }

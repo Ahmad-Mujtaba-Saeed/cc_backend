@@ -21,6 +21,10 @@ RUN echo "upload_max_filesize = 500M" >> /usr/local/etc/php/conf.d/uploads.ini \
     && echo "memory_limit = 512M" >> /usr/local/etc/php/conf.d/uploads.ini \
     && echo "max_execution_time = 300" >> /usr/local/etc/php/conf.d/uploads.ini
 
+# The request pool (see the file: the stock 5 children are what makes the
+# storyboard page reset connections on this machine).
+COPY docker/php/www-pool.conf /usr/local/etc/php-fpm.d/zz-pool.conf
+
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 COPY . /var/www
 

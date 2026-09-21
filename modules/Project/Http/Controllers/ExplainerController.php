@@ -1324,6 +1324,31 @@ class ExplainerController extends Controller
     }
 
     /**
+     * How far the depth rig leans (motion/depthStage): off, subtle or full.
+     *
+     * One control for the whole video, like the motion style it sits beside:
+     * it governs the scene camera, the row arrivals, the media dollies, the
+     * cuts, and how deep the canvas journey's out-of-focus wash goes.
+     */
+    public function setMotionDepth(Request $request, Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $level = (string) $request->input('depth', ExplainerRegistry::defaultMotionDepth());
+        if (!in_array($level, ExplainerRegistry::motionDepthNames(), true)) {
+            return response()->json(['success' => false, 'message' => 'Invalid depth level'], 422);
+        }
+
+        $settings = $project->settings ?? [];
+        $settings['motion_depth'] = $level;
+        $project->update(['settings' => $settings]);
+
+        return response()->json(['success' => true, 'data' => ['motion_depth' => $level]]);
+    }
+
+    /**
      * Pick the motion style preset (copilot.md §2.5), or "auto" for the
      * planner's suggestion / mood map.
      */
@@ -2176,6 +2201,14 @@ class ExplainerController extends Controller
             'motion_style' => $project->settings['motion_style'] ?? 'auto',
             'motion_style_auto' => $project->settings['motion_style_auto'] ?? null,
             'motion_styles' => ExplainerRegistry::motionStyles(),
+            // The depth rig (motion/depthStage). A maths board renders flat by
+            // design, so the control is simply not offered there.
+            'motion_depth' => ($project->settings['composition_mode'] ?? '') === 'math_board'
+                ? 'off'
+                : ($project->settings['motion_depth'] ?? ExplainerRegistry::defaultMotionDepth()),
+            'motion_depth_levels' => ($project->settings['composition_mode'] ?? '') === 'math_board'
+                ? null
+                : (array) (ExplainerRegistry::all()['motion_depth']['levels'] ?? []),
             'skin' => $project->settings['skin'] ?? 'auto',
             'skin_auto' => $project->settings['skin_auto'] ?? null,
             // Same explicit-beats-auto rule the render uses (one shared

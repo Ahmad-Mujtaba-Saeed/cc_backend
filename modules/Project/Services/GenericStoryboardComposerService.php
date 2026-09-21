@@ -78,7 +78,7 @@ class GenericStoryboardComposerService
      * full vocabulary.
      */
     private const CARD_DOCS = [
-        'single_focus' => 'slot_main: {content_type:"text_block", heading<=40, bullets:[1-4 <=60]} OR {content_type:"image", asset_request:{description: a concrete photographable subject}, camera_move:"slow_zoom_in"} OR {content_type:"vector_motif", subject: ONE sentence naming the concrete object or mechanism to DRAW ("a glass bottle melted down and re-formed as a jar", "a data packet hopping between three routers", "a seed cracking open into a seedling")} — a flat vector drawing of the beat\'s subject, drawn and animated for you by a later pass, so you write the sentence and nothing else. Choose it over an image when the beat is about a THING or a MECHANISM the viewer should see and a stock photograph would be generic or literally unphotographable (a molecule, a signal, a cross-section, a process happening inside something). Choose an image when the beat wants a real place, a real person or real texture. Never use it for numbers, a list, a comparison or anything with no shape.',
+        'single_focus' => 'slot_main: {content_type:"text_block", heading<=40, bullets:[1-4 <=60]} — THE PLAIN TEXT CARD, and the default everyone over-uses: never put two of them next to each other, and never more than about a third of the video. It takes ONE slot, so it cannot hold a picture AND its words: a beat that wants a photograph is full_bleed_with_side_panel (picture + panel), full_bleed_with_banner (picture + one line), split_side_by_side (picture beside the text) or image_grid — on those the slot is visibly a picture in the storyboard, which is what lets a person upload, browse or redraw it before paying for a render. The one visual it may carry is {content_type:"vector_motif", subject: ONE sentence naming the concrete object or mechanism to DRAW ("a glass bottle melted down and re-formed as a jar", "a data packet hopping between three routers", "a seed cracking open into a seedling")} — a flat vector drawing of the beat\'s subject, drawn and animated for you by a later pass, so you write the sentence and nothing else. Choose it over an image when the beat is about a THING or a MECHANISM the viewer should see and a stock photograph would be generic or literally unphotographable (a molecule, a signal, a cross-section, a process happening inside something). Choose an image when the beat wants a real place, a real person or real texture. Never use it for numbers, a list, a comparison or anything with no shape.',
         'stat_spotlight' => 'slot_stat: {content_type:"text_block", heading: THE stat itself ("\$4.2 Billion"), bullets:[1 support line]}',
         'quote_card' => 'slot_quote: {content_type:"text_block", heading: the quotation, bullets:["— attribution"]}',
         // NB: the media slot on both full-bleed templates is `slot_background`,
@@ -713,6 +713,10 @@ PROMPT;
             }
         }
 
+        foreach (self::critiqueSingleFocus($scenes) as $fault) {
+            $faults[] = $fault;
+        }
+
         $nudge = $this->nudgeCustomCard($scenes, $skeleton, $script);
         if ($nudge !== null) {
             $faults[] = $nudge;
@@ -720,6 +724,50 @@ PROMPT;
 
         foreach ($this->critiqueCinematic($scenes, $skeleton) as $fault) {
             $faults[] = $fault;
+        }
+
+        return $faults;
+    }
+
+    /**
+     * single_focus is the plain text card every menu offers first, which is
+     * why a long script collapses into a wall of them. The validator breaks a
+     * pair up by recasting the second from its own content, but the composer
+     * can do better while it still has the whole script in view: it knows
+     * which beat deserves a picture and which one is really a stat.
+     *
+     * @param  array<int, array<string, mixed>> $scenes
+     * @return string[]
+     */
+    public static function critiqueSingleFocus(array $scenes): array
+    {
+        $templates = array_map(fn ($s) => (string) ($s['layout_template'] ?? ''), array_values($scenes));
+        $faults = [];
+
+        $pairs = [];
+        foreach ($templates as $i => $template) {
+            if ($i > 0 && $template === 'single_focus' && $templates[$i - 1] === 'single_focus') {
+                $pairs[] = $i + 1;
+            }
+        }
+        if ($pairs !== []) {
+            $faults[] = sprintf(
+                '- Scenes %s repeat "single_focus" back to back. Two plain text cards in a row read as one long '
+                . 'slide: recast the second from what it actually holds — a number is stat_spotlight, a word being '
+                . 'defined is term_card, a list of actions is checklist_card, and a beat you can picture belongs on '
+                . 'full_bleed_with_side_panel or split_side_by_side.',
+                implode(', ', $pairs)
+            );
+        }
+
+        $plain = count(array_filter($templates, fn ($t) => $t === 'single_focus'));
+        if (count($templates) >= 6 && $plain > (int) ceil(count($templates) * 0.4)) {
+            $faults[] = sprintf(
+                '- %d of %d scenes are "single_focus". It is the fallback, not the format: keep it under a third and '
+                . 'give the rest the card their content asks for.',
+                $plain,
+                count($templates)
+            );
         }
 
         return $faults;

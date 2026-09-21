@@ -167,7 +167,9 @@ check('isPending: staged is not pending', !CinematicScene::isPending($good));
 
 echo "\n== 7. registry ==\n";
 $reg = ExplainerRegistry::all();
-check('registry version bumped to 49', (int) $reg['version'] === 49);
+check('registry version bumped to 51', (int) $reg['version'] === 51);
+check('the depth rig has its levels + a default', ExplainerRegistry::motionDepthNames() === ['off', 'subtle', 'full']
+    && ExplainerRegistry::defaultMotionDepth() === 'subtle', implode('|', ExplainerRegistry::motionDepthNames()));
 check('cinematic_card template exists with slot_cinematic', isset($reg['templates']['cinematic_card']['slots']['slot_cinematic']));
 check('slot accepts the cinematic content type', ExplainerRegistry::allowedContentTypes('cinematic_card', 'slot_cinematic') === ['cinematic']);
 check('the registry lists the drawn kind first', ($reg['cinematic']['kinds'][0] ?? '') === 'visual', json_encode($reg['cinematic']['kinds'] ?? []));

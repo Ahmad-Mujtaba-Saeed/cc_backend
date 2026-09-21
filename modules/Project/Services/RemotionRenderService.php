@@ -182,6 +182,13 @@ class RemotionRenderService
                 // (§11.2); 'auto' resolves server-side so the renderer only
                 // ever sees concrete names.
                 'motion_style' => $this->resolveMotionStyle($settings, $scenes),
+                // The depth rig (motion/depthStage): how far the camera leans.
+                // A maths board is a flat board by design, so it never gets it.
+                'motion_depth' => ($settings['composition_mode'] ?? '') === 'math_board'
+                    ? 'off'
+                    : (in_array($settings['motion_depth'] ?? null, ExplainerRegistry::motionDepthNames(), true)
+                        ? (string) $settings['motion_depth']
+                        : ExplainerRegistry::defaultMotionDepth()),
                 'skin' => self::resolveSkin($settings),
                 'font_pack' => $this->resolveFontPack($settings),
                 // Cinematic canvas journey: mode + the director's world plan.

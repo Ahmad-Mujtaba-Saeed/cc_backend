@@ -237,6 +237,20 @@ class ExplainerRegistry
     }
 
     /** @return string[] */
+    /** The depth-rig levels a project may pick (motion/depthStage). */
+    public static function motionDepthNames(): array
+    {
+        return array_keys((array) (self::all()['motion_depth']['levels'] ?? []));
+    }
+
+    /** The house depth level when the project has not chosen one. */
+    public static function defaultMotionDepth(): string
+    {
+        $default = (string) (self::all()['motion_depth']['default'] ?? 'subtle');
+
+        return in_array($default, self::motionDepthNames(), true) ? $default : 'subtle';
+    }
+
     public static function motionStyleNames(): array
     {
         return array_keys(self::motionStyles());

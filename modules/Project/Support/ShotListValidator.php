@@ -102,6 +102,11 @@ class ShotListValidator
         $scenes = $this->enforceStockCap($scenes);
         $scenes = $this->ensurePeakCards($scenes);
         $scenes = $this->ensureMediaFloor($scenes);
+        // LAST of the template passes: everything above can hand back a
+        // single_focus (a degrade past a cap keeps the picture in it, the
+        // media floor and the peak pass recast whole scenes), so the two
+        // single_focus rules are settled once nothing else will move a card.
+        $scenes = $this->enforceSingleFocus($scenes);
         if (($options['outro_enabled'] ?? true) !== false) {
             $scenes = $this->appendOutro($scenes, $options);
         }
@@ -2551,6 +2556,161 @@ class ShotListValidator
      * row. Safely swaps split layouts (which share slot shapes) to break runs;
      * other repeats are left to the prompt to avoid unsafe slot remapping.
      */
+    /**
+     * The two rules for the plainest card in the product.
+     *
+     * **A picture never hides inside a single_focus.** The card takes one
+     * slot, so a picture in it replaces the words — and in the storyboard it
+     * reads as an empty text card, because nothing has been generated yet.
+     * The user only finds out there was a photograph when the render is
+     * finished. So a single_focus carrying media is recast as the card that
+     * was wanted in the first place: full_bleed_with_banner, where the slot is
+     * visibly a picture the user can upload, browse or redraw before spending
+     * a render on it. Nothing about the request is lost — the asset, its
+     * camera move and its brief all move across.
+     *
+     * **Never two in a row.** single_focus is the default every menu offers
+     * first, so a long script collapses into a wall of identical text cards.
+     * The second of a pair is recast from its OWN content: a number becomes a
+     * stat, a definition becomes a term card, and anything else earns a
+     * picture — which is also how the beat gets a visual the user can see.
+     */
+    private function enforceSingleFocus(array $scenes): array
+    {
+        // A picture that arrived here inside a single_focus — from a degrade
+        // past a cap, say — is recast onto a card that shows it.
+        foreach ($scenes as $i => $scene) {
+            $scenes[$i] = $this->revealHiddenPicture($scene, (string) ($scene['scene_id'] ?? "scene_{$i}"));
+        }
+
+        // Adjacency, left to right: only the SECOND of a pair moves, so a run
+        // of three becomes text / other / text rather than three recasts.
+        $previous = null;
+        foreach ($scenes as $i => $scene) {
+            $template = (string) ($scene['layout_template'] ?? '');
+            if ($template === 'single_focus' && $previous === 'single_focus') {
+                $recast = $this->recastSingleFocus($scene, $scenes);
+                if ($recast !== null) {
+                    $this->warn(
+                        "Scene {$scene['scene_id']}: two single_focus cards in a row -> '{$recast['layout_template']}'."
+                    );
+                    $this->changed = true;
+                    $scenes[$i] = $recast;
+                }
+            }
+            $previous = (string) ($scenes[$i]['layout_template'] ?? '');
+        }
+
+        return $scenes;
+    }
+
+    /**
+     * A picture hidden in a single_focus, recast onto the card that was
+     * wanted: full_bleed_with_banner, where the slot is visibly a picture in
+     * the storyboard. The asset, its camera move and its brief all move
+     * across, so an upload the user already made survives untouched.
+     */
+    private function revealHiddenPicture(array $scene, string $sceneId): array
+    {
+        if (($scene['layout_template'] ?? '') !== 'single_focus') {
+            return $scene;
+        }
+        $slot = $scene['slots']['slot_main'] ?? null;
+        if (!is_array($slot) || !in_array((string) ($slot['content_type'] ?? ''), ['image', 'video'], true)) {
+            return $scene;
+        }
+
+        $narration = is_array($scene['narration'] ?? null)
+            ? (string) ($scene['narration']['text'] ?? '')
+            : (string) ($scene['narration'] ?? '');
+        $heading = trim((string) ($slot['label'] ?? ''));
+        if ($heading === '') {
+            $heading = $this->punchLine($narration);
+        }
+
+        $scene['layout_template'] = 'full_bleed_with_banner';
+        $scene['slots'] = [
+            'slot_background' => $slot,
+            'slot_banner' => $this->genericTextBlock($narration, $heading !== '' ? mb_substr($heading, 0, 40) : null),
+        ];
+        $this->changed = true;
+        $this->warn("Scene {$sceneId}: a picture inside single_focus is invisible in the storyboard -> full_bleed_with_banner.");
+
+        return $scene;
+    }
+
+    /**
+     * What this particular single_focus should be instead, read from the card
+     * it already holds. Returns null when nothing fits — a warning without a
+     * repair beats a card that misrepresents its content.
+     *
+     * @param array $scenes the whole storyboard, for the media budget
+     */
+    private function recastSingleFocus(array $scene, array $scenes): ?array
+    {
+        $slot = $scene['slots']['slot_main'] ?? null;
+        if (!is_array($slot) || ($slot['content_type'] ?? '') !== 'text_block') {
+            return null; // a vector motif is already this beat's picture
+        }
+
+        $heading = trim((string) ($slot['heading'] ?? ''));
+        $bullets = array_values(array_filter(
+            array_map(fn ($b) => trim((string) $b), (array) ($slot['bullets'] ?? [])),
+            fn ($b) => $b !== ''
+        ));
+
+        // A number wearing a heading is a stat card that lost its way.
+        if ($heading !== '' && count($bullets) <= 2 && mb_strlen($heading) <= 14
+            && preg_match('/\d/', $heading) === 1) {
+            $scene['layout_template'] = 'stat_spotlight';
+            $scene['slots'] = ['slot_stat' => $slot];
+
+            return $scene;
+        }
+
+        // "X is ..." under a short heading is a definition, and a term card
+        // wants the two halves apart: the word, then the sentence.
+        if ($heading !== '' && str_word_count($heading) <= 3 && count($bullets) === 1
+            && mb_strlen($heading) <= 28 && preg_match('/^(is|are|means|refers)\b/i', $bullets[0]) === 1) {
+            $scene['layout_template'] = 'term_card';
+            $scene['slots'] = ['slot_term' => [
+                'content_type' => 'term',
+                'term' => $heading,
+                'definition' => mb_substr($heading . ' ' . $bullets[0], 0, 120),
+            ]];
+
+            return $scene;
+        }
+
+        // Otherwise the beat earns a picture — visible in the storyboard, on a
+        // card built to show one. Bounded: half the video may carry media, so
+        // breaking up text runs can never turn the whole thing into a slideshow.
+        $withMedia = count(array_filter($scenes, fn ($s) => $this->sceneHasMedia($s)));
+        if ($withMedia < (int) ceil(count($scenes) / 2)) {
+            $subject = $this->shotFromNarration(
+                (string) ($scene['narration']['text'] ?? ''),
+                $heading
+            );
+            if ($subject !== '') {
+                $scene['layout_template'] = 'full_bleed_with_side_panel';
+                $scene['slots'] = [
+                    'slot_background' => [
+                        'content_type' => 'image',
+                        'label' => '',
+                        'camera_move' => $this->resolveCameraMove(null, $subject),
+                        'asset_request' => MediaBrief::build(['description' => $subject], 'image', $this->aspectRatio),
+                        'asset_ref' => null,
+                    ],
+                    'slot_panel' => $slot,
+                ];
+
+                return $scene;
+            }
+        }
+
+        return null;
+    }
+
     private function enforceVariety(array $scenes): array
     {
         $run = 0;
@@ -2607,6 +2767,12 @@ class ShotListValidator
         $sceneId = is_string($scene['scene_id'] ?? null) && $scene['scene_id'] !== ''
             ? $scene['scene_id']
             : "scene_{$order}";
+
+        // Before anything reads the slots: a picture hidden in a single_focus
+        // is recast onto a card that shows it. This has to happen HERE, on the
+        // raw scene — single_focus no longer allows media, so slot validation
+        // below would strip the request and the recast would arrive too late.
+        $scene = $this->revealHiddenPicture($scene, $sceneId);
 
         $narrationText = '';
         if (isset($scene['narration'])) {
