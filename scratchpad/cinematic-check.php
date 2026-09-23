@@ -223,8 +223,28 @@ $out = (new ShotListValidator())->validate(['scenes' => [
 $tpls = array_column($out['scenes'], 'layout_template', 'scene_id');
 check('never two in a row: the second of a pair is demoted', ($tpls['c1'] ?? '') === 'cinematic_card' && ($tpls['c2'] ?? '') !== 'cinematic_card', json_encode($tpls));
 $c2 = array_values(array_filter($out['scenes'], fn ($s) => $s['scene_id'] === 'c2'))[0];
-check('a demoted card keeps its parts as bullets', count($textOf($c2)['bullets'] ?? []) >= 3, json_encode($c2['slots']));
-check('...a stat keeps its label', in_array('Years — memory cells keep the recipe', $textOf($c2)['bullets'] ?? [], true));
+// The demote writes bullets; a later pass may move those same words onto a
+// checklist when the generic cards are over their share (iter 74). What must
+// never change is the WORDS, so the check follows the content, not the card.
+$partsOf = function (array $scene): array {
+    foreach ((array) ($scene['slots'] ?? []) as $slot) {
+        if (!is_array($slot)) {
+            continue;
+        }
+        foreach (['bullets', 'pros'] as $field) {
+            if (!empty($slot[$field])) {
+                return (array) $slot[$field];
+            }
+        }
+        if (!empty($slot['items'])) {
+            return array_map(fn ($i) => (string) ($i['label'] ?? ''), (array) $slot['items']);
+        }
+    }
+
+    return [];
+};
+check('a demoted card keeps its parts', count($partsOf($c2)) >= 3, json_encode($c2['slots']));
+check('...every part verbatim', in_array('Years — memory cells keep the recipe', $partsOf($c2), true), implode(' | ', $partsOf($c2)));
 
 // Budget: three spaced cinematic cards in a short video — way over 30%.
 $rich = $good;
@@ -304,7 +324,16 @@ $coreProp = new ReflectionProperty($composer, 'corePhase');
 $coreProp->setAccessible(true);
 $coreProp->setValue($composer, 3);
 check('the core phase offers only cinematic_card', $phaseMenu->invoke($composer, 3, 'point') === ['cinematic_card']);
-check('other phases keep their menus', $phaseMenu->invoke($composer, 2, 'point') === GenericStoryboardComposerService::menuFor('point'));
+// A menu is now ORDERED by fit (iter 74): the same cards, with the ones the
+// phase's own words ask for first and the generic fallback last.
+$plain = $phaseMenu->invoke($composer, 2, 'point', '');
+check('other phases keep every card their intent offers',
+    array_diff(GenericStoryboardComposerService::menuFor('point'), $plain) === []);
+check('...with single_focus moved to the end, not the front',
+    end($plain) === 'single_focus' && $plain[0] !== 'single_focus', $plain[0] . ' ... ' . end($plain));
+$shaped = $phaseMenu->invoke($composer, 2, 'point', 'Renting versus buying: what each one costs');
+check('...and a beat that names a shape is offered that card first',
+    $shaped[0] === 'versus_card', implode(', ', array_slice($shaped, 0, 3)));
 $coreProp->setValue($composer, null);
 $short = array_map(fn () => $mk('single_focus'), range(1, 4));
 check('a very short video is not nudged', $m->invoke($composer, $short, array_slice($sk, 0, 4)) === []);

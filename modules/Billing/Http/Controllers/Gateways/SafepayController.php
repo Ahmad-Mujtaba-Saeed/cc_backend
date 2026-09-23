@@ -58,6 +58,9 @@ class SafepayController extends Controller
                 TemplateSettingsService::all()
             ),
             'default_cost' => (int) config('credits.default', 3),
+            // The explainer is billed per step (storyboard tier, re-render,
+            // AI pictures) rather than one flat render fee.
+            'explainer_pricing' => \Modules\Project\Support\ExplainerBilling::pricing(),
         ]);
     }
 

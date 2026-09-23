@@ -258,7 +258,9 @@ class ProjectController extends Controller
 
         try {
             $video = $request->file('video');
-            $fileName = Str::uuid() . '.' . $video->getClientOriginalExtension();
+            // Extension from the detected content, never the client's name:
+            // the public disk is web-served.
+            $fileName = Str::uuid() . '.' . self::safeVideoExtension($video);
             $filePath = $video->storeAs('projects/videos', $fileName, 'public');
 
             // Get video metadata
@@ -313,7 +315,10 @@ class ProjectController extends Controller
             $fieldKey = $request->input('field_key');
             
             // Put it under projects/{project->id}/
-            $fileName = $fieldKey . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
+            // field_key is user input: keep it to filename-safe characters so
+            // it can never steer the path ("../") or the extension.
+            $safeKey = substr(preg_replace('/[^A-Za-z0-9_-]/', '', (string) $fieldKey) ?: 'file', 0, 60);
+            $fileName = $safeKey . '_' . Str::uuid() . '.' . self::safeVideoExtension($file);
             $filePath = $file->storeAs("projects/{$project->id}", $fileName, 'public');
 
             return response()->json([
@@ -366,6 +371,14 @@ class ProjectController extends Controller
     /**
      * Start processing the project.
      */
+    /** A video file extension from the detected MIME type, never the client's filename. */
+    private static function safeVideoExtension(\Illuminate\Http\UploadedFile $file): string
+    {
+        $guessed = strtolower((string) $file->guessExtension());
+
+        return in_array($guessed, ['mp4', 'avi', 'mov', 'qt', 'wmv', 'flv', 'webm', 'mkv', 'm4v'], true) ? $guessed : 'mp4';
+    }
+
     /**
      * Gate a render on subscription + credits and charge the cost.
      *

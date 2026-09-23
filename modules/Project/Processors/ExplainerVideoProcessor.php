@@ -350,6 +350,8 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
         // preview back to the top).
         $settings = $this->project->settings ?? [];
         $settings['rendered_look'] = \Modules\Project\Services\ExplainerPreviewService::lookHash($this->project);
+        // Billing: the first successful render is the free one.
+        $settings['billing']['renders_completed'] = (int) ($settings['billing']['renders_completed'] ?? 0) + 1;
 
         $this->project->update([
             'output_path' => $result['output_path'] ?? $this->outputPath,
@@ -748,6 +750,7 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
             }
 
             if (empty($pending)) {
+                $this->refundUndrawnFills(0);
                 return true;
             }
 
@@ -848,6 +851,7 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
     {
         try {
             if (!$this->autoVisualsEnabled()) {
+                $this->refundUndrawnFills(0);
                 return true;
             }
 
@@ -863,57 +867,17 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
             // same one the storyboard shows and the next render reuses.
             $this->briefEmptySlots($assets);
 
-            $budget = ExplainerRegistry::maxSlotFills();
-            $pending = [];
-            foreach ($this->project->explainerScenes()->orderBy('order')->get() as $scene) {
-                foreach ($scene->slots ?? [] as $slotKey => $slot) {
-                    if (!in_array($slot['content_type'] ?? null, ['image', 'video'], true)) {
-                        continue;
-                    }
-                    // Stock slots have their own fetcher; filled slots are done.
-                    if (trim((string) ($slot['stock_query'] ?? '')) !== '') {
-                        continue;
-                    }
-                    $existing = $assets->get($scene->scene_id . '::' . $slotKey);
-
-                    // Built by the SHARED prompt builder, which also carries
-                    // the user's own art direction (asset_request.instruction)
-                    // from the storyboard. Both facts matter: a prompt that
-                    // differed from the one the storyboard generated with would
-                    // re-bill an image the user already accepted, and one that
-                    // ignored their instruction would put the old picture back.
-                    // VLM retry (§12.4): a flagged fill regenerates with a
-                    // composition nudge — which also changes the prompt hash.
-                    $built = \Modules\Project\Support\ExplainerImagePrompt::forSlot(
-                        $slot,
-                        ExplainerRegistry::themeFor($this->project->settings ?? []),
-                        !empty(($this->project->settings['vlm_retry_suffix'] ?? [])[(string) $scene->scene_id])
-                    );
-                    $prompt = $built['prompt'];
-                    $hash = $built['hash'];
-
-                    if ($existing && Storage::disk('public')->exists($existing->path)) {
-                        $isFill = str_starts_with((string) $existing->original_name, 'slot-fill:');
-                        // A real upload always wins; an earlier fill is only
-                        // regenerated when its prompt (theme/description) changed.
-                        if (!$isFill || $existing->original_name === 'slot-fill:' . $hash) {
-                            continue;
-                        }
-                    }
-
-                    $pending[] = [
-                        'scene_id' => (string) $scene->scene_id,
-                        'slot_key' => (string) $slotKey,
-                        'prompt' => $prompt,
-                        'hash' => $hash,
-                    ];
-                    if (count($pending) >= $budget) {
-                        break 2;
-                    }
-                }
-            }
+            // The SAME list the render quote priced (ExplainerBilling), so the
+            // user is billed for exactly the pictures this pass sets out to
+            // draw. Built by the shared prompt builder, which also carries the
+            // user's own art direction — a prompt that differed from the one
+            // the storyboard generated with would re-bill an accepted image.
+            // VLM retry (§12.4) changes the prompt hash, so a flagged fill is
+            // redrawn with a composition nudge.
+            $pending = \Modules\Project\Support\ExplainerBilling::pendingSlotFills($this->project->fresh());
 
             if (empty($pending)) {
+                $this->refundUndrawnFills(0);
                 return true;
             }
 
@@ -959,11 +923,49 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
             // is exactly what made a network wobble look like a silent bug.
             $this->reportUnfilledSlots($missed);
 
+            // Paid pictures (the user switched AI visuals on and accepted the
+            // price at render) that could not be drawn go back to them.
+            $this->refundUndrawnFills(count($pending) - count($missed));
+
             return true;
         } catch (\Throwable $e) {
             // Decorative fill — the missing-gate exemption keeps the render alive.
             Log::warning('ExplainerVideoProcessor: slot fill failed (non-fatal): ' . $e->getMessage());
+            $this->refundUndrawnFills(0);
             return true;
+        }
+    }
+
+    /**
+     * The render charged `billing.paid_image_fills` pictures up front; refund
+     * the ones this pass did not deliver. Cleared afterwards, so a retried
+     * attempt of the same job cannot refund them twice.
+     */
+    private function refundUndrawnFills(int $made): void
+    {
+        $settings = $this->project->fresh()->settings ?? [];
+        $paid = (int) ($settings['billing']['paid_image_fills'] ?? 0);
+        if ($paid <= 0) {
+            return;
+        }
+
+        $undrawn = max(0, $paid - max(0, $made));
+        $settings['billing']['paid_image_fills'] = 0;
+        $this->project->update(['settings' => $settings]);
+
+        if ($undrawn > 0) {
+            try {
+                app(\Modules\Billing\Services\CreditService::class)->refundRenderPart(
+                    $this->project,
+                    $undrawn * \Modules\Project\Support\ExplainerBilling::imageCost(),
+                    "Refund for {$undrawn} AI picture(s) that could not be drawn"
+                );
+            } catch (\Throwable $e) {
+                Log::error('ExplainerVideoProcessor: picture refund failed', [
+                    'project_id' => $this->project->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
     }
 
@@ -1169,6 +1171,7 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
     {
         try {
             if (!$this->autoVisualsEnabled()) {
+                $this->refundUndrawnFills(0);
                 return true;
             }
 
@@ -1217,6 +1220,7 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
             }
 
             if (empty($pending)) {
+                $this->refundUndrawnFills(0);
                 return true;
             }
 
@@ -1843,7 +1847,10 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
 
             // Pass 1 — measure. loudnorm prints its JSON report to stderr.
             $measure = new \Symfony\Component\Process\Process([
-                'ffmpeg', '-hide_banner', '-nostats', '-y', '-i', $absolute,
+                // -vn: measure the audio only. Without it ffmpeg also decodes
+                // every video frame, which on a 15-minute 1080p render can
+                // run into the 600s limit and silently skip the mastering.
+                'ffmpeg', '-hide_banner', '-nostats', '-y', '-i', $absolute, '-vn',
                 '-af', 'loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json',
                 '-f', 'null', '-',
             ]);

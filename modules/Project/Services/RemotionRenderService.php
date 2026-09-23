@@ -86,8 +86,17 @@ class RemotionRenderService
             'dimensions' => "{$width}x{$height}",
         ]);
 
+        // The configured timeout (30 min) was sized for short videos; a 15
+        // minute explainer can take longer than that to render on modest
+        // hardware, and the HTTP client giving up fails a render that was
+        // still progressing. Allow ~6s of wall clock per second of video,
+        // never less than the configured floor and never past the job's own
+        // 4h ceiling (ProcessVideoJob::$timeout).
+        $videoSeconds = array_sum(array_map(fn ($s) => (float) ($s['duration_seconds'] ?? 6), $scenes));
+        $timeout = (int) min(14000, max($this->timeout, (int) ceil($videoSeconds * 6)));
+
         try {
-            $response = Http::timeout($this->timeout)->post("{$this->baseUrl}/render", $payload);
+            $response = Http::timeout($timeout)->post("{$this->baseUrl}/render", $payload);
         } catch (\Throwable $e) {
             Log::error('RemotionRenderService: request threw', ['error' => $e->getMessage()]);
             return ['success' => false, 'error' => 'Render service unreachable: ' . $e->getMessage()];

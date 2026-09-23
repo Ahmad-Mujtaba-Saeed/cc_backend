@@ -253,7 +253,9 @@ PROMPT;
 
         try {
             $response = Http::withToken($this->apiKey)
-                ->timeout(45)
+                // A 15-minute video plans 100+ phases; that JSON takes a while
+                // to write out.
+                ->timeout($targetSeconds > 300 ? 120 : 45)
                 ->post('https://api.openai.com/v1/chat/completions', LlmModels::tune([
                     // The `planner` role, not `explainer`: picking the story
                     // SPINE and writing the scenes are different jobs, and the
@@ -269,7 +271,11 @@ PROMPT;
                     // A long demo can legitimately plan 16 phases; the old
                     // 400-token ceiling truncated the JSON and the tail acts
                     // were lost before repairGeneric ever saw them.
-                    'max_tokens' => 900,
+                    // ~40 tokens a phase ({"intent","brief"} at <=12 words),
+                    // so a 10-15 minute plan (65-165 phases) needs several
+                    // thousand; a fixed 900 truncated it to invalid JSON and
+                    // every long video silently lost its structure plan.
+                    'max_tokens' => max(900, min(8000, $hi * 45)),
                     'response_format' => ['type' => 'json_object'],
                 ], 'low'));
             if (!$response->successful()) {

@@ -107,6 +107,7 @@ class ShotListValidator
         // media floor and the peak pass recast whole scenes), so the two
         // single_focus rules are settled once nothing else will move a card.
         $scenes = $this->enforceSingleFocus($scenes);
+        $scenes = $this->enforceGenericShare($scenes);
         if (($options['outro_enabled'] ?? true) !== false) {
             $scenes = $this->appendOutro($scenes, $options);
         }
@@ -2557,6 +2558,170 @@ class ShotListValidator
      * other repeats are left to the prompt to avoid unsafe slot remapping.
      */
     /**
+     * The cards with no cap of their own — and therefore the ones that absorb
+     * a whole video. Every SPECIFIC card in the registry is capped at one or
+     * two per video, which is right: they are rare by design. These are not
+     * capped at all, so when the composer is unsure it reaches for one of
+     * them, and the result measured across four fresh scripts was 32 of 49
+     * cards never cast once.
+     */
+    private const GENERIC_CARDS = [
+        'single_focus',
+        'full_bleed_with_side_panel',
+        'full_bleed_with_banner',
+        'stat_spotlight',
+        'quote_card',
+        'split_side_by_side',
+        'split_top_bottom',
+        'image_grid',
+    ];
+
+    /**
+     * No ONE card may be more than about a third of the video.
+     *
+     * The excess is promoted only where the content already satisfies the
+     * better card — the discipline {@see ensurePeakCards()} follows: a
+     * promotion reshapes what is there, it never invents. What cannot be
+     * promoted honestly is left alone with a warning, because a card that
+     * misrepresents its content is worse than a repetitive one.
+     */
+    private function enforceGenericShare(array $scenes): array
+    {
+        $beats = count(array_filter(
+            $scenes,
+            fn ($s) => !in_array((string) ($s['layout_template'] ?? ''), ['chapter_cover', 'outro_card'], true)
+        ));
+        if ($beats < 6) {
+            return $scenes;
+        }
+        $ceiling = (int) ceil($beats * 0.35);
+
+        foreach (self::GENERIC_CARDS as $card) {
+            $held = array_keys(array_filter(
+                $scenes,
+                fn ($s) => (string) ($s['layout_template'] ?? '') === $card
+            ));
+            $over = count($held) - $ceiling;
+            if ($over <= 0) {
+                continue;
+            }
+
+            // Weakest first: the beat with the least to say is the one whose
+            // card is carrying the least meaning.
+            usort($held, fn ($a, $b) => str_word_count((string) ($scenes[$a]['narration']['text'] ?? ''))
+                <=> str_word_count((string) ($scenes[$b]['narration']['text'] ?? '')));
+
+            $moved = 0;
+            foreach ($held as $i) {
+                if ($moved >= $over) {
+                    break;
+                }
+                $promoted = $this->promoteFromText($scenes[$i], $scenes);
+                if ($promoted === null) {
+                    continue;
+                }
+                $this->warn(sprintf(
+                    "Scene %s: '%s' is %d of %d beats -> '%s' (its bullets already fit).",
+                    $scenes[$i]['scene_id'],
+                    $card,
+                    count($held),
+                    $beats,
+                    $promoted['layout_template']
+                ));
+                $scenes[$i] = $promoted;
+                $this->changed = true;
+                $moved++;
+            }
+
+            if ($moved < $over) {
+                $this->warn(sprintf(
+                    "'%s' carries %d of %d beats (over the %d ceiling); %d could not be promoted without inventing content.",
+                    $card,
+                    count($held),
+                    $beats,
+                    $ceiling,
+                    $over - $moved
+                ));
+            }
+        }
+
+        return $scenes;
+    }
+
+    /**
+     * The better card this beat's OWN bullets already satisfy, or null.
+     *
+     * Short bullets in a beat that reads as a sequence are a step flow; short
+     * bullets otherwise are a checklist. Anything longer would have to be
+     * rewritten to fit, which is where a repair stops being a repair.
+     */
+    private function promoteFromText(array $scene, array $scenes): ?array
+    {
+        $key = null;
+        foreach ((array) ($scene['slots'] ?? []) as $slotKey => $slot) {
+            if (is_array($slot) && ($slot['content_type'] ?? '') === 'text_block') {
+                $key = $slotKey;
+                break;
+            }
+        }
+        if ($key === null) {
+            return null;
+        }
+        $slot = $scene['slots'][$key];
+        $bullets = array_values(array_filter(
+            array_map(fn ($b) => trim((string) $b), (array) ($slot['bullets'] ?? [])),
+            fn ($b) => $b !== ''
+        ));
+        if (count($bullets) < 3) {
+            return null;
+        }
+
+        $heading = trim((string) ($slot['heading'] ?? ''));
+        $narration = mb_strtolower((string) ($scene['narration']['text'] ?? ''));
+        $inUse = fn (string $card) => count(array_filter(
+            $scenes,
+            fn ($s) => (string) ($s['layout_template'] ?? '') === $card
+        ));
+        $under = function (string $card) use ($inUse): bool {
+            $cap = ExplainerRegistry::maxPerVideo($card);
+
+            return $cap === null || $inUse($card) < $cap;
+        };
+
+        $longest = max(array_map('str_word_count', $bullets));
+
+        // An ordered procedure, in the narration's own words.
+        $ordered = preg_match('/\b(first|then|next|after that|finally|in (this|that) order|step)\b/', $narration) === 1;
+        // Every bullet must ALREADY be a label: a step whose text had to be
+        // cut to fit is a step that lost its meaning ("Years — memory cells
+        // keep the recipe" became "Years — memory cells").
+        if ($ordered && $longest <= 4 && count($bullets) <= 5 && $under('step_flow')) {
+            $scene['layout_template'] = 'step_flow';
+            $scene['slots'] = ['slot_steps' => array_filter([
+                'content_type' => 'steps',
+                'heading' => $heading !== '' ? $heading : null,
+                'items' => array_map(fn ($b) => ['label' => $b], array_slice($bullets, 0, 5)),
+            ], fn ($v) => $v !== null)];
+
+            return $scene;
+        }
+
+        // A set of things to do or check.
+        if ($longest <= 8 && $under('checklist_card')) {
+            $scene['layout_template'] = 'checklist_card';
+            $scene['slots'] = ['slot_checklist' => array_filter([
+                'content_type' => 'proscons',
+                'heading' => $heading !== '' ? $heading : null,
+                'pros' => array_slice($bullets, 0, 4),
+            ], fn ($v) => $v !== null)];
+
+            return $scene;
+        }
+
+        return null;
+    }
+
+    /**
      * The two rules for the plainest card in the product.
      *
      * **A picture never hides inside a single_focus.** The card takes one
@@ -2589,7 +2754,13 @@ class ShotListValidator
         foreach ($scenes as $i => $scene) {
             $template = (string) ($scene['layout_template'] ?? '');
             if ($template === 'single_focus' && $previous === 'single_focus') {
-                $recast = $this->recastSingleFocus($scene, $scenes);
+                $recast = $this->recastSingleFocus(
+                    $scene,
+                    $scenes,
+                    (int) $i,
+                    $previous,
+                    (string) ($scenes[$i + 1]['layout_template'] ?? '')
+                );
                 if ($recast !== null) {
                     $this->warn(
                         "Scene {$scene['scene_id']}: two single_focus cards in a row -> '{$recast['layout_template']}'."
@@ -2646,8 +2817,13 @@ class ShotListValidator
      *
      * @param array $scenes the whole storyboard, for the media budget
      */
-    private function recastSingleFocus(array $scene, array $scenes): ?array
-    {
+    private function recastSingleFocus(
+        array $scene,
+        array $scenes,
+        int $index = 0,
+        ?string $previous = null,
+        ?string $next = null
+    ): ?array {
         $slot = $scene['slots']['slot_main'] ?? null;
         if (!is_array($slot) || ($slot['content_type'] ?? '') !== 'text_block') {
             return null; // a vector motif is already this beat's picture
@@ -2692,17 +2868,30 @@ class ShotListValidator
                 $heading
             );
             if ($subject !== '') {
-                $scene['layout_template'] = 'full_bleed_with_side_panel';
-                $scene['slots'] = [
-                    'slot_background' => [
-                        'content_type' => 'image',
-                        'label' => '',
-                        'camera_move' => $this->resolveCameraMove(null, $subject),
-                        'asset_request' => MediaBrief::build(['description' => $subject], 'image', $this->aspectRatio),
-                        'asset_ref' => null,
-                    ],
-                    'slot_panel' => $slot,
+                $picture = [
+                    'content_type' => 'image',
+                    'label' => '',
+                    'camera_move' => $this->resolveCameraMove(null, $subject),
+                    'asset_request' => MediaBrief::build(['description' => $subject], 'image', $this->aspectRatio),
+                    'asset_ref' => null,
                 ];
+
+                // Two ways to put a picture beside words, and the one the
+                // NEIGHBOURS are not already using wins. Breaking up a run of
+                // plain cards with the same replacement every time just trades
+                // one monotony for another — measured, it made the side panel
+                // 13 of 47 beats across four videos.
+                $neighbours = [$previous ?? '', $next ?? ''];
+                $split = in_array('full_bleed_with_side_panel', $neighbours, true)
+                    || (!in_array('split_side_by_side', $neighbours, true) && $index % 2 === 1);
+
+                if ($split) {
+                    $scene['layout_template'] = 'split_side_by_side';
+                    $scene['slots'] = ['slot_left' => $picture, 'slot_right' => $slot];
+                } else {
+                    $scene['layout_template'] = 'full_bleed_with_side_panel';
+                    $scene['slots'] = ['slot_background' => $picture, 'slot_panel' => $slot];
+                }
 
                 return $scene;
             }
@@ -6818,9 +7007,17 @@ class ShotListValidator
             $bullets = array_map(fn ($b) => MathPlain::toPlain($this->linearizeMathSymbols((string) $b)), $bullets);
         }
 
+        if ($heading === '') {
+            // This beat's own opening words, never a constant that repeats
+            // on every card that arrived without a title.
+            $heading = self::headingFromSentence(
+                (string) (preg_split('/(?<=[.!?])\s+/u', trim($narrationText))[0] ?? '')
+            ) ?: 'Key Points';
+        }
+
         return [
             'content_type' => 'text_block',
-            'heading' => $heading !== '' ? $heading : 'Key Points',
+            'heading' => $heading,
             'bullets' => $bullets,
             'reveal' => $reveal,
         ];
@@ -6922,12 +7119,51 @@ class ShotListValidator
     {
         $this->changed = true;
 
+        // Never a constant: the same "Key Point" heading on every rebuilt
+        // card is a repeat the viewer sees (project 211 had six). The heading
+        // is this beat's own opening words; the line under it is its NEXT
+        // sentence, so the two do not say the same thing twice.
+        $sentences = array_values(array_filter(array_map(
+            'trim',
+            preg_split('/(?<=[.!?])\s+/u', trim($narrationText)) ?: []
+        )));
+        $derived = self::headingFromSentence($sentences[0] ?? '');
+
         return [
             'content_type' => 'text_block',
-            'heading' => $heading !== null && $heading !== '' ? $heading : 'Key Point',
-            'bullets' => [$this->firstSentence($narrationText) ?: 'Continue...'],
+            'heading' => $heading !== null && $heading !== '' ? $heading : ($derived !== '' ? $derived : 'Key Point'),
+            'bullets' => [($derived !== '' && isset($sentences[1]) ? $sentences[1] : $this->firstSentence($narrationText)) ?: 'Continue...'],
             'reveal' => 'all_at_once',
         ];
+    }
+
+    /**
+     * A short heading from a sentence: leading connectives and dates dropped
+     * ("Back in 1998, ...", "And yet ..."), cut to six words, never ending
+     * on a function word.
+     */
+    public static function headingFromSentence(string $sentence): string
+    {
+        $s = trim(preg_replace('/[.!?…]+$/u', '', trim($sentence)) ?? '');
+        $s = preg_replace('/^((and|but|so|now|then|well|okay|yet|still|also)\b[\s,]*)+/iu', '', $s) ?? $s;
+        $s = preg_replace('/^(back )?in \d{4},?\s*/iu', '', $s) ?? $s;
+        // A clause is a better heading than half a sentence.
+        $clause = trim(explode(',', $s)[0]);
+        if (count(preg_split('/\s+/u', $clause) ?: []) >= 3) {
+            $s = $clause;
+        }
+        $words = preg_split('/\s+/u', trim($s)) ?: [];
+        $words = array_slice(array_values(array_filter($words, fn ($w) => $w !== '')), 0, 6);
+        $stop = ['the', 'a', 'an', 'of', 'to', 'and', 'in', 'on', 'with', 'that', 'their', 'his', 'her', 'its', 'for', 'at', 'by', 'from', 'as', 'or', 'is', 'was', 'are', 'were', 'your', 'our', 'then', 'already', 'same', 'just', 'very', 'really', 'also', 'still', 'who', 'which', 'when', 'where', 'if', 'than', 'so', 'but'];
+        while ($words !== [] && in_array(mb_strtolower(trim(end($words), ",;:—–-")), $stop, true)) {
+            array_pop($words);
+        }
+        if (count($words) < 2) {
+            return '';
+        }
+        $heading = rtrim(implode(' ', $words), ",;:—–- ");
+
+        return mb_strtoupper(mb_substr($heading, 0, 1)) . mb_substr($heading, 1);
     }
 
     private function firstSentence(string $text): string

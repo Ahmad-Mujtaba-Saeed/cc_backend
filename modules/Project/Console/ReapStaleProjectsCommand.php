@@ -77,6 +77,11 @@ class ReapStaleProjectsCommand extends Command
             // an interrupted render must not silently keep the user's credits.
             try {
                 $credits->refund($project);
+                // An explainer stuck in analysis paid for a storyboard it
+                // never got.
+                if ($project->template_type === 'ai_explainer_video') {
+                    \Modules\Project\Support\ExplainerBilling::refundStoryboardIfUndelivered($project);
+                }
             } catch (Throwable $e) {
                 Log::error("projects:reap-stale: refund failed for project {$project->id}: " . $e->getMessage());
                 $this->error("    refund failed: {$e->getMessage()}");

@@ -129,14 +129,18 @@ check('...with the word and the sentence apart',
 $plain = $scene('p2', 'single_focus', ['slot_main' => $text('What happens next', ['The belt carries it to the scanner', 'Air jets blow the bottles off the line'])], 'The belt carries everything to the scanner, and air jets blow the bottles off the line.');
 $out = $run([$a, $plain]);
 $second = $out['scenes'][1];
+// Either way of putting a picture beside words is right; which one is chosen
+// depends on the neighbours, so the checks are on the SHAPE, not the name.
 check('anything else earns a picture, on a card that shows one',
-    $second['layout_template'] === 'full_bleed_with_side_panel', $second['layout_template']);
+    in_array($second['layout_template'], ['full_bleed_with_side_panel', 'split_side_by_side'], true),
+    $second['layout_template']);
+$picture = $second['slots']['slot_background'] ?? $second['slots']['slot_left'] ?? [];
+$words = $second['slots']['slot_panel'] ?? $second['slots']['slot_right'] ?? [];
 check('...the picture slot is a real request the user can act on',
-    ($second['slots']['slot_background']['content_type'] ?? '') === 'image'
-    && trim((string) ($second['slots']['slot_background']['asset_request']['description'] ?? '')) !== '');
+    ($picture['content_type'] ?? '') === 'image'
+    && trim((string) ($picture['asset_request']['description'] ?? '')) !== '');
 check('...and the words are kept beside it',
-    ($second['slots']['slot_panel']['content_type'] ?? '') === 'text_block'
-    && ($second['slots']['slot_panel']['heading'] ?? '') === 'What happens next');
+    ($words['content_type'] ?? '') === 'text_block' && ($words['heading'] ?? '') === 'What happens next');
 
 echo "\n== 6. the pass is idempotent ==\n";
 $once = $run([$a, $b, $c]);

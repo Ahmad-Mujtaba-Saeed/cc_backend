@@ -111,9 +111,23 @@ class CreditService
      * Atomically deduct $cost from the user for a project render. Re-checks the
      * balance under a row lock. Throws InsufficientCreditsException if short.
      */
-    public function charge(User $user, Project $project, int $cost): void
+    public function charge(User $user, Project $project, int $cost, string $reason = 'Render charge'): void
     {
-        DB::transaction(function () use ($user, $project, $cost) {
+        $this->debit($user, $project, $cost, $reason, self::renderChargeRef($project));
+    }
+
+    /**
+     * Atomically deduct $cost for any billable action, under a row lock, with
+     * the ledger `reference` that a later refund keys on. Throws
+     * InsufficientCreditsException when the balance is short.
+     */
+    public function debit(User $user, ?Project $project, int $cost, string $reason, string $reference): void
+    {
+        if ($cost <= 0) {
+            return;
+        }
+
+        DB::transaction(function () use ($user, $project, $cost, $reason, $reference) {
             $locked = User::whereKey($user->getKey())->lockForUpdate()->first();
 
             if (!$locked || (int) $locked->credits < $cost) {
@@ -128,79 +142,137 @@ class CreditService
                 'debit',
                 -$cost,
                 (int) $locked->credits,
-                $project->template_type,
-                $project->id,
-                'Render charge',
-                'charge:project:' . $project->id
+                $project?->template_type,
+                $project?->id,
+                $reason,
+                $reference
             );
 
             $user->setRawAttributes($locked->getAttributes(), true);
         });
 
-        Log::info('CreditService: charged render', [
+        Log::info('CreditService: debited', [
             'user_id' => $user->id,
-            'project_id' => $project->id,
+            'project_id' => $project?->id,
             'cost' => $cost,
+            'reference' => $reference,
             'balance_after' => (int) $user->credits,
         ]);
     }
 
     /**
-     * Refund the charge for a project's render. Idempotent: if a refund already
-     * exists for the latest charge, or no charge exists, it does nothing.
+     * Refund the charge for a project's render. Idempotent: whatever is left
+     * of the latest render charge after earlier (full or partial) refunds is
+     * given back, and nothing when that is zero or no charge exists.
      */
     public function refund(Project $project): void
     {
-        DB::transaction(function () use ($project) {
-            $chargeRef = 'charge:project:' . $project->id;
-            $refundRef = 'refund:project:' . $project->id;
+        $this->refundRender($project, null, 'Refund for failed render');
+    }
 
+    /**
+     * Give back part of the latest render charge — e.g. the AI pictures a
+     * render was paid for but could not draw. Never more than what is still
+     * unrefunded on that charge, so a later full refund cannot double-pay.
+     */
+    public function refundRenderPart(Project $project, int $amount, string $reason): void
+    {
+        if ($amount > 0) {
+            $this->refundRender($project, $amount, $reason);
+        }
+    }
+
+    /**
+     * Refund a one-off charge identified by its own reference (a storyboard,
+     * a single AI picture). Idempotent per charge.
+     */
+    public function refundReference(string $chargeRef, string $reason): void
+    {
+        DB::transaction(function () use ($chargeRef, $reason) {
             $charge = CreditTransaction::where('reference', $chargeRef)
                 ->where('type', 'debit')
                 ->latest('id')
+                ->lockForUpdate()
+                ->first();
+            if (!$charge) {
+                return;
+            }
+
+            $refundRef = 'refund:' . $chargeRef;
+            if (CreditTransaction::where('reference', $refundRef)->where('id', '>', $charge->id)->exists()) {
+                return;
+            }
+
+            $this->credit((int) $charge->user_id, abs((int) $charge->amount), $charge->template_type, $charge->project_id, $reason, $refundRef);
+        });
+    }
+
+    private function refundRender(Project $project, ?int $amount, string $reason): void
+    {
+        DB::transaction(function () use ($project, $amount, $reason) {
+            $chargeRef = self::renderChargeRef($project);
+            $refundRef = 'refund:project:' . $project->id;
+
+            // Locking the charge row serialises two refunds racing for it
+            // (the job's failed() and the reaper, say).
+            $charge = CreditTransaction::where('reference', $chargeRef)
+                ->where('type', 'debit')
+                ->latest('id')
+                ->lockForUpdate()
                 ->first();
 
             if (!$charge) {
-                return; // never charged (e.g. legacy project)
+                return; // never charged (e.g. a free first render)
             }
 
-            // Already refunded a charge at/after this one? Then we're done.
-            $alreadyRefunded = CreditTransaction::where('reference', $refundRef)
+            $alreadyRefunded = (int) CreditTransaction::where('project_id', $project->id)
                 ->where('type', 'refund')
+                ->where('reference', 'like', $refundRef . '%')
                 ->where('id', '>', $charge->id)
-                ->exists();
-            if ($alreadyRefunded) {
+                ->sum('amount');
+
+            $remaining = abs((int) $charge->amount) - $alreadyRefunded;
+            $give = $amount === null ? $remaining : min($amount, $remaining);
+            if ($give <= 0) {
                 return;
             }
 
-            $amount = abs($charge->amount);
-
-            $locked = User::whereKey($charge->user_id)->lockForUpdate()->first();
-            if (!$locked) {
-                return;
-            }
-
-            $locked->increment('credits', $amount);
-            $locked->refresh();
-
-            $this->log(
-                $locked,
-                'refund',
-                $amount,
-                (int) $locked->credits,
+            $this->credit(
+                (int) $charge->user_id,
+                $give,
                 $project->template_type,
                 $project->id,
-                'Refund for failed render',
-                $refundRef
+                $reason,
+                $amount === null ? $refundRef : $refundRef . ':part'
             );
-
-            Log::info('CreditService: refunded failed render', [
-                'user_id' => $locked->id,
-                'project_id' => $project->id,
-                'amount' => $amount,
-                'balance_after' => (int) $locked->credits,
-            ]);
         });
+    }
+
+    /** Add credits back to a user and write the refund ledger row. */
+    private function credit(int $userId, int $amount, ?string $templateType, ?int $projectId, string $reason, string $reference): void
+    {
+        $locked = User::whereKey($userId)->lockForUpdate()->first();
+        if (!$locked || $amount <= 0) {
+            return;
+        }
+
+        $locked->increment('credits', $amount);
+        $locked->refresh();
+
+        $this->log($locked, 'refund', $amount, (int) $locked->credits, $templateType, $projectId, $reason, $reference);
+
+        Log::info('CreditService: refunded', [
+            'user_id' => $locked->id,
+            'project_id' => $projectId,
+            'amount' => $amount,
+            'reference' => $reference,
+            'balance_after' => (int) $locked->credits,
+        ]);
+    }
+
+    public static function renderChargeRef(Project $project): string
+    {
+        return 'charge:project:' . $project->id;
     }
 
     private function log(User $user, string $type, int $amount, int $balanceAfter, ?string $templateType, ?int $projectId, string $reason, ?string $reference): void

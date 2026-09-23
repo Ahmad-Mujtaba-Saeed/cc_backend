@@ -41,6 +41,19 @@ class GenericStoryboardComposerService
         'aspect' => ['single_focus', 'cinematic_card', 'split_side_by_side', 'animated_chart', 'icon_grid', 'phone_mockup', 'labeled_diagram', 'cycle_diagram', 'function_plot', 'formula_anatomy', 'math_steps', 'venn_card', 'common_mistake', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card', 'image_grid', 'custom_card'],
         'payoff' => ['single_focus', 'practice_card', 'icon_grid', 'checklist_card', 'full_bleed_with_banner', 'image_grid', 'custom_card'],
 
+        // A beat of a user-written script (composeVerbatim). The words are
+        // fixed and could be about anything, so the card choice is open: every
+        // content card the other intents offer, minus the ones that need a
+        // structure only a planned shape guarantees (a ranked list, a quiz).
+        'beat' => [
+            'full_bleed_with_side_panel', 'split_side_by_side', 'full_bleed_with_banner', 'stat_spotlight',
+            'big_counter', 'quote_card', 'timeline_card', 'map_card', 'before_after', 'versus_card', 'myth_fact',
+            'term_card', 'icon_grid', 'checklist_card', 'cinematic_card', 'animated_chart', 'pictogram_percent',
+            'labeled_diagram', 'cycle_diagram', 'spectrum_card', 'scale_comparison', 'evidence_card',
+            'layer_stack', 'hierarchy_card', 'venn_card', 'step_flow', 'phone_mockup', 'photo_stack',
+            'image_grid', 'custom_card', 'single_focus',
+        ],
+
         // The `demo` shape. A walkthrough is a SCREEN video: its natural cards
         // are the device mockup, the split with the screenshot beside the
         // instruction, and the photo stack for a set of results — not the wall
@@ -184,6 +197,9 @@ class GenericStoryboardComposerService
      */
     private const PHASES_PER_CALL = 16;
 
+    /** Windows of a verbatim board: each beat carries its full narration. */
+    private const VERBATIM_PHASES_PER_CALL = 10;
+
     private ?string $apiKey;
     private string $model;
     private int $attempts = 0;
@@ -204,6 +220,15 @@ class GenericStoryboardComposerService
 
     /** The video's target length — the script window is sized from it. */
     private int $targetSeconds = 60;
+
+    /**
+     * Verbatim mode ({@see composeVerbatim()}): one entry per phase with the
+     * EXACT narration the user wrote and their on-screen note. When set, the
+     * model only picks cards and fills slots; it never writes narration.
+     *
+     * @var array<int, array{narration: string, hint: string, chapter: string}>
+     */
+    private array $verbatim = [];
 
     /** The user's brief. This composer WRITES the narration and picks every
      *  card, so anything the guide asked for — the order of the beats, the
@@ -234,6 +259,83 @@ class GenericStoryboardComposerService
     public static function menuFor(string $intent): array
     {
         return self::MENUS[$intent] ?? ['single_focus'];
+    }
+
+    /**
+     * Compose a storyboard for a script the user WROTE, keeping every word.
+     *
+     * {@see compose()} writes its own narration from ~20 planned phases, which
+     * is right for a topic and ruinous for a finished script: project 211's
+     * 2,890-word, fifteen-minute script came back as 456 words — a four minute
+     * video. Here the phases ARE the script's own beats ({@see ScriptBeats}),
+     * each carrying its fixed narration and the writer's ON SCREEN note, and
+     * the model's whole job is choosing and filling the card. A beat the model
+     * skips still becomes a scene (a text card), because dropping it would
+     * drop part of the script.
+     *
+     * @param array<int, array{narration: string, hint: string, chapter: string}> $beats
+     */
+    public function composeVerbatim(string $script, array $beats, int $targetSeconds): ?array
+    {
+        $beats = array_values(array_filter($beats, fn ($b) => trim((string) ($b['narration'] ?? '')) !== ''));
+        if (empty($this->apiKey) || count($beats) < 3) {
+            return null;
+        }
+
+        $this->verbatim = $beats;
+        $this->targetSeconds = max(10, $targetSeconds);
+        $this->processShape = false;
+        $this->corePhase = null;
+
+        $last = count($beats) - 1;
+        $skeleton = [];
+        foreach ($beats as $i => $beat) {
+            $skeleton[] = [
+                'intent' => $i === 0 ? 'hook' : ($i === $last ? 'payoff' : 'beat'),
+                'brief' => $beat['hint'] !== ''
+                    ? mb_substr($beat['hint'], 0, 160)
+                    : implode(' ', array_slice(preg_split('/\s+/u', $beat['narration']) ?: [], 0, 14)),
+            ];
+        }
+
+        $best = null;
+        $bestFaults = null;
+        for ($pass = 0; $pass < 2; $pass++) {
+            $parsed = $this->requestBoard($skeleton, $script, $this->targetSeconds, $pass === 0 ? '' : implode("\n", $bestFaults));
+            if ($parsed === null && $best !== null) {
+                break;
+            }
+            $parsed = $this->fillMissingBeats($parsed ?? [], $skeleton, $script);
+
+            $scenes = $this->mapScenes($parsed ?? [], $skeleton);
+            $faults = $this->critique($scenes, $skeleton, 0, '');
+            if ($best === null || count($faults) < count($bestFaults)) {
+                $best = $scenes;
+                $bestFaults = $faults;
+            }
+            if ($bestFaults === []) {
+                break;
+            }
+        }
+
+        $best = $this->clearChapterHeadings($best);
+        $best = $this->uniqueHeadings($best);
+        $best = self::dropDuplicateCards($best);
+        $best = self::collapseTwinPictures($best);
+        $best = self::varyPictureCards($best);
+        $best = $this->ensureCinematic($best, $skeleton);
+
+        Log::info('GenericStoryboardComposer: script composed verbatim', [
+            'beats' => count($beats),
+            'scenes' => count($best),
+            'words' => array_sum(array_map(fn ($b) => str_word_count($b['narration']), $beats)),
+            'attempts' => $this->attempts,
+            'unresolved' => $bestFaults,
+        ]);
+
+        $this->verbatim = [];
+
+        return ['scenes' => $best, 'summary' => ''];
     }
 
     /** Compose a non-math storyboard from its skeleton. Null -> fallback. */
@@ -315,9 +417,13 @@ class GenericStoryboardComposerService
      * @param  array<int, array{intent: string, brief: string}> $skeleton
      * @return array<int, mixed>|null  the model's raw `scenes` entries
      */
-    private function requestBoard(array $skeleton, string $script, int $targetSeconds, string $critique): ?array
+    private function requestBoard(array $skeleton, string $script, int $targetSeconds, string $critique, ?array $only = null): ?array
     {
-        $windows = array_chunk($skeleton, self::PHASES_PER_CALL, true);
+        // A verbatim beat carries its whole narration in the prompt, and at 16
+        // a window the model routinely answered half of them and stopped.
+        $perCall = $this->verbatim !== [] ? self::VERBATIM_PHASES_PER_CALL : self::PHASES_PER_CALL;
+        $phases = $only === null ? $skeleton : array_intersect_key($skeleton, array_flip($only));
+        $windows = array_chunk($phases, $perCall, true);
         $raw = [];
         $tail = '';
 
@@ -335,12 +441,63 @@ class GenericStoryboardComposerService
                 // and compose() weighs against the 60% floor.
                 continue;
             }
+            $part = self::numberWindow($part, array_keys($window));
             $raw = array_merge($raw, $part);
             $last = end($part);
             $tail = is_array($last) ? trim((string) ($last['narration'] ?? '')) : '';
         }
 
         return $raw === [] ? null : $raw;
+    }
+
+    /**
+     * Give every scene of one window's answer its GLOBAL phase number, and
+     * drop what cannot be placed.
+     *
+     * mapScenes() used to fall back to "the i-th scene of everything returned"
+     * when it could not find phase i by number. With one call per board that
+     * was a harmless tolerance; with windows it is a bug: project 211's first
+     * window answered 8 of its 16 beats, so beats 9-16 were handed the cards
+     * written for beats 17-24 — which then appeared AGAIN in their own place,
+     * eight duplicated cards sitting on the wrong narration. Numbers are now
+     * settled here, per window, and a beat nobody answered stays missing
+     * (and is asked for again) instead of borrowing a neighbour's card.
+     *
+     * @param array<int, mixed> $part     the model's scenes for this window
+     * @param array<int, int>   $indexes  the window's 0-based phase indexes
+     */
+    private static function numberWindow(array $part, array $indexes): array
+    {
+        $first = $indexes[0] + 1;
+        $last = end($indexes) + 1;
+        $numbers = array_map(fn ($s) => is_array($s) ? (int) ($s['phase'] ?? 0) : 0, $part);
+        $inRange = count(array_filter($numbers, fn ($n) => $n >= $first && $n <= $last));
+        // Numbered 1..n although the window starts later: local numbering.
+        $local = $first > 1 && $inRange === 0
+            && count(array_filter($numbers, fn ($n) => $n >= 1 && $n <= count($indexes))) > 0;
+
+        $out = [];
+        $seen = [];
+        foreach ($part as $j => $scene) {
+            if (!is_array($scene)) {
+                continue;
+            }
+            $n = $numbers[$j];
+            if ($local && $n >= 1 && $n <= count($indexes)) {
+                $n = $indexes[$n - 1] + 1;
+            } elseif ($n === 0 && isset($indexes[$j])) {
+                // No number at all: its position inside THIS window.
+                $n = $indexes[$j] + 1;
+            }
+            if ($n < $first || $n > $last || isset($seen[$n]) || !in_array($n - 1, $indexes, true)) {
+                continue;
+            }
+            $seen[$n] = true;
+            $scene['phase'] = $n;
+            $out[] = $scene;
+        }
+
+        return $out;
     }
 
     /**
@@ -357,8 +514,17 @@ class GenericStoryboardComposerService
         $phaseLines = '';
         foreach ($window as $i => $p) {
             $intent = (string) ($p['intent'] ?? '');
-            $menu = $this->menuForPhase((int) $i, $intent);
+            $menu = $this->menuForPhase((int) $i, $intent, (string) ($p['brief'] ?? ''));
             $offered = array_merge($offered, $menu);
+            if ($this->verbatim !== []) {
+                $beat = $this->verbatim[$i] ?? ['narration' => '', 'hint' => '', 'chapter' => ''];
+                $phaseLines .= '  ' . ($i + 1) . '.'
+                    . ($beat['chapter'] !== '' ? ' [chapter: ' . $beat['chapter'] . ']' : '')
+                    . ' NARRATION: "' . $beat['narration'] . '"'
+                    . ($beat['hint'] !== '' ? ' | THE WRITER\'S ON-SCREEN NOTE: ' . $beat['hint'] : '')
+                    . ' | choose layout_template from: ' . implode(' | ', $menu) . "\n";
+                continue;
+            }
             $phaseLines .= '  ' . ($i + 1) . '. ' . strtoupper($intent)
                 . ' — ' . (string) ($p['brief'] ?? '')
                 . ' | choose layout_template from: ' . implode(' | ', $menu)
@@ -394,6 +560,10 @@ class GenericStoryboardComposerService
                 . 'are being written separately, so write ONLY the phases listed above, keep their phase numbers '
                 . 'exactly as given, and do not re-introduce the video or re-state its ending unless one of YOUR '
                 . 'phases is the hook or the payoff.';
+        }
+
+        if ($this->verbatim !== []) {
+            return $this->buildVerbatimSystem($phaseLines, $docs, $window, $phaseCount);
         }
 
         $system = <<<PROMPT
@@ -447,6 +617,352 @@ PROMPT;
         return $system . $windowNote;
     }
 
+    /**
+     * Ask again — only for the beats no window answered. Two focused rounds;
+     * whatever is still missing becomes a text card from its own narration.
+     */
+    private function fillMissingBeats(array $parsed, array $skeleton, string $script): array
+    {
+        for ($round = 0; $round < 2; $round++) {
+            $have = [];
+            foreach ($parsed as $k => $scene) {
+                // A card whose words are all empty is not an answer: the
+                // validator would fill it with a generic placeholder.
+                if (self::textIsEmpty($scene)) {
+                    unset($parsed[$k]);
+                    continue;
+                }
+                $have[(int) ($scene['phase'] ?? 0)] = true;
+            }
+            $parsed = array_values($parsed);
+            $missing = [];
+            foreach (array_keys($skeleton) as $i) {
+                if (!isset($have[$i + 1])) {
+                    $missing[] = $i;
+                }
+            }
+            if ($missing === []) {
+                break;
+            }
+            Log::info('GenericStoryboardComposer: asking again for unanswered beats', [
+                'round' => $round + 1,
+                'missing' => count($missing),
+            ]);
+            $extra = $this->requestBoard($skeleton, $script, $this->targetSeconds, '', $missing);
+            if ($extra === null) {
+                break;
+            }
+            $parsed = array_merge($parsed, $extra);
+        }
+
+        return $parsed;
+    }
+
+    /** Does a scene carry text slots and leave every one of them blank? */
+    private static function textIsEmpty(array $scene): bool
+    {
+        $textSlots = 0;
+        foreach ((array) ($scene['slots'] ?? []) as $slot) {
+            if (!is_array($slot) || !in_array((string) ($slot['content_type'] ?? ''), ['text_block', 'explanation_box'], true)) {
+                continue;
+            }
+            $textSlots++;
+            if (trim((string) ($slot['heading'] ?? '')) !== '' || array_filter((array) ($slot['bullets'] ?? [])) !== []
+                || trim((string) ($slot['body'] ?? $slot['text'] ?? '')) !== '') {
+                return false;
+            }
+        }
+
+        return $textSlots > 0;
+    }
+
+    /**
+     * A card heading that just repeats the chapter title says nothing the
+     * chapter's own cover did not say a second earlier. Dropped when the card
+     * has bullets to stand on.
+     */
+    private function clearChapterHeadings(array $scenes): array
+    {
+        foreach ($scenes as $k => $scene) {
+            $n = (int) preg_replace('/\D/', '', (string) ($scene['scene_id'] ?? '')) - 1;
+            $chapter = mb_strtolower(trim((string) ($this->verbatim[$n]['chapter'] ?? '')));
+            if ($chapter === '') {
+                continue;
+            }
+            foreach ((array) ($scene['slots'] ?? []) as $key => $slot) {
+                if (is_array($slot) && mb_strtolower(trim((string) ($slot['heading'] ?? ''))) === $chapter) {
+                    $narration = (string) ($this->verbatim[$n]['narration'] ?? '');
+                    $scenes[$k]['slots'][$key]['heading'] = \Modules\Project\Support\ShotListValidator::headingFromSentence(
+                        (string) (preg_split('/(?<=[.!?])\s+/u', trim($narration))[0] ?? '')
+                    );
+                }
+            }
+        }
+
+        return $scenes;
+    }
+
+    /**
+     * Every card heading is its own: a generic one ("Key Points", "Overview")
+     * or one an earlier card already used is replaced by this beat's own
+     * opening words, so a long video never shows the same title twice.
+     */
+    private function uniqueHeadings(array $scenes): array
+    {
+        $generic = '/^(key (point|points|takeaway|takeaways|idea|ideas|facts?)|overview|summary|important|note|details|more|explanation|insight|insights|findings)$/iu';
+        $used = [];
+        foreach ($scenes as $k => $scene) {
+            $n = (int) preg_replace('/\D/', '', (string) ($scene['scene_id'] ?? '')) - 1;
+            $narration = (string) ($this->verbatim[$n]['narration'] ?? ($scene['narration']['text'] ?? ''));
+            foreach ((array) ($scene['slots'] ?? []) as $key => $slot) {
+                $heading = is_array($slot) ? trim((string) ($slot['heading'] ?? '')) : '';
+                if ($heading === '') {
+                    continue;
+                }
+                $norm = mb_strtolower($heading);
+                if (isset($used[$norm]) || preg_match($generic, $heading)) {
+                    $derived = \Modules\Project\Support\ShotListValidator::headingFromSentence(
+                        (string) (preg_split('/(?<=[.!?])\s+/u', trim($narration))[0] ?? '')
+                    );
+                    if ($derived !== '' && !isset($used[mb_strtolower($derived)])) {
+                        $scenes[$k]['slots'][$key]['heading'] = $derived;
+                        $norm = mb_strtolower($derived);
+                    }
+                }
+                $used[$norm] = true;
+            }
+        }
+
+        return $scenes;
+    }
+
+    /**
+     * A card that says exactly what an earlier card said is a repeat the
+     * viewer will notice, whatever caused it. Rebuilt as a text card, which
+     * the validator fills from the beat's OWN narration.
+     *
+     * @param  array<int, array<string, mixed>> $scenes
+     * @return array<int, array<string, mixed>>
+     */
+    public static function dropDuplicateCards(array $scenes): array
+    {
+        $seen = [];
+        foreach ($scenes as $k => $scene) {
+            $words = [];
+            foreach ((array) ($scene['slots'] ?? []) as $slot) {
+                if (!is_array($slot)) {
+                    continue;
+                }
+                $words[] = (string) ($slot['heading'] ?? '');
+                foreach ((array) ($slot['bullets'] ?? []) as $b) {
+                    $words[] = is_array($b) ? json_encode($b) : (string) $b;
+                }
+            }
+            $key = mb_strtolower(trim(preg_replace('/\s+/u', ' ', implode(' | ', array_filter($words))) ?? ''));
+            if ($key === '' || mb_strlen($key) < 12) {
+                continue;
+            }
+            if (isset($seen[$key])) {
+                $scenes[$k]['layout_template'] = 'single_focus';
+                $scenes[$k]['slots'] = ['slot_main' => ['content_type' => 'text_block', 'heading' => '', 'bullets' => []]];
+                continue;
+            }
+            $seen[$key] = true;
+        }
+
+        return $scenes;
+    }
+
+    /**
+     * A two-picture card whose two pictures describe the same subject ("a
+     * chimpanzee's eye..." twice, where the script compared it with a human
+     * eye) shows the viewer one image twice. The model ignores the prompt rule
+     * often enough that it is enforced here: the card keeps ONE picture and
+     * gets a text side, which the validator writes from the beat's narration.
+     *
+     * @param  array<int, array<string, mixed>> $scenes
+     * @return array<int, array<string, mixed>>
+     */
+    public static function collapseTwinPictures(array $scenes): array
+    {
+        foreach ($scenes as $k => $scene) {
+            $pictures = [];
+            foreach ((array) ($scene['slots'] ?? []) as $slot) {
+                if (is_array($slot) && in_array((string) ($slot['content_type'] ?? ''), ['image', 'video'], true)) {
+                    $pictures[] = $slot;
+                }
+            }
+            if (count($pictures) !== 2 || count((array) $scene['slots']) !== 2) {
+                continue;
+            }
+            $words = fn ($slot) => array_values(array_unique(array_filter(
+                preg_split('/[^a-z0-9]+/', mb_strtolower((string) ($slot['asset_request']['description'] ?? ''))) ?: [],
+                fn ($w) => mb_strlen($w) > 3
+            )));
+            [$a, $b] = [$words($pictures[0]), $words($pictures[1])];
+            if ($a === [] || $b === []) {
+                continue;
+            }
+            $overlap = count(array_intersect($a, $b)) / max(1, min(count($a), count($b)));
+            if ($overlap < 0.6) {
+                continue;
+            }
+            $scenes[$k]['layout_template'] = 'split_side_by_side';
+            $scenes[$k]['slots'] = [
+                'slot_left' => $pictures[0],
+                'slot_right' => ['content_type' => 'text_block', 'heading' => '', 'bullets' => []],
+            ];
+        }
+
+        return $scenes;
+    }
+
+    /** The picture-plus-words cards: same content, different framing. */
+    private const PICTURE_TEXT_CARDS = ['full_bleed_with_side_panel', 'split_side_by_side', 'full_bleed_with_banner'];
+
+    /**
+     * Break up runs of the same picture card on a verbatim board.
+     *
+     * A long script is mostly "here is a thing, and here is what it means",
+     * and the model answers nearly every such beat with the side-panel card:
+     * project 211's first verbatim pass cast it 51 times out of 98, nine in a
+     * row. Rules in the prompt did not hold across six separate calls, so the
+     * guarantee is made here. The three picture+text cards carry the same
+     * content — one picture, a heading, a few bullets — so a beat can move
+     * between them without losing anything: consecutive picture beats step
+     * through the rotation, and the side panel / split alternate which side
+     * the picture sits on.
+     *
+     * @param  array<int, array<string, mixed>> $scenes
+     * @return array<int, array<string, mixed>>
+     */
+    public static function varyPictureCards(array $scenes): array
+    {
+        $rotation = self::PICTURE_TEXT_CARDS;
+        $prev = null;
+        $flip = false;
+        foreach ($scenes as $k => $scene) {
+            $tpl = (string) ($scene['layout_template'] ?? '');
+            if (!in_array($tpl, $rotation, true)) {
+                $prev = $tpl;
+                continue;
+            }
+            $parts = self::pictureAndText((array) ($scene['slots'] ?? []));
+            if ($parts === null) {
+                $prev = $tpl;
+                continue;
+            }
+
+            // Picture beat after picture beat: take the next framing in the
+            // rotation, so a run reads side panel -> split -> banner -> ...
+            // instead of the same card (or an A-B-A-B ping-pong).
+            $target = $tpl;
+            if (in_array($prev, $rotation, true)) {
+                $i = (int) array_search($prev, $rotation, true);
+                $target = $rotation[($i + 1) % count($rotation)];
+            }
+            $flip = !$flip;
+            [$picture, $text] = $parts;
+
+            if ($target === 'full_bleed_with_side_panel') {
+                $text['dock'] = $flip ? 'right' : 'left';
+                $text['width_pct'] = (int) ($text['width_pct'] ?? 33) ?: 33;
+                $slots = ['slot_background' => $picture, 'slot_panel' => $text];
+            } elseif ($target === 'full_bleed_with_banner') {
+                // A banner is a strip: the heading and at most two lines.
+                $text['dock'] = 'bottom';
+                unset($text['width_pct']);
+                $text['bullets'] = array_slice(array_values((array) ($text['bullets'] ?? [])), 0, 2);
+                $slots = ['slot_background' => $picture, 'slot_banner' => $text];
+            } else {
+                unset($text['dock'], $text['width_pct']);
+                $slots = $flip
+                    ? ['slot_left' => $picture, 'slot_right' => $text]
+                    : ['slot_left' => $text, 'slot_right' => $picture];
+            }
+
+            $scenes[$k]['layout_template'] = $target;
+            $scenes[$k]['slots'] = $slots;
+            $prev = $target;
+        }
+
+        return $scenes;
+    }
+
+    /** [picture slot, text slot] of a picture+text card, or null. */
+    private static function pictureAndText(array $slots): ?array
+    {
+        $picture = null;
+        $text = null;
+        foreach ($slots as $slot) {
+            if (!is_array($slot)) {
+                continue;
+            }
+            $type = (string) ($slot['content_type'] ?? '');
+            if ($picture === null && in_array($type, ['image', 'video'], true)) {
+                $picture = $slot;
+            } elseif ($text === null && in_array($type, ['text_block', 'explanation_box'], true)) {
+                $text = $slot;
+            }
+        }
+        // No text side means two pictures — a comparison (chimp eye beside
+        // human eye). Re-framing it would throw one picture away and leave an
+        // empty text card, so it is not a picture+text card at all.
+        if ($picture === null || $text === null) {
+            return null;
+        }
+        if (($text['content_type'] ?? '') === 'explanation_box') {
+            $text['content_type'] = 'text_block';
+        }
+
+        return [$picture, $text];
+    }
+
+    /**
+     * The system prompt for one window of a verbatim board: the narration is
+     * fixed, so every rule about writing or pacing it is gone and what is left
+     * is the visual craft.
+     */
+    private function buildVerbatimSystem(string $phaseLines, string $docs, array $window, int $phaseCount): string
+    {
+        $first = (int) array_key_first($window) + 1;
+        $last = (int) array_key_last($window) + 1;
+
+        $system = <<<PROMPT
+You are the VISUAL director for an explainer video whose narration is already written, word for word, by its creator. You do NOT write or change narration. For each numbered beat you choose the card that best SHOWS what that narration says, and fill the card's slots. Return ONLY JSON:
+
+{"scenes": [{"phase": <the beat's number>, "layout_template": "<from THAT beat's menu>", "slots": {<the template's slots, shapes below>}}]}
+
+This call covers beats {$first}-{$last} of {$phaseCount}:
+{$phaseLines}
+Card content shapes:
+{$docs}
+Rules:
+- Exactly one scene per beat, keeping its number. Never use a template a beat does not offer. Do NOT include a "narration" field.
+- Everything on a card comes from THAT beat's narration (or the script around it): a number it says becomes a stat card, a person it quotes a quote card, two things it contrasts a comparison, a sequence it walks through a flow. Chart values are REAL numbers the script states; never invent data.
+- When a beat has THE WRITER'S ON-SCREEN NOTE, that is what the creator wants shown: build the card around it (a described photo/scene -> an image slot whose asset_request.description is that shot; a stopwatch, a caption, a title -> the card that displays it).
+- Cards carry few words: a heading and at most 3 short bullets. Never paste the narration onto the card, and never leave a card's text empty.
+- A card with TWO pictures (split_side_by_side, before_after) is a comparison: the two asset_request descriptions must show the two DIFFERENT things being compared (a chimpanzee's eye | a human eye), never the same subject twice.
+- A heading names what THIS beat shows ("Pupils widen with longer gazes"). Never use the chapter name as a heading — each chapter already has its own title card — and never reuse a heading from another beat.
+
+VARIETY — never use the same layout_template twice in a row. No card may take more than a quarter of these beats, and "single_focus" at most a fifth. full_bleed_with_side_panel is ONE option among many, not the default for every picture beat: rotate the picture cards (split_side_by_side, full_bleed_with_banner, before_after, photo_stack, image_grid) and spend the beats that state a number, a quote, a contrast, a definition or a sequence on the card built for it. This is a long video, and a repeating look is what makes long videos boring.
+
+VISUALS — at least half of the beats must carry an image slot (content_type "image"): full_bleed_with_side_panel, split_side_by_side, full_bleed_with_banner, before_after, photo_stack, image_grid, phone_mockup, or single_focus holding an image.
+- asset_request.description is a concrete photographable scene — never text, charts or diagrams.
+
+THE MEDIA BRIEF — every image/video slot's asset_request also carries:
+- "search_query": 2-4 PLAIN words that would find this on a stock site.
+- "media_kind": "image", "video" (the beat is about movement) or "either". "video" for at most a third of media slots.
+- "guidance": ONE sentence TO THE USER on what shot works and what to avoid.
+PROMPT;
+
+        if ($this->guide !== '') {
+            $system .= "\n\nTHE USER'S GUIDE for this video — it OUTRANKS the advice above:\n" . mb_substr($this->guide, 0, 1500);
+        }
+
+        return $system;
+    }
+
     /** One chat round over one window of phases. Null on transport/parse failure. */
     private function request(
         string $system,
@@ -463,6 +979,12 @@ PROMPT;
         // Continuity across a windowed board: the call cannot see the scenes
         // written before it, so it is handed the last thing the narrator said.
         $user = "SCRIPT / TOPIC:\n" . mb_substr(trim($script), 0, ScriptSkeletonService::scriptWindow($this->targetSeconds));
+        if ($this->verbatim !== []) {
+            // The beats carry their own words; the opening of the script is
+            // enough to say what the video is about.
+            $user = "THE VIDEO (opening of the script, for context):\n" . mb_substr(trim($script), 0, 1500);
+            $previousNarration = '';
+        }
         if ($previousNarration !== '') {
             $user .= "\n\nTHE NARRATION SO FAR ENDS WITH:\n" . mb_substr($previousNarration, 0, 400)
                 . "\n\nPick the story up from there — do not repeat it.";
@@ -515,7 +1037,7 @@ PROMPT;
         $scenes = [];
         $n = 0;
         foreach (array_values($skeleton) as $i => $p) {
-            $menu = $this->menuForPhase($i, (string) ($p['intent'] ?? ''));
+            $menu = $this->menuForPhase($i, (string) ($p['intent'] ?? ''), (string) ($p['brief'] ?? ''));
             // Find the model's scene for this phase (by index, tolerant of
             // its own numbering).
             $cand = null;
@@ -525,7 +1047,14 @@ PROMPT;
                     break;
                 }
             }
-            $cand = $cand ?? (is_array($raw[$i] ?? null) ? $raw[$i] : null);
+            // No positional fallback: requestBoard() numbered every scene, so
+            // "the i-th thing returned" is somebody else's beat.
+            if ($cand === null && $this->verbatim !== []) {
+                // A verbatim beat is part of the script: skipped by the model
+                // it still gets a scene, on a plain card the validator builds
+                // from the narration.
+                $cand = ['layout_template' => 'single_focus', 'slots' => ['slot_main' => ['content_type' => 'text_block', 'heading' => '', 'bullets' => []]]];
+            }
             if ($cand === null) {
                 continue;
             }
@@ -548,6 +1077,12 @@ PROMPT;
             // honoured when it gave one, clamped to the card's sane range.
             $secs = (float) ($cand['seconds'] ?? 0);
             $secs = $secs > 0 ? max(3.0, min(14.0, $secs)) : 0.0;
+            $narration = trim((string) ($cand['narration'] ?? '')) ?: (string) ($p['brief'] ?? '');
+            if ($this->verbatim !== []) {
+                // The writer's words, exactly; the length follows from them.
+                $narration = (string) ($this->verbatim[$i]['narration'] ?? $narration);
+                $secs = 0.0;
+            }
 
             $n++;
             $scenes[] = [
@@ -555,7 +1090,7 @@ PROMPT;
                 'order' => $n,
                 'layout_template' => $tpl,
                 'duration_seconds' => $secs,
-                'narration' => ['text' => trim((string) ($cand['narration'] ?? '')) ?: (string) ($p['brief'] ?? '')],
+                'narration' => ['text' => $narration],
                 'mood' => 'neutral',
                 'slots' => $slots,
             ];
@@ -676,8 +1211,9 @@ PROMPT;
                 . 'photo_stack, image_grid, the full_bleed pair, or single_focus with an image).';
         }
 
-        // Flat pacing: near-identical durations across the whole video.
-        $secs = array_values(array_filter(array_map(
+        // Flat pacing: near-identical durations across the whole video. Not
+        // a fault on a verbatim board: the writer's words set the lengths.
+        $secs = $this->verbatim !== [] ? [] : array_values(array_filter(array_map(
             fn ($s) => (float) $s['duration_seconds'],
             $scenes
         ), fn ($v) => $v > 0));
@@ -779,7 +1315,7 @@ PROMPT;
      * {@see processLike()}) — the flow card is the card for a chain of things,
      * and a chain is exactly what `era` phases hold there.
      */
-    private function menuForPhase(int $i, string $intent): array
+    private function menuForPhase(int $i, string $intent, string $brief = ''): array
     {
         if ($i === $this->corePhase) {
             return ['cinematic_card'];
@@ -789,7 +1325,108 @@ PROMPT;
             $menu[] = 'cinematic_card';
         }
 
-        return $menu;
+        // Whatever the phase was LABELLED, its own words may name a card the
+        // intent's menu does not carry. Without this a script about renting
+        // versus buying — planned, correctly, as ten `point` phases — is never
+        // once offered versus_card, because that card is only reachable
+        // through the compare shape's intents. Measured across four scripts:
+        // 32 of 49 cards were never cast, and the shape cards were the bulk
+        // of them.
+        $shape = self::shapeCards($brief);
+
+        // ORDER IS THE DEFAULT. Every intent menu starts with single_focus, and
+        // a model reading "choose from: single_focus | ..." picks the first
+        // plausible entry — which is how a beat that literally says "follow
+        // this order" landed on a plain text card with step_flow sitting two
+        // places to its right. So the cards this beat's own words asked for go
+        // FIRST, and the fallback goes last.
+        $ordered = [];
+        foreach ($shape as $card) {
+            $ordered[$card] = true;
+        }
+        foreach ($menu as $card) {
+            if ($card !== 'single_focus') {
+                $ordered[$card] = true;
+            }
+        }
+        if (in_array('single_focus', $menu, true) || $menu === []) {
+            $ordered['single_focus'] = true;
+        }
+
+        return array_keys($ordered);
+    }
+
+    /**
+     * Cards a phase's own brief asks for, whatever intent it was given.
+     *
+     * Read as: "if the beat is about X, the model should at least SEE the card
+     * built for X." Nothing here forces a card — the menu only decides what is
+     * on the table, and the composer still picks.
+     *
+     * @return string[]
+     */
+    public static function shapeCards(string $brief): array
+    {
+        $text = ' ' . mb_strtolower(trim($brief)) . ' ';
+        if (trim($brief) === '') {
+            return [];
+        }
+
+        $shapes = [
+            // two named things weighed against each other
+            '/\b(versus|vs\.?|compared with|against each other|either .* or |two options|both sides|one side .* other)\b/'
+                => ['versus_card', 'split_side_by_side'],
+            // an ordered procedure
+            '/\b(steps?|in (this |that )?order|the order|first\b.{0,40}\bthen|how to read|how to use|procedure|sequence)\b/'
+                => ['step_flow', 'checklist_card'],
+            // a belief corrected
+            '/\b(myth|believe|assume|think it|people say|actually|in fact|really|wrong)\b/'
+                => ['myth_fact'],
+            // the error itself
+            '/\b(mistake|mistakes|error|trap|gets? it wrong|confuse|misread)\b/'
+                => ['common_mistake'],
+            // a change over time, one thing then another
+            '/\b(before|after|used to|once was|changed from|then and now|transformed)\b/'
+                => ['before_after'],
+            // a choice with conditions
+            '/\b(depends on|if you|choose|decide|which one|when to)\b/'
+                => ['decision_tree'],
+            // the parts of one object
+            '/\b(parts of|labell?ed|anatomy|diagram of|the panel|components of)\b/'
+                => ['labeled_diagram'],
+            // a word being defined
+            '/\b(means|definition|is called|the term|known as)\b/'
+                => ['term_card'],
+            // a whole split into shares
+            '/\b(shares?|percent|per cent|breakdown|goes to|slice|where the money|made up of|portions?|a (third|quarter|fifth|half)|two thirds)\b/'
+                => ['proportion_flow', 'receipt_card', 'pictogram_percent'],
+            // two magnitudes
+            '/\b(times (bigger|smaller|more|less)|orders of magnitude|compare the size|how big|how small|dwarf)\b/'
+                => ['scale_comparison'],
+            // a ranked list
+            '/\b(rank|ranked|top \d|best|worst|biggest|in order of)\b/'
+                => ['list_ranking'],
+            // a loop that closes
+            '/\b(cycle|loop|repeats|back to the start|round again)\b/'
+                => ['cycle_diagram'],
+            // levels sitting on each other
+            '/\b(layers?|levels?|stack|tiers?|on top of)\b/'
+                => ['layer_stack'],
+            // dates
+            '/\b(1[89]\d{2}|20[0-2]\d|nineteen (hundred|ten|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)|decades?|century|timeline|history of|years later)\b/'
+                => ['timeline_card'],
+        ];
+
+        $cards = [];
+        foreach ($shapes as $pattern => $offer) {
+            if (preg_match($pattern, $text) === 1) {
+                foreach ($offer as $card) {
+                    $cards[$card] = true;
+                }
+            }
+        }
+
+        return array_keys($cards);
     }
 
     /**

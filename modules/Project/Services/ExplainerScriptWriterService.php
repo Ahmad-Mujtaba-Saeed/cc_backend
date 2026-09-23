@@ -127,7 +127,10 @@ PROMPT;
         }
 
         $response = Http::withToken($this->apiKey)
-            ->timeout(60)
+            // ~2,250 words for a 15-minute script is a long generation. This
+            // runs inside the web request (nginx/PHP stop at 300s) and may be
+            // called twice (length retry), so two calls must fit under that.
+            ->timeout($targetSeconds > 300 ? 130 : 60)
             ->post('https://api.openai.com/v1/chat/completions', [
                 'model' => $this->model,
                 'messages' => $messages,

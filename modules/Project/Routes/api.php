@@ -101,6 +101,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/explainer/projects/{project}/captions', [ExplainerController::class, 'toggleCaptions']);
     Route::post('/explainer/projects/{project}/backdrop', [ExplainerController::class, 'toggleBackdrop']);
     Route::post('/explainer/projects/{project}/auto-visuals', [ExplainerController::class, 'toggleAutoVisuals']);
+    Route::get('/explainer/projects/{project}/billing-quote', [ExplainerController::class, 'billingQuote']);
+    Route::post('/explainer/projects/{project}/voice', [ExplainerController::class, 'setVoice']);
     Route::post('/explainer/projects/{project}/font-pack', [ExplainerController::class, 'setFontPack']);
     Route::post('/explainer/projects/{project}/motion-style', [ExplainerController::class, 'setMotionStyle']);
     Route::post('/explainer/projects/{project}/motion-depth', [ExplainerController::class, 'setMotionDepth']);

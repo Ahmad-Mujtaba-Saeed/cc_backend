@@ -40,7 +40,12 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
     // windows — up to four 120s calls before the motif, geometry and text
     // passes even start. The ceiling exists to kill a HUNG analysis, not a
     // long one, so it now sits above the longest legitimate run.
-    public int $timeout = 900;
+    //
+    // Fifteen minutes (the longest duration tier) plans ~100-160 phases:
+    // ten-plus composer windows, each possibly retried once against its
+    // critique, at up to 120s a call. 45 minutes is above that worst case
+    // and still kills a genuinely hung job.
+    public int $timeout = 2700;
 
     public function __construct(public Project $project)
     {
@@ -54,8 +59,9 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
      * restart mid-analysis, or an OOM kill. Without this the project sits on
      * 'analyzing' forever and the dashboard spins with no way back.
      *
-     * Deliberately does NOT refund credits: the charge happens at render, so
-     * a failed analysis has nothing to give back.
+     * The storyboard is billed when it is requested, so an analysis that
+     * never produced one gives those credits back (a failed RE-analysis of a
+     * project that already has its storyboard does not).
      */
     public function failed(Throwable $exception): void
     {
@@ -64,6 +70,15 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
             'error' => $exception->getMessage(),
             'class' => get_class($exception),
         ]);
+
+        try {
+            \Modules\Project\Support\ExplainerBilling::refundStoryboardIfUndelivered($this->project);
+        } catch (Throwable $e) {
+            Log::error('AnalyzeExplainerScriptJob: storyboard refund failed', [
+                'project_id' => $this->project->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         // Preserve the richer message handle()'s catch may already have stored.
         $this->project->refresh();
@@ -139,21 +154,36 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
             $guide = (string) ($settings['guide'] ?? '');
             $targetSeconds = (int) ($settings['target_seconds'] ?? 60);
 
+            // A finished voice-over script (not a topic, not maths) keeps every
+            // word: it is cut into its own spoken beats and the composer only
+            // picks the visuals. Planning ~20 phases and letting the composer
+            // re-write the narration turned project 211's fifteen-minute
+            // script into a four-minute summary.
+            $beats = [];
+            $scriptChapters = [];
+            if ($mathTopic === [] && \Modules\Project\Support\ScriptBeats::isFullScript($script)) {
+                $beats = \Modules\Project\Support\ScriptBeats::segment($script);
+            }
+            $settings['script_mode'] = $beats !== [] ? 'verbatim' : 'composed';
+
             $skeleton = [];
-            try {
-                $planner = new \Modules\Project\Services\ScriptSkeletonService();
-                // Math gets the guaranteed canonical skeleton; everything
-                // else gets a story shape (argument/journey/compare/
-                // countdown/demo) when the planner can see one — and NO
-                // directive when it can't, which is exactly today's behavior.
-                $skeleton = $mathTopic !== []
-                    ? $planner->plan($script, $mathTopic, $guide)
-                    : $planner->planGeneric($script, $guide, $targetSeconds);
-            } catch (Throwable $e) {
-                Log::info('AnalyzeExplainerScriptJob: skeleton planning unavailable', [
-                    'project_id' => $this->project->id,
-                    'error' => $e->getMessage(),
-                ]);
+            // A verbatim script is not planned: its own beats are the structure.
+            if ($beats === []) {
+                try {
+                    $planner = new \Modules\Project\Services\ScriptSkeletonService();
+                    // Math gets the guaranteed canonical skeleton; everything
+                    // else gets a story shape (argument/journey/compare/
+                    // countdown/demo) when the planner can see one — and NO
+                    // directive when it can't, which is exactly today's behavior.
+                    $skeleton = $mathTopic !== []
+                        ? $planner->plan($script, $mathTopic, $guide)
+                        : $planner->planGeneric($script, $guide, $targetSeconds);
+                } catch (Throwable $e) {
+                    Log::info('AnalyzeExplainerScriptJob: skeleton planning unavailable', [
+                        'project_id' => $this->project->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
             $settings['script_skeleton'] = $skeleton ?: null;
 
@@ -164,7 +194,32 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
             // failures, and the off switch (EXPLAINER_TREE=false).
             $raw = null;
             $settings['composed_by_tree'] = false;
-            if ($skeleton !== [] && (bool) config('services.openai.explainer_tree', true)) {
+            if ($beats !== []) {
+                try {
+                    $composer = (new \Modules\Project\Services\GenericStoryboardComposerService())->setGuide($guide);
+                    $raw = $composer->composeVerbatim($script, $beats, $targetSeconds);
+                    if ($raw !== null) {
+                        // Beat N is scene_N (a verbatim board never drops one),
+                        // so the script's chapters map straight onto scenes.
+                        foreach ($beats as $n => $beat) {
+                            $scriptChapters['scene_' . ($n + 1)] = (string) $beat['chapter'];
+                        }
+                        $settings['composed_by_tree'] = true;
+                        $settings['analysis_attempts'] = $composer->attempts();
+                        $settings['script_beats'] = count($beats);
+                    }
+                } catch (Throwable $e) {
+                    Log::warning('AnalyzeExplainerScriptJob: verbatim composer failed, falling back', [
+                        'project_id' => $this->project->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $raw = null;
+                }
+                if ($raw === null) {
+                    $settings['script_mode'] = 'composed';
+                }
+            }
+            if ($raw === null && $skeleton !== [] && (bool) config('services.openai.explainer_tree', true)) {
                 try {
                     $kind = $mathTopic['kind'] ?? null;
                     // The composer rewrites narration from the script, so the
@@ -327,7 +382,9 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
             // decides; everything it did (or refused) lands in the lint
             // report below. Never fatal, and off via EXPLAINER_TEXT_PASS.
             $textFindings = [];
-            if ((bool) config('services.openai.explainer_text_pass', true)) {
+            // A verbatim board speaks the writer's own words; an editor pass
+            // "fixing" them would be exactly what the mode exists to prevent.
+            if ((bool) config('services.openai.explainer_text_pass', true) && ($settings['script_mode'] ?? '') !== 'verbatim') {
                 try {
                     $reviewer = new \Modules\Project\Services\StoryboardTextReviewService();
                     $issues = $reviewer->review($scenes);
@@ -495,7 +552,21 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                 };
             }
 
-            if ($mode === 'hybrid') {
+            $fromScript = $mode === 'hybrid' && $scriptChapters !== []
+                ? (new ChapterPlanValidator())->fromScriptChapters($scenes, $scriptChapters)
+                : null;
+            if ($fromScript !== null) {
+                // The writer's own acts, titled by the writer, one cover each.
+                $settings['chapter_plan'] = $fromScript;
+                $covered = (new ChapterPlanValidator())->insertCovers($fromScript, $scenes, 12);
+                $settings['chapter_plan'] = $covered['plan'];
+                $scenes = $covered['scenes'];
+                Log::info('AnalyzeExplainerScriptJob: chapters taken from the script', [
+                    'project_id' => $this->project->id,
+                    'chapters' => count($fromScript['chapters']),
+                    'covers' => $covered['inserted'],
+                ]);
+            } elseif ($mode === 'hybrid') {
                 try {
                     $settings['chapter_plan'] = (new CompositionDirectorService())->direct($scenes, $aspect);
                 } catch (Throwable $e) {

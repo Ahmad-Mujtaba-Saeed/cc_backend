@@ -177,7 +177,67 @@ class ChapterPlanValidator
      * @param  array  $scenes  Full validated scene arrays, storyboard order.
      * @return array{plan: array, scenes: array, inserted: int}
      */
-    public function insertCovers(array $plan, array $scenes): array
+    /**
+     * A chapter plan taken from the SCRIPT's own chapters ("Chapter 2 — Eyes
+     * built to be read"), for a storyboard composed verbatim from a written
+     * script. The writer already decided where the acts break and what they
+     * are called; asking a model to regroup ninety-odd scenes into at most
+     * six chapters threw that away (project 211: eight chapters in, two
+     * covers out, placed where the script had none). Every chapter is a
+     * slides chapter; an outro heading folds into the act before it rather
+     * than earning a cover of its own.
+     *
+     * @param array<int, array<string, mixed>> $scenes     storyboard order
+     * @param array<string, string>            $chapterOf  scene_id => chapter name
+     * @return array|null  null when the script names fewer than three chapters
+     */
+    public function fromScriptChapters(array $scenes, array $chapterOf): ?array
+    {
+        $names = array_values(array_unique(array_filter(array_map('strval', $chapterOf))));
+        if (count($names) < 3) {
+            return null;
+        }
+
+        $closing = '/^(outro|end screen|the end|credits)$/iu';
+        $opening = '/^(cold open|intro|introduction|prologue|opening|hook)$/iu';
+
+        $chapters = [];
+        $current = null;
+        foreach ($scenes as $scene) {
+            $id = (string) ($scene['scene_id'] ?? '');
+            $name = trim((string) ($chapterOf[$id] ?? ''));
+            if ($name === '' || preg_match($closing, $name) || ($current !== null && $name === $current)) {
+                if ($chapters === []) {
+                    $chapters[] = ['name' => $name, 'scene_ids' => []];
+                }
+                $chapters[count($chapters) - 1]['scene_ids'][] = $id;
+                continue;
+            }
+            $current = $name;
+            $chapters[] = ['name' => $name, 'scene_ids' => [$id]];
+        }
+
+        $numbered = 0;
+        $plan = [];
+        foreach ($chapters as $i => $ch) {
+            $isOpening = $i === 0 && preg_match($opening, $ch['name']);
+            if (!$isOpening) {
+                $numbered++;
+            }
+            $plan[] = [
+                'id' => 'ch_' . ($i + 1),
+                'mode' => 'slides',
+                'scene_ids' => $ch['scene_ids'],
+                'transition_in' => $i === 0 ? 'none' : ExplainerRegistry::defaultChapterTransition(),
+                'reason' => mb_substr($ch['name'], 0, 60),
+                'cover_label' => 'Chapter ' . $numbered,
+            ];
+        }
+
+        return ['version' => 1, 'chapters' => $plan];
+    }
+
+    public function insertCovers(array $plan, array $scenes, int $maxCovers = self::MAX_COVERS): array
     {
         $conf = ExplainerRegistry::coversConfig();
         $chapters = is_array($plan['chapters'] ?? null) ? array_values($plan['chapters']) : [];
@@ -246,7 +306,7 @@ class ChapterPlanValidator
                 && count($prevIds) >= self::MIN_ACT_SCENES
                 && $chapterSeconds($ch) >= self::MIN_ACT_SECONDS;
 
-            if (!$isRealAct || $inserted >= self::MAX_COVERS) {
+            if (!$isRealAct || $inserted >= $maxCovers) {
                 $newChapters[] = $ch;
                 continue;
             }
@@ -274,7 +334,7 @@ class ChapterPlanValidator
                     'content_type' => 'text_block',
                     'heading' => $title,
                     'bullets' => [],
-                    'label' => 'Chapter ' . str_pad((string) $ordinal, 2, '0', STR_PAD_LEFT),
+                    'label' => (string) ($ch['cover_label'] ?? ('Chapter ' . str_pad((string) $ordinal, 2, '0', STR_PAD_LEFT))),
                     'reveal' => 'all_at_once',
                 ]],
                 'transition' => 'none',

@@ -28,6 +28,7 @@ use Modules\Project\Support\ElementEdits;
 use Modules\Project\Support\ExplainerRegistry;
 use Modules\Project\Support\ShotListValidator;
 use Modules\Billing\Services\CreditService;
+use Modules\Project\Support\ExplainerBilling;
 use Modules\Billing\Exceptions\InsufficientCreditsException;
 use Modules\User\Models\User;
 
@@ -70,12 +71,19 @@ class ExplainerController extends Controller
             // The user's own direction for the script — "open by naming the
             // chapter, solve it by factoring, end on the sanity check".
             'guide' => 'sometimes|nullable|string|max:2000',
-            'target_seconds' => 'sometimes|integer|min:10|max:600',
+            'target_seconds' => 'sometimes|integer|min:10|max:' . ExplainerBilling::maxSeconds(),
             'aspect_ratio' => 'sometimes|string|in:16:9,9:16,1:1',
             'tone' => 'sometimes|string|max:60',
             'audience' => 'sometimes|string|max:120',
             'language' => 'sometimes|string|max:40',
         ]);
+
+        // Paid LLM work (up to two long calls for a 15-minute script), so it
+        // is a subscriber feature like everything else that spends money.
+        // No credits are taken: the storyboard is the billed step.
+        if ($gate = $this->gateCredits(auth()->user(), 0)) {
+            return $gate;
+        }
 
         // No project exists yet — attribute the script-writer spend to the user.
         \Modules\Project\Services\CostTracker::setContext(null, auth()->id());
@@ -123,7 +131,10 @@ class ExplainerController extends Controller
             // between the script writer and the board.
             'guide' => 'sometimes|nullable|string|max:2000',
             'aspect_ratio' => 'sometimes|string|in:16:9,9:16,1:1',
-            'target_seconds' => 'sometimes|integer|min:10|max:600',
+            // The duration tier is what the storyboard is billed at, and it
+            // caps how long the video may be.
+            'duration_tier' => 'sometimes|string|in:' . implode(',', array_keys(ExplainerBilling::tiers())),
+            'target_seconds' => 'sometimes|integer|min:10|max:' . ExplainerBilling::maxSeconds(),
             // A stock voice, or one of THIS user's own cloned voices.
             'tts_voice' => ['sometimes', 'string', 'max:40', function (string $attribute, mixed $value, \Closure $fail) {
                 if (!\Modules\Project\Support\TtsVoices::isAllowed((string) $value, (int) auth()->id())) {
@@ -135,9 +146,29 @@ class ExplainerController extends Controller
             'music_volume' => ['sometimes', 'numeric', 'min:0', 'max:1'],
         ]);
 
+        $targetSeconds = (int) ($validated['target_seconds'] ?? 60);
+        $tier = $validated['duration_tier'] ?? ExplainerBilling::tierForSeconds($targetSeconds);
+        $tierMax = ExplainerBilling::tiers()[$tier]['max_seconds'];
+        if ($targetSeconds > $tierMax) {
+            return response()->json([
+                'success' => false,
+                'message' => 'That length is longer than the "' . ExplainerBilling::tiers()[$tier]['label'] . '" option allows — pick a longer option.',
+                'errors' => ['target_seconds' => ['Must be ' . $tierMax . ' seconds or less for this option.']],
+            ], 422);
+        }
+
+        // Generating the storyboard is the billed step: check before any
+        // project exists, so a refusal leaves nothing behind.
+        $user = auth()->user();
+        $cost = ExplainerBilling::storyboardCost($tier);
+        if ($gate = $this->gateCredits($user, $cost)) {
+            return $gate;
+        }
+
         $settings = [
             'script' => $validated['script'],
-            'target_seconds' => $validated['target_seconds'] ?? 60,
+            'target_seconds' => $targetSeconds,
+            'duration_tier' => $tier,
         ];
         if (trim((string) ($validated['guide'] ?? '')) !== '') {
             $settings['guide'] = trim((string) $validated['guide']);
@@ -165,11 +196,33 @@ class ExplainerController extends Controller
             'settings' => $settings,
         ]);
 
-        AnalyzeExplainerScriptJob::dispatch($project);
+        try {
+            app(CreditService::class)->debit(
+                $user,
+                $project,
+                $cost,
+                'Storyboard (' . ExplainerBilling::tiers()[$tier]['label'] . ')',
+                ExplainerBilling::storyboardChargeRef($project)
+            );
+        } catch (InsufficientCreditsException $e) {
+            // Spent elsewhere between the check and now.
+            $project->delete();
+
+            return $this->insufficient($e);
+        }
+
+        try {
+            AnalyzeExplainerScriptJob::dispatch($project);
+        } catch (\Throwable $e) {
+            app(CreditService::class)->refundReference(ExplainerBilling::storyboardChargeRef($project), 'Refund: storyboard never started');
+            $project->update(['status' => 'failed', 'error_message' => 'Could not start the analysis. Your credits were refunded.']);
+
+            return response()->json(['success' => false, 'message' => 'Could not start the analysis — please try again.'], 500);
+        }
 
         return response()->json([
             'success' => true,
-            'data' => ['id' => $project->id, 'status' => $project->status],
+            'data' => ['id' => $project->id, 'status' => $project->status, 'charged' => $cost],
             'message' => 'Project created. Analyzing script...',
         ], 201);
     }
@@ -187,12 +240,32 @@ class ExplainerController extends Controller
             ], 409);
         }
 
+        // Re-analysing mid-render would swap the storyboard out from under the
+        // renderer (and flip a paid render's status back to analyzing).
+        if (in_array($project->status, ['processing', 'analyzing'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Wait for the current job to finish before re-analyzing.',
+            ], 409);
+        }
+
         $validated = $request->validate([
             'script' => 'sometimes|string|min:10',
-            'target_seconds' => 'sometimes|integer|min:10|max:600',
+            'target_seconds' => 'sometimes|integer|min:10|max:' . ExplainerBilling::maxSeconds(),
         ]);
 
+        // Re-analysis is free, within the length the storyboard was bought at.
+        $tier = ExplainerBilling::tierFor($project);
+        $tierMax = ExplainerBilling::tiers()[$tier]['max_seconds'];
+        if (isset($validated['target_seconds']) && (int) $validated['target_seconds'] > $tierMax) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This storyboard was generated for "' . ExplainerBilling::tiers()[$tier]['label'] . '" — create a new video for a longer one.',
+            ], 422);
+        }
+
         $settings = $project->settings ?? [];
+        $settings['duration_tier'] = $tier;
         if (isset($validated['script'])) {
             $settings['script'] = $validated['script'];
         }
@@ -329,7 +402,12 @@ class ExplainerController extends Controller
 
         $file = $request->file('file');
         $isVideo = str_starts_with((string) $file->getMimeType(), 'video/');
-        $fileName = $sceneId . '_' . $slotKey . '_' . Str::uuid() . '.' . $file->getClientOriginalExtension();
+        // The extension comes from the file's CONTENT, never its name: the
+        // public disk is web-served, and a valid image saved as "x.php" or
+        // "x.html" would be executed / rendered as a page on our domain. The
+        // ids go through a filename-safe filter for the same reason.
+        $fileName = self::safeName($sceneId) . '_' . self::safeName($slotKey) . '_' . Str::uuid()
+            . '.' . self::safeExtension($file, ['jpg', 'jpeg', 'png', 'webp', 'mp4'], $isVideo ? 'mp4' : 'png');
         $path = $file->storeAs("projects/{$project->id}/explainer", $fileName, 'public');
 
         if ($isVideo) {
@@ -473,6 +551,10 @@ class ExplainerController extends Controller
                 'message' => 'Only image slots can be drawn by AI. Upload a file for a video slot.',
             ], 422);
         }
+        // Refuse before any paid work (the shot brief below is an LLM call).
+        if ($gate = $this->gateCredits(auth()->user(), ExplainerBilling::imageCost())) {
+            return $gate;
+        }
 
         $request_ = is_array($slot['asset_request'] ?? null) ? $slot['asset_request'] : [];
         if ($request->has('description')) {
@@ -519,34 +601,56 @@ class ExplainerController extends Controller
             ExplainerRegistry::themeFor($project->settings ?? [])
         );
 
+        // Every picture the user asks for is billed, up front, and given back
+        // if none comes out. Its own reference, so a refund can only ever
+        // return this one picture's credits.
+        $user = auth()->user();
+        $imageCost = ExplainerBilling::imageCost();
+        $chargeRef = 'slot-image:project:' . $project->id . ':' . Str::uuid();
+        if ($gate = $this->gateCredits($user, $imageCost)) {
+            return $gate;
+        }
+        try {
+            app(CreditService::class)->debit($user, $project, $imageCost, 'AI picture (' . $sceneId . ' / ' . $slotKey . ')', $chargeRef);
+        } catch (InsufficientCreditsException $e) {
+            return $this->insufficient($e);
+        }
+
         \Modules\Project\Services\CostTracker::setContext($project);
-        $images = (new \Modules\Project\Services\ImageGenerationService())->generateImages(
-            [$built['prompt']],
-            1,
-            '',
-            [
-                'project_id' => $project->id,
-                'template' => 'explainer_slot_fill',
-                'aspect_ratio' => in_array($project->aspect_ratio, ['16:9', '9:16', '1:1'], true)
-                    ? $project->aspect_ratio
-                    : '16:9',
-                'visual_tone' => 'flat 2D vector graphic, solid colour shapes, crisp edges, limited three-colour palette, no gradients, no shading, no photorealism',
-                'detail_boosters' => false,
-                'character_consistency' => false,
-                // A NEW seed every time. The pipeline's seeds are deliberately
-                // deterministic so re-rendering a project does not reshuffle
-                // its pictures — but here the entire request is "give me a
-                // different one", and a stable seed would hand back the image
-                // the user just rejected.
-                'seed' => random_int(1, 2147483646),
-            ]
-        );
+        try {
+            $images = (new \Modules\Project\Services\ImageGenerationService())->generateImages(
+                [$built['prompt']],
+                1,
+                '',
+                [
+                    'project_id' => $project->id,
+                    'template' => 'explainer_slot_fill',
+                    'aspect_ratio' => in_array($project->aspect_ratio, ['16:9', '9:16', '1:1'], true)
+                        ? $project->aspect_ratio
+                        : '16:9',
+                    'visual_tone' => 'flat 2D vector graphic, solid colour shapes, crisp edges, limited three-colour palette, no gradients, no shading, no photorealism',
+                    'detail_boosters' => false,
+                    'character_consistency' => false,
+                    // A NEW seed every time. The pipeline's seeds are deliberately
+                    // deterministic so re-rendering a project does not reshuffle
+                    // its pictures — but here the entire request is "give me a
+                    // different one", and a stable seed would hand back the image
+                    // the user just rejected.
+                    'seed' => random_int(1, 2147483646),
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('generateSlotImage: image generation threw', ['project_id' => $project->id, 'error' => $e->getMessage()]);
+            $images = null;
+        }
 
         $absolute = is_array($images) ? ($images[0] ?? null) : null;
         if (!$absolute) {
+            app(CreditService::class)->refundReference($chargeRef, 'Refund: AI picture was not drawn');
+
             return response()->json([
                 'success' => false,
-                'message' => 'The image service did not return a picture. Try again in a moment, or upload your own.',
+                'message' => 'The image service did not return a picture — your credits were refunded. Try again in a moment, or upload your own.',
             ], 503);
         }
 
@@ -829,12 +933,29 @@ class ExplainerController extends Controller
             ], 422);
         }
 
-        // Gate + charge credits before rendering (analysis/storyboard stays free).
+        // Claim the project atomically: a double-click (or two tabs) must not
+        // queue two renders — two charges, two sets of AI pictures, and two
+        // jobs writing the same files.
+        $previousStatus = $project->status;
+        $claimed = Project::whereKey($project->id)
+            ->whereNotIn('status', ['processing', 'analyzing'])
+            ->update(['status' => 'processing', 'progress' => 0]);
+        if ($claimed === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'This video is already being processed.',
+            ], 409);
+        }
+
+        // Gate + charge credits: the first render is free, later ones and any
+        // AI pictures the user asked for are billed (ExplainerBilling).
         if ($gate = $this->chargeForRender($project)) {
+            Project::whereKey($project->id)->update(['status' => $previousStatus]);
             return $gate;
         }
 
         try {
+            $project->refresh();
             $project->update([
                 'status' => 'processing',
                 'progress' => 0,
@@ -845,11 +966,13 @@ class ExplainerController extends Controller
 
             ProcessVideoJob::dispatch($project->fresh());
         } catch (\Throwable $e) {
-            // The job never queued — refund the charge.
+            // The job never queued — refund the charge and let go of the claim.
             app(CreditService::class)->refund($project);
+            Project::whereKey($project->id)->update(['status' => $previousStatus]);
+            Log::error('ExplainerController: render dispatch failed', ['project_id' => $project->id, 'error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to start render: ' . $e->getMessage(),
+                'message' => 'Failed to start the render — please try again.',
             ], 500);
         }
 
@@ -1198,7 +1321,9 @@ class ExplainerController extends Controller
         }
 
         $request->validate([
-            'logo' => 'sometimes|file|mimetypes:image/png,image/jpeg,image/webp,image/svg+xml|max:4096',
+            // No SVG: an SVG is a document that can carry script, and this
+            // file is served from our own domain.
+            'logo' => 'sometimes|file|mimetypes:image/png,image/jpeg,image/webp|max:4096',
             'color' => ['sometimes', 'nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
             'remove_logo' => 'sometimes|boolean',
         ]);
@@ -1220,7 +1345,7 @@ class ExplainerController extends Controller
             $file = $request->file('logo');
             $brand['logo_path'] = $file->storeAs(
                 "projects/{$project->id}/explainer",
-                'brand_logo_' . Str::uuid() . '.' . $file->getClientOriginalExtension(),
+                'brand_logo_' . Str::uuid() . '.' . self::safeExtension($file, ['jpg', 'jpeg', 'png', 'webp'], 'png'),
                 'public'
             );
         }
@@ -1294,11 +1419,98 @@ class ExplainerController extends Controller
         }
 
         $enabled = filter_var($request->input('enabled', true), FILTER_VALIDATE_BOOLEAN);
+
+        // Switching it on is a purchase when the pictures are not already part
+        // of the storyboard (maths videos have them on by default, free): the
+        // client must show the count and price and send accept_cost with the
+        // user's yes. The charge itself happens at render, for what is still
+        // empty then, and undrawn pictures are refunded.
+        $preview = $this->aiVisualsPreview($project);
+        if ($enabled && $preview['paid'] && $preview['images'] > 0
+            && !filter_var($request->input('accept_cost', false), FILTER_VALIDATE_BOOLEAN)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'confirm_cost',
+                'message' => "AI visuals will draw {$preview['images']} picture(s) for {$preview['total']} credits.",
+                'data' => $preview,
+            ], 409);
+        }
+
         $settings = $project->settings ?? [];
         $settings['auto_visuals'] = $enabled;
         $project->update(['settings' => $settings]);
 
-        return response()->json(['success' => true, 'data' => ['auto_visuals' => $enabled]]);
+        return response()->json([
+            'success' => true,
+            'data' => ['auto_visuals' => $enabled, 'ai_visuals' => $this->aiVisualsPreview($project->fresh())],
+        ]);
+    }
+
+    /**
+     * What switching AI visuals on would draw and cost right now. `paid` is
+     * false when they are part of the storyboard already (maths default).
+     */
+    private function aiVisualsPreview(Project $project): array
+    {
+        $settings = $project->settings ?? [];
+        $paid = empty($settings['auto_visuals_auto']);
+        $images = count(ExplainerBilling::pendingSlotFills($project));
+        $each = $paid ? ExplainerBilling::imageCost() : 0;
+
+        return [
+            'paid' => $paid,
+            'images' => $images,
+            'image_cost' => $each,
+            'total' => $images * $each,
+            'max_images' => ExplainerBilling::slotFillBudget($project),
+        ];
+    }
+
+    /**
+     * Price list + what Render would cost right now, itemised. Read-only;
+     * the editor asks before it shows the render and AI-visuals confirmations.
+     */
+    public function billingQuote(Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'render' => ExplainerBilling::renderQuote($project),
+                'ai_visuals' => $this->aiVisualsPreview($project),
+                'pricing' => ExplainerBilling::pricing(),
+                'duration_tier' => ExplainerBilling::tierFor($project),
+            ],
+        ]);
+    }
+
+    /**
+     * Change the narrator from the storyboard. Narration is synthesised at
+     * render and its cache is keyed by voice, so the next render re-records
+     * every scene in the new voice; nothing else changes.
+     */
+    public function setVoice(Request $request, Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $validated = $request->validate([
+            'tts_voice' => ['required', 'string', 'max:40', function (string $attribute, mixed $value, \Closure $fail) {
+                if (!\Modules\Project\Support\TtsVoices::isAllowed((string) $value, (int) auth()->id())) {
+                    $fail('That narrator voice is not available.');
+                }
+            }],
+        ]);
+
+        $settings = $project->settings ?? [];
+        $settings['tts_voice'] = $validated['tts_voice'];
+        $project->update(['settings' => $settings]);
+
+        return response()->json(['success' => true, 'data' => ['tts_voice' => $validated['tts_voice']]]);
     }
 
     /**
@@ -2160,6 +2372,9 @@ class ExplainerController extends Controller
             'moods' => ExplainerRegistry::moods(),
             'color_schemes' => self::schemesFor($project->user_id),
             'narration_enabled' => $project->settings['narration_enabled'] ?? true,
+            // The narrator, changeable from the storyboard's Sound section.
+            // Empty = the engine's default for this template.
+            'tts_voice' => $project->settings['tts_voice'] ?? null,
             'music_enabled' => $project->settings['music_enabled'] ?? true,
             // Background music, editable from the storyboard. 'auto' lets the
             // renderer map the dominant scene mood onto a category; a null
@@ -2254,6 +2469,14 @@ class ExplainerController extends Controller
             'accent_shift' => (bool) ($project->settings['accent_shift'] ?? false),
             'aspect_variants' => (bool) ($project->settings['aspect_variants'] ?? false),
             'aspect_variants_multiplier' => (float) config('credits.aspect_variants_multiplier', 2.5),
+            // Credits: what Render costs right now (itemised), what the AI
+            // visuals switch would draw, and the price list.
+            'billing' => [
+                'render' => ExplainerBilling::renderQuote($project),
+                'ai_visuals' => $this->aiVisualsPreview($project),
+                'pricing' => ExplainerBilling::pricing(),
+                'duration_tier' => ExplainerBilling::tierFor($project),
+            ],
             'brand' => [
                 'logo_url' => !empty($project->settings['brand']['logo_path'])
                     ? Storage::disk('public')->url($project->settings['brand']['logo_path'])
@@ -2344,6 +2567,23 @@ class ExplainerController extends Controller
         ];
     }
 
+    /**
+     * A file extension read from the upload's detected MIME type, limited to
+     * $allowed. Never the client's name for it.
+     */
+    private static function safeExtension(\Illuminate\Http\UploadedFile $file, array $allowed, string $fallback): string
+    {
+        $guessed = strtolower((string) $file->guessExtension());
+
+        return in_array($guessed, $allowed, true) ? $guessed : $fallback;
+    }
+
+    /** Route ids are free text; keep only what is safe inside a filename. */
+    private static function safeName(string $value): string
+    {
+        return substr(preg_replace('/[^A-Za-z0-9_-]/', '', $value) ?: 'x', 0, 60);
+    }
+
     private function guard(Project $project): ?JsonResponse
     {
         if ($project->user_id !== auth()->id()) {
@@ -2353,8 +2593,11 @@ class ExplainerController extends Controller
     }
 
     /**
-     * Gate a render on subscription + credits and charge the cost. Returns a
-     * 402 JsonResponse to abort with, or null when charged successfully.
+     * Gate a render on subscription + credits and charge its quote. Returns a
+     * 402 JsonResponse to abort with, or null when charged (or free).
+     *
+     * The number of AI pictures paid for is written on the project, so the
+     * render can refund any it fails to draw.
      */
     private function chargeForRender(Project $project): ?JsonResponse
     {
@@ -2366,10 +2609,48 @@ class ExplainerController extends Controller
             ], 400);
         }
 
-        /** @var CreditService $credits */
-        $credits = app(CreditService::class);
         $user = $project->user ?: User::find($project->user_id);
+        $project->refresh();
+        $quote = ExplainerBilling::renderQuote($project);
 
+        if ($gate = $this->gateCredits($user, $quote['total'], $quote)) {
+            return $gate;
+        }
+
+        try {
+            app(CreditService::class)->charge($user, $project, $quote['total'], $this->renderReason($quote));
+        } catch (InsufficientCreditsException $e) {
+            return $this->insufficient($e, $quote);
+        }
+
+        $settings = $project->settings ?? [];
+        $settings['billing']['paid_image_fills'] = $quote['images'];
+        $settings['billing']['last_render_quote'] = $quote;
+        $project->update(['settings' => $settings]);
+
+        return null;
+    }
+
+    private function renderReason(array $quote): string
+    {
+        $parts = [$quote['free_render'] ? 'First render (free)' : 'Render'];
+        if ($quote['variants'] > 0) {
+            $parts[] = 'aspect variants';
+        }
+        if ($quote['images'] > 0) {
+            $parts[] = $quote['images'] . ' AI picture(s)';
+        }
+
+        return implode(' + ', $parts);
+    }
+
+    /**
+     * Subscription + balance check for a charge of $cost (0 still needs a
+     * subscription). Syncs the daily grant first. Null = go ahead.
+     */
+    private function gateCredits(User $user, int $cost, array $quote = []): ?JsonResponse
+    {
+        $credits = app(CreditService::class);
         $credits->syncDailyGrant($user);
 
         if (!$user->hasActiveSubscription()) {
@@ -2380,24 +2661,23 @@ class ExplainerController extends Controller
             ], 402);
         }
 
-        $cost = $credits->costFor($project->template_type);
-        // Aspect-variant bundle (§10.6): three renders' worth of compute.
-        if (($project->settings['aspect_variants'] ?? false) === true) {
-            $cost = (int) ceil($cost * (float) config('credits.aspect_variants_multiplier', 2.5));
-        }
-
-        try {
-            $credits->charge($user, $project, $cost);
-        } catch (InsufficientCreditsException $e) {
-            return response()->json([
-                'success' => false,
-                'code' => 'insufficient_credits',
-                'message' => 'You do not have enough credits for this video.',
-                'balance' => $e->balance,
-                'cost' => $e->cost,
-            ], 402);
+        $balance = (int) $user->fresh()->credits;
+        if ($balance < $cost) {
+            return $this->insufficient(new InsufficientCreditsException($balance, $cost), $quote);
         }
 
         return null;
+    }
+
+    private function insufficient(InsufficientCreditsException $e, array $quote = []): JsonResponse
+    {
+        return response()->json(array_filter([
+            'success' => false,
+            'code' => 'insufficient_credits',
+            'message' => "You need {$e->cost} credits for this — you have {$e->balance}.",
+            'balance' => $e->balance,
+            'cost' => $e->cost,
+            'quote' => $quote ?: null,
+        ], fn ($v) => $v !== null), 402);
     }
 }
