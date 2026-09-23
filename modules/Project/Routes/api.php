@@ -98,6 +98,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/explainer/color-schemes/{name}', [ExplainerController::class, 'destroyColorScheme']);
     Route::post('/explainer/projects/{project}/narration', [ExplainerController::class, 'toggleNarration']);
     Route::post('/explainer/projects/{project}/music', [ExplainerController::class, 'toggleMusic']);
+    Route::post('/explainer/projects/{project}/sfx', [ExplainerController::class, 'setSfx']);
     Route::post('/explainer/projects/{project}/captions', [ExplainerController::class, 'toggleCaptions']);
     Route::post('/explainer/projects/{project}/backdrop', [ExplainerController::class, 'toggleBackdrop']);
     Route::post('/explainer/projects/{project}/auto-visuals', [ExplainerController::class, 'toggleAutoVisuals']);

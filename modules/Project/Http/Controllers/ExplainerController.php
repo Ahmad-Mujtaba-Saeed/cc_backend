@@ -1390,6 +1390,38 @@ class ExplainerController extends Controller
     }
 
     /**
+     * Sound effects — the whooshes on camera flights, the pops as bullets
+     * land, the hits under punchlines. On by default; the renderer routes
+     * every one of them through this switch (SfxCue), so off is silent.
+     * Optional `volume` (0-2, 1 = as designed) sits beside it.
+     */
+    public function setSfx(Request $request, Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+
+        $validated = $request->validate([
+            'enabled' => 'sometimes|boolean',
+            'volume' => 'sometimes|numeric|min:0|max:2',
+        ]);
+
+        $settings = $project->settings ?? [];
+        if (array_key_exists('enabled', $validated)) {
+            $settings['sfx_enabled'] = (bool) $validated['enabled'];
+        }
+        if (array_key_exists('volume', $validated)) {
+            $settings['sfx_volume'] = round((float) $validated['volume'], 2);
+        }
+        $project->update(['settings' => $settings]);
+
+        return response()->json(['success' => true, 'data' => [
+            'sfx_enabled' => ($settings['sfx_enabled'] ?? true) !== false,
+            'sfx_volume' => (float) ($settings['sfx_volume'] ?? 1.0),
+        ]]);
+    }
+
+    /**
      * Toggle the mood backdrop field (§11.5): the whisper-quiet geometric
      * texture on the flat colour field, keyed per scene mood. Default on.
      */
@@ -2376,6 +2408,9 @@ class ExplainerController extends Controller
             // Empty = the engine's default for this template.
             'tts_voice' => $project->settings['tts_voice'] ?? null,
             'music_enabled' => $project->settings['music_enabled'] ?? true,
+            // Sound effects (flight whooshes, bullet pops, punchline hits).
+            'sfx_enabled' => ($project->settings['sfx_enabled'] ?? true) !== false,
+            'sfx_volume' => (float) ($project->settings['sfx_volume'] ?? 1.0),
             // Background music, editable from the storyboard. 'auto' lets the
             // renderer map the dominant scene mood onto a category; a null
             // track means the deterministic per-project pick.
