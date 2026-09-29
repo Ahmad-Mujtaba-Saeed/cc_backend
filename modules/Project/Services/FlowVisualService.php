@@ -143,6 +143,7 @@ class FlowVisualService
         if (!$redraw && $disk->exists($path)) {
             return $path;
         }
+        // (A stored image_path whose file has gone is redrawn: see drawAll.)
 
         // The model's own png is kept: the keying below is a recipe we tune,
         // and re-keying a drawing must never re-bill for it.
@@ -152,8 +153,11 @@ class FlowVisualService
             if ($raw === null) {
                 return null;
             }
-            $disk->put($rawPath, $raw);
+            // Paid for: record it even if it cannot be kept.
             CostTracker::recordImages(1, 'flow_visual');
+            if (!$disk->put($rawPath, $raw)) {
+                Log::warning('FlowVisualService: could not save the raw drawing (storage not writable?)', ['path' => $rawPath]);
+            }
         }
 
         $stencil = $this->stencil($raw);
@@ -166,11 +170,18 @@ class FlowVisualService
             if ($stencil === null) {
                 return null;
             }
-            $disk->put($rawPath, $retry);
             CostTracker::recordImages(1, 'flow_visual');
+            $disk->put($rawPath, $retry);
         }
 
-        $disk->put($path, $stencil);
+        // Only a path that really holds the picture is handed back: a failed
+        // save used to return the path anyway, and the storyboard then pointed
+        // at a drawing that 404'd forever (project 211, scene 15).
+        if (!$disk->put($path, $stencil) || !$disk->exists($path)) {
+            Log::error('FlowVisualService: could not save the drawing (storage not writable?)', ['path' => $path]);
+
+            return null;
+        }
 
         return $path;
     }
@@ -208,7 +219,11 @@ class FlowVisualService
                     continue;
                 }
                 $subject = trim((string) ($el['prompt'] ?? ''));
-                if ($subject === '' || !empty($el['image_path'])) {
+                // A part that already has its picture is never redrawn — but
+                // only if the picture is really there; a path to a missing
+                // file (a save that failed) is drawn again.
+                if ($subject === '' || (!empty($el['image_path'])
+                    && Storage::disk('public')->exists((string) $el['image_path']))) {
                     continue;
                 }
                 if ($drawn >= self::MAX_PER_VIDEO) {
@@ -236,7 +251,12 @@ class FlowVisualService
     private function generate(string $prompt, int $seed): ?string
     {
         try {
+            // Every fal hop gets a 20s connect timeout and retries: Laravel's
+            // default 10s connect lost two drawings on 2026-09-23 (the image
+            // pipeline got the same treatment earlier).
             $submit = Http::withHeaders(['Authorization' => 'Key ' . $this->token])
+                ->connectTimeout(20)
+                ->retry(2, 1000, throw: false)
                 ->timeout(60)
                 ->post($this->base . '/' . self::MODEL, [
                     'prompt' => $prompt,
@@ -269,7 +289,8 @@ class FlowVisualService
             $done = false;
             for ($i = 0; $i < 30; $i++) {
                 usleep(1_000_000);
-                $status = Http::withHeaders(['Authorization' => 'Key ' . $this->token])->timeout(20)->get($statusUrl);
+                $status = Http::withHeaders(['Authorization' => 'Key ' . $this->token])
+                    ->connectTimeout(20)->retry(3, 1000, throw: false)->timeout(20)->get($statusUrl);
                 $state = (string) $status->json('status');
                 if ($state === 'COMPLETED') {
                     $done = true;
@@ -284,12 +305,13 @@ class FlowVisualService
                 return null;
             }
 
-            $result = Http::withHeaders(['Authorization' => 'Key ' . $this->token])->timeout(30)->get($responseUrl);
+            $result = Http::withHeaders(['Authorization' => 'Key ' . $this->token])
+                ->connectTimeout(20)->retry(3, 1000, throw: false)->timeout(30)->get($responseUrl);
             $url = (string) $result->json('images.0.url');
             if ($url === '') {
                 return null;
             }
-            $image = Http::timeout(60)->get($url);
+            $image = Http::connectTimeout(20)->retry(3, 1000, throw: false)->timeout(60)->get($url);
 
             return $image->successful() ? $image->body() : null;
         } catch (\Throwable $e) {

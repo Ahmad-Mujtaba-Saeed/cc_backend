@@ -645,6 +645,12 @@ class ExplainerController extends Controller
         }
 
         $absolute = is_array($images) ? ($images[0] ?? null) : null;
+        // A path is not a picture: check the file really landed before
+        // storing it on the slot and keeping the user's credits.
+        if ($absolute && !is_file($absolute)) {
+            Log::error('generateSlotImage: generated image path has no file', ['project_id' => $project->id, 'path' => $absolute]);
+            $absolute = null;
+        }
         if (!$absolute) {
             app(CreditService::class)->refundReference($chargeRef, 'Refund: AI picture was not drawn');
 

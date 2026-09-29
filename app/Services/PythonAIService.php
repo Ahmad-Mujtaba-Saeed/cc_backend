@@ -755,7 +755,18 @@ class PythonAIService
             // generated image, so a short digest of it keeps every file
             // distinct while the readable scene_N prefix stays.
             $relativePath = "projects/{$projectId}/images/scene_{$index}_" . substr(md5($url), 0, 8) . '.jpg';
-            Storage::disk('public')->put($relativePath, $imageContent);
+            // put() returns false instead of throwing (the local disk does not
+            // throw), and this used to be ignored: a folder owned by another
+            // user made every save fail while the log said "Downloaded" and
+            // the caller stored a path to a file that never existed.
+            if (!Storage::disk('public')->put($relativePath, $imageContent)
+                || !Storage::disk('public')->exists($relativePath)) {
+                Log::error('Could not save the generated image (storage not writable?)', [
+                    'path' => $relativePath,
+                    'user' => function_exists('posix_geteuid') ? (posix_getpwuid(posix_geteuid())['name'] ?? '?') : '?',
+                ]);
+                return null;
+            }
 
             $absolutePath = Storage::disk('public')->path($relativePath);
 
