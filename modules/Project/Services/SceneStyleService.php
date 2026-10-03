@@ -2,6 +2,8 @@
 
 namespace Modules\Project\Services;
 
+use Modules\Project\Support\TextClip;
+
 use Modules\Project\Support\LlmModels;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -104,7 +106,7 @@ class SceneStyleService
                 'model' => $this->model,
                 'messages' => [
                     ['role' => 'system', 'content' => $system],
-                    ['role' => 'user', 'content' => "TOPIC: {$title}\nSUMMARY: " . mb_substr($summary, 0, 300) . "\nDOMINANT MOOD: {$mood}"],
+                    ['role' => 'user', 'content' => "TOPIC: {$title}\nSUMMARY: " . TextClip::clip($summary, 300) . "\nDOMINANT MOOD: {$mood}"],
                 ],
                 'temperature' => 0.4,
                 'max_tokens' => 120,
@@ -154,10 +156,10 @@ class SceneStyleService
         foreach ($scenes as $scene) {
             $lines[] = json_encode(array_filter([
                 'scene_id' => (string) $scene['scene_id'],
-                'heading' => mb_substr((string) $scene['heading'], 0, 120),
-                'bullets' => array_map(fn ($b) => mb_substr((string) $b, 0, 110), array_slice((array) $scene['bullets'], 0, 6)),
-                'body' => mb_substr((string) $scene['body'], 0, 200),
-                'narration' => mb_substr((string) $scene['narration'], 0, 280),
+                'heading' => TextClip::clip((string) $scene['heading'], 120),
+                'bullets' => array_map(fn ($b) => TextClip::clip((string) $b, 110), array_slice((array) $scene['bullets'], 0, 6)),
+                'body' => TextClip::clip((string) $scene['body'], 200),
+                'narration' => TextClip::clip((string) $scene['narration'], 280),
                 'has_media' => (bool) $scene['has_media'],
                 'mood' => (string) ($scene['mood'] ?? '') ?: null,
                 'has_box' => (bool) ($scene['has_box'] ?? false) ?: null,
@@ -237,7 +239,7 @@ PROMPT;
 
         $kicker = trim((string) ($raw['kicker'] ?? ''));
         if (mb_strlen($kicker) > 20) {
-            $kicker = mb_substr($kicker, 0, 20);
+            $kicker = TextClip::clip($kicker, 20);
         }
 
         // Highlights must be real heading words or the renderer can't paint them.
@@ -261,7 +263,7 @@ PROMPT;
 
         $imagePrompt = $this->sanitizeSubject((string) ($raw['image_prompt'] ?? ''));
         if (mb_strlen($imagePrompt) > 300) {
-            $imagePrompt = mb_substr($imagePrompt, 0, 300);
+            $imagePrompt = TextClip::clip($imagePrompt, 300);
         }
         if ($imagePrompt === '') {
             $imagePrompt = $this->fallbackImagePrompt($scene);
@@ -471,7 +473,7 @@ PROMPT;
         // Deliberately NOT "a simple object representing …" — "simple object"
         // pushed the model toward one tiny glyph in an empty frame, which is
         // exactly the look this pass is supposed to prevent.
-        return 'a bold symbolic scene about ' . mb_substr($topic !== '' ? $topic : 'sharing an idea', 0, 140);
+        return 'a bold symbolic scene about ' . TextClip::clip($topic !== '' ? $topic : 'sharing an idea', 140);
     }
 
     private function norm(string $word): string

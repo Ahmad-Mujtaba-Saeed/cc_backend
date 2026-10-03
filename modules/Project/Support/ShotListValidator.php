@@ -315,9 +315,9 @@ class ShotListValidator
         }
 
         return array_filter([
-            'name' => mb_substr($heading, 0, 40),
+            'name' => TextClip::clip($heading, 40),
             'formula' => mb_substr($formula, 0, 60),
-            'why' => $why !== null ? mb_substr($why, 0, 120) : null,
+            'why' => $why !== null ? TextClip::clip($why, 120) : null,
         ], fn ($v) => $v !== null);
     }
 
@@ -377,7 +377,7 @@ class ShotListValidator
                     60
                 )];
                 if ($echo['unit'] !== '') {
-                    $step['note'] = mb_substr($echo['unit'], 0, 36);
+                    $step['note'] = TextClip::clip($echo['unit'], 36);
                 }
                 $steps[] = $step;
                 $prev['slots']['slot_math']['steps'] = $steps;
@@ -1053,7 +1053,7 @@ class ShotListValidator
                 'versus_card', 'animated_chart', 'big_counter', 'checklist_card', 'icon_grid',
                 'timeline_card', 'step_flow', 'before_after', 'list_ranking', 'progress_meter', 'quote_portrait',
                 'phone_mockup', 'photo_stack', 'image_grid', 'custom_card', 'cinematic_card', 'map_card', 'headline_ticker', 'myth_fact', 'pictogram_percent',
-                'cycle_diagram', 'spectrum_card', 'quadrant_map', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card', 'venn_card', 'term_card', 'receipt_card', 'decision_tree',
+                'cycle_diagram', 'spectrum_card', 'interface_morph', 'quadrant_map', 'proportion_flow', 'scale_comparison', 'evidence_card', 'layer_stack', 'hierarchy_card', 'venn_card', 'term_card', 'receipt_card', 'decision_tree',
                 'practice_card', 'common_mistake',
                 'math_steps', 'geometry_diagram', 'function_plot', 'scenario_diagram', 'formula_anatomy',
                 'chapter_cover', 'outro_card',
@@ -1291,7 +1291,7 @@ class ShotListValidator
             'layout_template' => 'outro_card',
             'slots' => ['slot_outro' => [
                 'content_type' => 'text_block',
-                'heading' => $title !== '' ? mb_substr($title, 0, 80) : 'Thanks for watching',
+                'heading' => $title !== '' ? TextClip::clip($title, 80) : 'Thanks for watching',
                 'bullets' => array_values(array_filter(
                     [$cta !== '' ? $cta : 'Follow for more', $handle],
                     fn ($v) => $v !== ''
@@ -2038,6 +2038,18 @@ class ShotListValidator
                     'content_type' => 'text_block',
                     'heading' => (string) ($slot['heading'] ?? '') ?: 'What they share',
                     'bullets' => array_slice($labels, 0, 5),
+                    'reveal' => 'sequential',
+                ]];
+                return $scene;
+            }
+
+            case 'interface_morph': {
+                $slot = $slots['slot_ui'] ?? [];
+                $scene['layout_template'] = 'single_focus';
+                $scene['slots'] = ['slot_main' => [
+                    'content_type' => 'text_block',
+                    'heading' => (string) ($slot['heading'] ?? '') ?: 'How it works',
+                    'bullets' => $this->interfaceBullets(is_array($slot) ? $slot : []),
                     'reveal' => 'sequential',
                 ]];
                 return $scene;
@@ -2802,7 +2814,7 @@ class ShotListValidator
         $scene['layout_template'] = 'full_bleed_with_banner';
         $scene['slots'] = [
             'slot_background' => $slot,
-            'slot_banner' => $this->genericTextBlock($narration, $heading !== '' ? mb_substr($heading, 0, 40) : null),
+            'slot_banner' => $this->genericTextBlock($narration, $heading !== '' ? TextClip::clip($heading, 40) : null),
         ];
         $this->changed = true;
         $this->warn("Scene {$sceneId}: a picture inside single_focus is invisible in the storyboard -> full_bleed_with_banner.");
@@ -2852,7 +2864,7 @@ class ShotListValidator
             $scene['slots'] = ['slot_term' => [
                 'content_type' => 'term',
                 'term' => $heading,
-                'definition' => mb_substr($heading . ' ' . $bullets[0], 0, 120),
+                'definition' => TextClip::clip($heading . ' ' . $bullets[0], 120),
             ]];
 
             return $scene;
@@ -2895,6 +2907,57 @@ class ShotListValidator
 
                 return $scene;
             }
+        }
+
+        // The picture budget is spent (project 211 was over half media and
+        // kept three plain cards in a row because of it). Words can still
+        // wear a different card: dated rows are a timeline, a short list is a
+        // checklist — both text-only, both visibly different from the pair.
+        return $this->recastSingleFocusAsText($scene, $heading, $bullets);
+    }
+
+    /**
+     * The text-only way out of a single_focus pair: "YYYY — label" rows with
+     * at least two DIFFERENT years become a timeline_card; otherwise 2-4 short
+     * rows become a single-column checklist_card. Null when neither reads
+     * honestly (one bullet, or rows too long to be checklist lines).
+     */
+    private function recastSingleFocusAsText(array $scene, string $heading, array $bullets): ?array
+    {
+        $dated = [];
+        foreach ($bullets as $b) {
+            if (preg_match('/^\s*((?:1[5-9]|20)\d{2}s?)\s*[—–:-]+\s*(.+)$/u', $b, $m) !== 1) {
+                $dated = [];
+                break;
+            }
+            $dated[] = ['date' => $m[1], 'label' => TextClip::clip($m[2], 44)];
+        }
+        if (count($dated) >= 2 && count(array_unique(array_column($dated, 'date'))) >= 2) {
+            $scene['layout_template'] = 'timeline_card';
+            $scene['slots'] = ['slot_timeline' => array_filter([
+                'content_type' => 'timeline_nodes',
+                'nodes' => array_slice($dated, 0, 6),
+                'heading' => $heading !== '' ? TextClip::clip($heading, 60) : null,
+            ], fn ($v) => $v !== null)];
+
+            return $scene;
+        }
+
+        // Rows that all share one year are not a timeline; the year is
+        // repeated noise, so the checklist keeps only the words after it.
+        $rows = array_map(
+            fn ($b) => preg_replace('/^\s*(?:1[5-9]|20)\d{2}s?\s*[—–:-]+\s*/u', '', $b),
+            $bullets
+        );
+        if (count($rows) >= 2 && count($rows) <= 4 && max(array_map('mb_strlen', $rows)) <= 60) {
+            $scene['layout_template'] = 'checklist_card';
+            $scene['slots'] = ['slot_checklist' => array_filter([
+                'content_type' => 'proscons',
+                'pros' => array_map(fn ($r) => TextClip::clip($r, 48), $rows),
+                'heading' => $heading !== '' ? TextClip::clip($heading, 60) : null,
+            ], fn ($v) => $v !== null)];
+
+            return $scene;
         }
 
         return null;
@@ -3163,6 +3226,7 @@ class ShotListValidator
             'cinematic' => $this->clampCinematicContent($slot, $narrationText) ?? $this->genericTextBlock($narrationText),
             'vector_motif' => $this->clampVectorMotifContent($slot) ?? $this->genericTextBlock($narrationText),
             'spectrum' => $this->clampSpectrumContent($slot) ?? $this->genericTextBlock($narrationText),
+            'interface' => $this->clampInterfaceContent($slot) ?? $this->genericTextBlock($narrationText),
             'quadrant' => $this->clampQuadrantContent($slot) ?? $this->genericTextBlock($narrationText),
             'layers' => $this->clampLayerStackContent($slot) ?? $this->genericTextBlock($narrationText),
             'venn' => $this->clampVennContent($slot) ?? $this->genericTextBlock($narrationText),
@@ -3229,11 +3293,11 @@ class ShotListValidator
         }
         $label = trim((string) ($slot['label'] ?? $slot['caption'] ?? ''));
         if ($label !== '') {
-            $clean['label'] = mb_substr($label, 0, 80);
+            $clean['label'] = TextClip::clip($label, 80);
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
 
         return $clean;
@@ -3283,7 +3347,7 @@ class ShotListValidator
             $seen[$match] = true;
             // A prefix of a substring is still a substring, so the length cap
             // cannot un-anchor the match.
-            $parts[] = ['match' => mb_substr($match, 0, 30), 'label' => mb_substr($label, 0, 48)];
+            $parts[] = ['match' => TextClip::clip($match, 30), 'label' => TextClip::clip($label, 48)];
             if (count($parts) >= 4) {
                 break;
             }
@@ -3299,7 +3363,7 @@ class ShotListValidator
         ];
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
 
         return $clean;
@@ -3319,12 +3383,12 @@ class ShotListValidator
         }
         $clean = [
             'content_type' => 'myth_fact',
-            'myth' => mb_substr($myth, 0, 140),
-            'fact' => mb_substr($fact, 0, 140),
+            'myth' => TextClip::clip($myth, 140),
+            'fact' => TextClip::clip($fact, 140),
         ];
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
 
         return $clean;
@@ -3341,7 +3405,7 @@ class ShotListValidator
             if (!is_array($raw)) {
                 continue;
             }
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 24);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 24);
             $lat = $raw['lat'] ?? null;
             $lon = $raw['lon'] ?? ($raw['lng'] ?? null);
             if ($label === '' || !is_numeric($lat) || !is_numeric($lon)) {
@@ -3370,7 +3434,7 @@ class ShotListValidator
             'pins' => $pins,
             'region' => $region,
             'route' => count($pins) === 2 && filter_var($slot['route'] ?? false, FILTER_VALIDATE_BOOLEAN),
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -3384,8 +3448,8 @@ class ShotListValidator
                 continue;
             }
             $items[] = [
-                'text' => mb_substr($text, 0, 70),
-                'source' => is_array($raw) ? mb_substr(trim((string) ($raw['source'] ?? '')), 0, 20) : '',
+                'text' => TextClip::clip($text, 70),
+                'source' => is_array($raw) ? TextClip::clip(trim((string) ($raw['source'] ?? '')), 20) : '',
             ];
             if (count($items) >= 3) {
                 break;
@@ -3398,7 +3462,7 @@ class ShotListValidator
         return array_filter([
             'content_type' => 'headlines',
             'items' => $items,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -3410,8 +3474,8 @@ class ShotListValidator
             if (!is_array($raw)) {
                 continue;
             }
-            $date = mb_substr(trim((string) ($raw['date'] ?? '')), 0, 14);
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 44);
+            $date = TextClip::clip(trim((string) ($raw['date'] ?? '')), 14);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 44);
             if ($date === '' && $label === '') {
                 continue;
             }
@@ -3427,7 +3491,7 @@ class ShotListValidator
         return array_filter([
             'content_type' => 'timeline_nodes',
             'nodes' => $nodes,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -3440,7 +3504,7 @@ class ShotListValidator
             if (!is_array($raw)) {
                 continue;
             }
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 30);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 30);
             if ($label === '') {
                 continue;
             }
@@ -3460,7 +3524,7 @@ class ShotListValidator
         return array_filter([
             'content_type' => 'steps',
             'items' => $items,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -3481,7 +3545,7 @@ class ShotListValidator
      */
     private function clampDecisionContent(array $slot): ?array
     {
-        $question = mb_substr(trim((string) ($slot['question'] ?? $slot['heading'] ?? '')), 0, 64);
+        $question = TextClip::clip(trim((string) ($slot['question'] ?? $slot['heading'] ?? '')), 64);
         if ($question === '') {
             return null;
         }
@@ -3497,7 +3561,7 @@ class ShotListValidator
         $defaults = ['Yes', 'No'];
         $branches = [];
         foreach (array_slice($rawBranches, 0, 2) as $i => $raw) {
-            $label = mb_substr(trim((string) ($raw['label'] ?? $raw['answer'] ?? '')), 0, 14);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? $raw['answer'] ?? '')), 14);
             if ($label === '') {
                 $label = $defaults[$i];
             }
@@ -3505,17 +3569,17 @@ class ShotListValidator
             // A second-level question needs two real leaves to be worth the
             // extra row; with fewer, the branch collapses onto whatever single
             // outcome survived so the path still ENDS somewhere.
-            $subQuestion = mb_substr(trim((string) ($raw['question'] ?? '')), 0, 48);
+            $subQuestion = TextClip::clip(trim((string) ($raw['question'] ?? '')), 48);
             $leaves = [];
             foreach ((array) ($raw['branches'] ?? []) as $j => $leaf) {
                 if (!is_array($leaf)) {
                     continue;
                 }
-                $leafOutcome = mb_substr(trim((string) ($leaf['outcome'] ?? '')), 0, 36);
+                $leafOutcome = TextClip::clip(trim((string) ($leaf['outcome'] ?? '')), 36);
                 if ($leafOutcome === '') {
                     continue;
                 }
-                $leafLabel = mb_substr(trim((string) ($leaf['label'] ?? $leaf['answer'] ?? '')), 0, 14);
+                $leafLabel = TextClip::clip(trim((string) ($leaf['label'] ?? $leaf['answer'] ?? '')), 14);
                 $leaves[] = [
                     'label' => $leafLabel !== '' ? $leafLabel : ($defaults[count($leaves)] ?? 'Yes'),
                     'outcome' => $leafOutcome,
@@ -3530,7 +3594,7 @@ class ShotListValidator
                 continue;
             }
 
-            $outcome = mb_substr(trim((string) ($raw['outcome'] ?? '')), 0, 40);
+            $outcome = TextClip::clip(trim((string) ($raw['outcome'] ?? '')), 40);
             if ($outcome === '' && count($leaves) === 1) {
                 $outcome = $leaves[0]['outcome'];
             }
@@ -3551,11 +3615,11 @@ class ShotListValidator
         ];
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '' && $heading !== $question) {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 80);
+            $clean['caption'] = TextClip::clip($caption, 80);
         }
 
         return $clean;
@@ -3573,7 +3637,7 @@ class ShotListValidator
      */
     private function clampHierarchyContent(array $slot): ?array
     {
-        $root = mb_substr(trim((string) ($slot['root'] ?? $slot['title'] ?? $slot['name'] ?? '')), 0, 28);
+        $root = TextClip::clip(trim((string) ($slot['root'] ?? $slot['title'] ?? $slot['name'] ?? '')), 28);
         if ($root === '') {
             return null;
         }
@@ -3588,19 +3652,19 @@ class ShotListValidator
             if (is_string($raw)) {
                 $raw = ['label' => $raw];
             }
-            $label = mb_substr(trim((string) ($raw['label'] ?? $raw['name'] ?? '')), 0, 22);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? $raw['name'] ?? '')), 22);
             if ($label === '') {
                 continue;
             }
             $child = ['label' => $label];
             $caption = trim((string) ($raw['caption'] ?? $raw['note'] ?? ''));
             if ($caption !== '') {
-                $child['caption'] = mb_substr($caption, 0, 40);
+                $child['caption'] = TextClip::clip($caption, 40);
             }
 
             $grand = [];
             foreach ((array) ($raw['children'] ?? $raw['items'] ?? []) as $g) {
-                $gl = mb_substr(trim((string) (is_array($g) ? ($g['label'] ?? $g['name'] ?? '') : $g)), 0, 18);
+                $gl = TextClip::clip(trim((string) (is_array($g) ? ($g['label'] ?? $g['name'] ?? '') : $g)), 18);
                 if ($gl === '') {
                     continue;
                 }
@@ -3636,11 +3700,11 @@ class ShotListValidator
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '' && $heading !== $root) {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 80);
+            $clean['caption'] = TextClip::clip($caption, 80);
         }
 
         return $clean;
@@ -3693,7 +3757,7 @@ class ShotListValidator
             if (!is_array($raw)) {
                 continue;
             }
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 28);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 28);
             $value = $this->receiptNumber($raw['value'] ?? null);
             if ($label === '' || $value === null) {
                 continue;
@@ -3721,19 +3785,19 @@ class ShotListValidator
 
         $totalLabel = trim((string) ($slot['total_label'] ?? ''));
         if ($totalLabel !== '') {
-            $clean['total_label'] = mb_substr($totalLabel, 0, 20);
+            $clean['total_label'] = TextClip::clip($totalLabel, 20);
         }
         $unit = trim((string) ($slot['unit'] ?? ''));
         if ($unit !== '') {
-            $clean['unit'] = mb_substr($unit, 0, 6);
+            $clean['unit'] = TextClip::clip($unit, 6);
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 80);
+            $clean['caption'] = TextClip::clip($caption, 80);
         }
 
         return $clean;
@@ -3750,8 +3814,8 @@ class ShotListValidator
      */
     private function clampTermContent(array $slot): ?array
     {
-        $term = mb_substr(trim((string) ($slot['term'] ?? $slot['heading'] ?? '')), 0, 28);
-        $definition = mb_substr(trim((string) ($slot['definition'] ?? $slot['body'] ?? '')), 0, 120);
+        $term = TextClip::clip(trim((string) ($slot['term'] ?? $slot['heading'] ?? '')), 28);
+        $definition = TextClip::clip(trim((string) ($slot['definition'] ?? $slot['body'] ?? '')), 120);
         if ($term === '' || $definition === '') {
             return null;
         }
@@ -3764,21 +3828,21 @@ class ShotListValidator
 
         $phonetic = trim((string) ($slot['phonetic'] ?? ''));
         if ($phonetic !== '') {
-            $clean['phonetic'] = mb_substr($phonetic, 0, 32);
+            $clean['phonetic'] = TextClip::clip($phonetic, 32);
         }
         $pos = trim((string) ($slot['part_of_speech'] ?? ''));
         if ($pos !== '') {
-            $clean['part_of_speech'] = mb_substr($pos, 0, 16);
+            $clean['part_of_speech'] = TextClip::clip($pos, 16);
         }
         // `heading` doubles as the term source above, so only keep it as a
         // heading when it is genuinely something else.
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '' && $heading !== $term) {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 80);
+            $clean['caption'] = TextClip::clip($caption, 80);
         }
 
         return $clean;
@@ -3846,16 +3910,16 @@ class ShotListValidator
 
         $why = $this->linearizeMathSymbols(trim((string) ($slot['why'] ?? '')));
         if ($why !== '') {
-            $clean['why'] = mb_substr($why, 0, 100);
+            $clean['why'] = TextClip::clip($why, 100);
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         // Same as the practice card: the kicker already reads COMMON MISTAKE.
         if ($heading !== '' && mb_strtolower($heading) !== 'common mistake') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 80);
+            $clean['caption'] = TextClip::clip($caption, 80);
         }
 
         return $clean;
@@ -3916,17 +3980,17 @@ class ShotListValidator
 
         $hint = $this->linearizeMathSymbols(trim((string) ($slot['hint'] ?? '')));
         if ($hint !== '') {
-            $clean['hint'] = mb_substr($hint, 0, 70);
+            $clean['hint'] = TextClip::clip($hint, 70);
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         // The card already prints YOUR TURN as its kicker, so a heading that
         // just says it again stacks the same two words twice down the frame.
         if ($heading !== '' && $heading !== $prompt && mb_strtolower($heading) !== 'your turn') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 80);
+            $clean['caption'] = TextClip::clip($caption, 80);
         }
 
         return $clean;
@@ -3947,14 +4011,14 @@ class ShotListValidator
         $sets = [];
         $seen = [];
         foreach ((array) ($slot['sets'] ?? $slot['items'] ?? []) as $raw) {
-            $label = mb_substr(trim((string) (is_array($raw) ? ($raw['label'] ?? '') : $raw)), 0, 20);
+            $label = TextClip::clip(trim((string) (is_array($raw) ? ($raw['label'] ?? '') : $raw)), 20);
             if ($label === '' || isset($seen[mb_strtolower($label)])) {
                 continue;
             }
             $seen[mb_strtolower($label)] = true;
 
             $set = ['label' => $label];
-            $caption = is_array($raw) ? mb_substr(trim((string) ($raw['caption'] ?? '')), 0, 32) : '';
+            $caption = is_array($raw) ? TextClip::clip(trim((string) ($raw['caption'] ?? '')), 32) : '';
             if ($caption !== '') {
                 $set['caption'] = $caption;
             }
@@ -3973,15 +4037,15 @@ class ShotListValidator
         ];
         $overlap = trim((string) ($slot['overlap_label'] ?? ''));
         if ($overlap !== '') {
-            $clean['overlap_label'] = mb_substr($overlap, 0, 28);
+            $clean['overlap_label'] = TextClip::clip($overlap, 28);
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 80);
+            $clean['caption'] = TextClip::clip($caption, 80);
         }
 
         return $clean;
@@ -4012,14 +4076,14 @@ class ShotListValidator
             if (!is_array($raw)) {
                 continue;
             }
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 24);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 24);
             $value = $this->receiptNumber($raw['value'] ?? $raw['size'] ?? null);
             if ($label === '' || $value === null || $value <= 0 || isset($seen[mb_strtolower($label)])) {
                 continue;
             }
             $seen[mb_strtolower($label)] = true;
             $item = ['label' => $label, 'value' => round($value, 4)];
-            $note = mb_substr(trim((string) ($raw['note'] ?? $raw['caption'] ?? '')), 0, 40);
+            $note = TextClip::clip(trim((string) ($raw['note'] ?? $raw['caption'] ?? '')), 40);
             if ($note !== '') {
                 $item['note'] = $note;
             }
@@ -4053,7 +4117,7 @@ class ShotListValidator
         $clean['shape'] = in_array($shape, ['square', 'circle'], true) ? $shape : 'square';
         $unit = trim((string) ($slot['unit'] ?? ''));
         if ($unit !== '') {
-            $clean['unit'] = mb_substr($unit, 0, 8);
+            $clean['unit'] = TextClip::clip($unit, 8);
         }
         $highlight = $slot['highlight_index'] ?? null;
         if (is_numeric($highlight) && isset($items[(int) $highlight])) {
@@ -4061,11 +4125,11 @@ class ShotListValidator
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 80);
+            $clean['caption'] = TextClip::clip($caption, 80);
         }
 
         return $clean;
@@ -4091,24 +4155,24 @@ class ShotListValidator
 
         $clean = [
             'content_type' => 'evidence',
-            'finding' => mb_substr($finding, 0, 160),
-            'source' => mb_substr($source, 0, 48),
+            'finding' => TextClip::clip($finding, 160),
+            'source' => TextClip::clip($source, 48),
         ];
         $year = trim((string) ($slot['year'] ?? $slot['date'] ?? ''));
         if ($year !== '') {
-            $clean['year'] = mb_substr($year, 0, 12);
+            $clean['year'] = TextClip::clip($year, 12);
         }
         $sample = trim((string) ($slot['sample'] ?? $slot['sample_size'] ?? $slot['n'] ?? ''));
         if ($sample !== '') {
-            $clean['sample'] = mb_substr($sample, 0, 40);
+            $clean['sample'] = TextClip::clip($sample, 40);
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 80);
+            $clean['caption'] = TextClip::clip($caption, 80);
         }
 
         return $clean;
@@ -4171,14 +4235,14 @@ class ShotListValidator
             if (!is_array($raw)) {
                 continue;
             }
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 24);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 24);
             $value = $this->receiptNumber($raw['value'] ?? $raw['amount'] ?? null);
             if ($label === '' || $value === null || $value <= 0 || isset($seen[mb_strtolower($label)])) {
                 continue;
             }
             $seen[mb_strtolower($label)] = true;
             $branch = ['label' => $label, 'value' => round($value, 3)];
-            $bnote = mb_substr(trim((string) ($raw['note'] ?? $raw['caption'] ?? '')), 0, 40);
+            $bnote = TextClip::clip(trim((string) ($raw['note'] ?? $raw['caption'] ?? '')), 40);
             if ($bnote !== '') {
                 $branch['note'] = $bnote;
             }
@@ -4235,13 +4299,13 @@ class ShotListValidator
             'total' => round($sum, 3),
         ];
 
-        $source = mb_substr(trim((string) ($slot['source_label'] ?? $slot['source'] ?? '')), 0, 24);
+        $source = TextClip::clip(trim((string) ($slot['source_label'] ?? $slot['source'] ?? '')), 24);
         if ($source !== '') {
             $clean['source_label'] = $source;
         }
         $unit = trim((string) ($slot['unit'] ?? ''));
         if ($unit !== '') {
-            $clean['unit'] = mb_substr($unit, 0, 6);
+            $clean['unit'] = TextClip::clip($unit, 6);
         }
         $highlight = $slot['highlight_index'] ?? null;
         if (is_numeric($highlight) && isset($branches[(int) $highlight])) {
@@ -4249,11 +4313,11 @@ class ShotListValidator
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 80);
+            $clean['caption'] = TextClip::clip($caption, 80);
         }
 
         return $clean;
@@ -4275,10 +4339,10 @@ class ShotListValidator
     {
         $xAxis = is_array($slot['x_axis'] ?? null) ? $slot['x_axis'] : [];
         $yAxis = is_array($slot['y_axis'] ?? null) ? $slot['y_axis'] : [];
-        $xLeft = mb_substr(trim((string) ($xAxis['left_label'] ?? '')), 0, 18);
-        $xRight = mb_substr(trim((string) ($xAxis['right_label'] ?? '')), 0, 18);
-        $yBottom = mb_substr(trim((string) ($yAxis['bottom_label'] ?? '')), 0, 18);
-        $yTop = mb_substr(trim((string) ($yAxis['top_label'] ?? '')), 0, 18);
+        $xLeft = TextClip::clip(trim((string) ($xAxis['left_label'] ?? '')), 18);
+        $xRight = TextClip::clip(trim((string) ($xAxis['right_label'] ?? '')), 18);
+        $yBottom = TextClip::clip(trim((string) ($yAxis['bottom_label'] ?? '')), 18);
+        $yTop = TextClip::clip(trim((string) ($yAxis['top_label'] ?? '')), 18);
         if ($xLeft === '' || $xRight === '' || $yBottom === '' || $yTop === '') {
             return null;
         }
@@ -4289,7 +4353,7 @@ class ShotListValidator
             if (!is_array($raw)) {
                 continue;
             }
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 20);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 20);
             $x = $raw['x'] ?? null;
             $y = $raw['y'] ?? null;
             if ($label === '' || !is_numeric($x) || !is_numeric($y) || isset($seen[mb_strtolower($label)])) {
@@ -4318,7 +4382,7 @@ class ShotListValidator
 
         $zones = [];
         foreach (['top_left', 'top_right', 'bottom_left', 'bottom_right'] as $corner) {
-            $name = mb_substr(trim((string) (is_scalar($slot['zones'][$corner] ?? null) ? $slot['zones'][$corner] : '')), 0, 16);
+            $name = TextClip::clip(trim((string) (is_scalar($slot['zones'][$corner] ?? null) ? $slot['zones'][$corner] : '')), 16);
             if ($name !== '') {
                 $zones[$corner] = $name;
             }
@@ -4333,11 +4397,107 @@ class ShotListValidator
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 60);
+            $clean['caption'] = TextClip::clip($caption, 60);
+        }
+
+        return $clean;
+    }
+
+    /** The interface states' words as plain rows, for every text degrade. */
+    private function interfaceBullets(array $slot): array
+    {
+        $rows = [];
+        foreach ((array) ($slot['states'] ?? []) as $st) {
+            if (!is_array($st)) {
+                continue;
+            }
+            $text = trim((string) ($st['text'] ?? ''));
+            if ($text === '' && !empty($st['items'])) {
+                $text = implode(', ', array_slice(array_map('strval', (array) $st['items']), 0, 3));
+            }
+            if ($text !== '') {
+                $rows[] = TextClip::clip($text, 60);
+            }
+        }
+
+        return array_slice(array_values(array_unique($rows)), 0, 4);
+    }
+
+    /**
+     * Clamp an interface_morph payload: 2-5 states from the fixed kind
+     * vocabulary, short UI words only. Null below two usable states.
+     *
+     * Honesty (the skill this card came from): a value is kept only when the
+     * planner gave one — the renderer never prints a made-up number.
+     */
+    private function clampInterfaceContent(array $slot): ?array
+    {
+        $kinds = ['button', 'search', 'toggle', 'slider', 'tabs', 'checklist', 'progress', 'terminal', 'card', 'toast'];
+        $states = [];
+        foreach ((array) ($slot['states'] ?? []) as $raw) {
+            if (!is_array($raw)) {
+                continue;
+            }
+            $kind = mb_strtolower(trim((string) ($raw['kind'] ?? '')));
+            if (!in_array($kind, $kinds, true)) {
+                continue;
+            }
+            $text = TextClip::clip(trim((string) ($raw['text'] ?? $raw['label'] ?? '')), 28);
+            $items = [];
+            foreach ((array) ($raw['items'] ?? []) as $it) {
+                $it = TextClip::clip(trim((string) (is_scalar($it) ? $it : '')), $kind === 'terminal' ? 40 : 32);
+                if ($it !== '') {
+                    $items[] = $it;
+                }
+                if (count($items) >= 4) {
+                    break;
+                }
+            }
+            // Each kind needs its own minimum to draw honestly.
+            $ok = match ($kind) {
+                'tabs' => count($items) >= 2,
+                'checklist' => count($items) >= 2,
+                'terminal' => $text !== '' || count($items) >= 1,
+                'search', 'card' => $text !== '',
+                default => $text !== '',
+            };
+            if (!$ok) {
+                continue;
+            }
+            $state = ['kind' => $kind];
+            $cue = TextClip::clip(trim((string) ($raw['cue'] ?? '')), 30);
+            if ($cue !== '') {
+                $state['cue'] = $cue;
+            }
+            if ($text !== '') {
+                $state['text'] = $text;
+            }
+            if ($items) {
+                $state['items'] = $items;
+            }
+            if (isset($raw['value']) && is_numeric($raw['value']) && in_array($kind, ['slider', 'progress', 'toggle'], true)) {
+                $state['value'] = (int) round(max(0, min(100, (float) $raw['value'])));
+            }
+            if ($kind === 'tabs' && isset($raw['active']) && is_numeric($raw['active'])) {
+                $state['active'] = max(0, min(count($items) - 1, (int) $raw['active']));
+            }
+            $states[] = $state;
+            if (count($states) >= 5) {
+                break;
+            }
+        }
+        if (count($states) < 2) {
+            return null;
+        }
+
+        $clean = ['content_type' => 'interface', 'states' => $states];
+        $heading = trim((string) ($slot['heading'] ?? ''));
+        if ($heading !== '') {
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
 
         return $clean;
@@ -4352,8 +4512,8 @@ class ShotListValidator
     private function clampSpectrumContent(array $slot): ?array
     {
         $axis = is_array($slot['axis'] ?? null) ? $slot['axis'] : [];
-        $left = mb_substr(trim((string) ($axis['left_label'] ?? '')), 0, 18);
-        $right = mb_substr(trim((string) ($axis['right_label'] ?? '')), 0, 18);
+        $left = TextClip::clip(trim((string) ($axis['left_label'] ?? '')), 18);
+        $right = TextClip::clip(trim((string) ($axis['right_label'] ?? '')), 18);
         if ($left === '' || $right === '') {
             return null;
         }
@@ -4364,7 +4524,7 @@ class ShotListValidator
             if (!is_array($raw)) {
                 continue;
             }
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 20);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 20);
             $position = $raw['position'] ?? null;
             if ($label === '' || !is_numeric($position) || isset($seen[mb_strtolower($label)])) {
                 continue;
@@ -4390,11 +4550,11 @@ class ShotListValidator
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 60);
+            $clean['caption'] = TextClip::clip($caption, 60);
         }
 
         return $clean;
@@ -4418,12 +4578,12 @@ class ShotListValidator
             if (!is_array($raw)) {
                 continue;
             }
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 24);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 24);
             if ($label === '') {
                 continue;
             }
             $layer = ['label' => $label];
-            $cap = mb_substr(trim((string) ($raw['caption'] ?? '')), 0, 44);
+            $cap = TextClip::clip(trim((string) ($raw['caption'] ?? '')), 44);
             if ($cap !== '') {
                 $layer['caption'] = $cap;
             }
@@ -4446,11 +4606,11 @@ class ShotListValidator
         }
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 60);
+            $clean['caption'] = TextClip::clip($caption, 60);
         }
 
         return $clean;
@@ -4495,7 +4655,7 @@ class ShotListValidator
      */
     private function cinematicAsText(array $slot): array
     {
-        $heading = mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null;
+        $heading = TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null;
         $bullets = [];
         foreach ((array) ($slot['elements'] ?? []) as $el) {
             if (!is_array($el) || count($bullets) >= 4) {
@@ -4519,7 +4679,7 @@ class ShotListValidator
                 $main .= ' — ' . $sub;
             }
             if ($main !== '') {
-                $bullets[] = mb_substr($main, 0, 60);
+                $bullets[] = TextClip::clip($main, 60);
             }
         }
 
@@ -4626,11 +4786,11 @@ class ShotListValidator
 
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
         $caption = trim((string) ($slot['caption'] ?? ''));
         if ($caption !== '') {
-            $clean['caption'] = mb_substr($caption, 0, 90);
+            $clean['caption'] = TextClip::clip($caption, 90);
         }
 
         return $clean;
@@ -4670,12 +4830,12 @@ class ShotListValidator
 
         $clean = ['content_type' => 'vector_motif'];
         if ($subject !== '') {
-            $clean['subject'] = mb_substr($subject, 0, 200);
+            $clean['subject'] = TextClip::clip($subject, 200);
         }
 
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
 
         if (!$hasShapes) {
@@ -4717,7 +4877,7 @@ class ShotListValidator
             if (!is_array($raw)) {
                 continue;
             }
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 26);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 26);
             if ($label === '') {
                 continue;
             }
@@ -4737,8 +4897,8 @@ class ShotListValidator
         return array_filter([
             'content_type' => 'cycle',
             'items' => $items,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
-            'caption' => mb_substr(trim((string) ($slot['caption'] ?? '')), 0, 60) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
+            'caption' => TextClip::clip(trim((string) ($slot['caption'] ?? '')), 60) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -4749,7 +4909,7 @@ class ShotListValidator
         foreach ((array) ($slot['items'] ?? []) as $raw) {
             $r = trim((string) $raw);
             if ($r !== '') {
-                $items[] = mb_substr($r, 0, 44);
+                $items[] = TextClip::clip($r, 44);
             }
             if (count($items) >= 6) {
                 break;
@@ -4762,7 +4922,7 @@ class ShotListValidator
         return array_filter([
             'content_type' => 'ranking',
             'items' => $items,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -4774,7 +4934,7 @@ class ShotListValidator
             return null;
         }
         $pct = max(1.0, min(100.0, round((float) $pct, 1)));
-        $label = mb_substr(trim((string) ($slot['label'] ?? '')), 0, 70);
+        $label = TextClip::clip(trim((string) ($slot['label'] ?? '')), 70);
         if ($label === '') {
             return null;
         }
@@ -4783,7 +4943,7 @@ class ShotListValidator
             'content_type' => 'meter',
             'value_pct' => $pct,
             'label' => $label,
-            'unit' => mb_substr(trim((string) ($slot['unit'] ?? '')), 0, 6) ?: '%',
+            'unit' => TextClip::clip(trim((string) ($slot['unit'] ?? '')), 6) ?: '%',
         ];
     }
 
@@ -4800,14 +4960,14 @@ class ShotListValidator
             foreach ((array) ($raw['stats'] ?? []) as $s) {
                 $s = trim((string) $s);
                 if ($s !== '') {
-                    $stats[] = mb_substr($s, 0, 48);
+                    $stats[] = TextClip::clip($s, 48);
                 }
                 if (count($stats) >= 3) {
                     break;
                 }
             }
             return [
-                'label' => mb_substr(trim((string) ($raw['label'] ?? '')), 0, 24),
+                'label' => TextClip::clip(trim((string) ($raw['label'] ?? '')), 24),
                 'stats' => $stats,
             ];
         };
@@ -4822,7 +4982,7 @@ class ShotListValidator
             'content_type' => 'versus',
             'left' => $left,
             'right' => $right,
-            'verdict' => mb_substr(trim((string) ($slot['verdict'] ?? '')), 0, 80),
+            'verdict' => TextClip::clip(trim((string) ($slot['verdict'] ?? '')), 80),
         ];
     }
 
@@ -4853,9 +5013,22 @@ class ShotListValidator
 
         $labels = [];
         foreach ((array) ($slot['labels'] ?? []) as $l) {
-            $labels[] = mb_substr(trim((string) $l), 0, 16);
+            // 26, not 16: the bar label wraps to two lines, and two bars
+            // whose labels differ past char 16 ("Easy word, no eye contact" /
+            // "Easy word, eye contact") must not collapse to the same text.
+            $labels[] = TextClip::clip(trim((string) $l), 26);
             if (count($labels) >= count($values)) {
                 break;
+            }
+        }
+
+        // A series that is all zeros but one mark carries no comparison: the
+        // model had no numbers and wrote placeholders (project 211: 0, 0, 0, 1
+        // "performa"). Treat it as no usable series so the scene recasts.
+        if (count($values) >= 3 && $type !== 'counter') {
+            $nonZero = count(array_filter($values, fn ($v) => abs($v) > 1e-9));
+            if ($nonZero <= 1) {
+                return null;
             }
         }
 
@@ -4869,10 +5042,10 @@ class ShotListValidator
             'chart_type' => $type,
             'values' => $values,
             'labels' => $labels,
-            'unit' => mb_substr(trim((string) ($slot['unit'] ?? '')), 0, 8),
-            'caption' => mb_substr(trim((string) ($slot['caption'] ?? '')), 0, 80),
+            'unit' => TextClip::clip(trim((string) ($slot['unit'] ?? '')), 12),
+            'caption' => TextClip::clip(trim((string) ($slot['caption'] ?? '')), 80),
             'highlight_index' => $highlight,
-            'source' => mb_substr(trim((string) ($slot['source'] ?? '')), 0, 60),
+            'source' => TextClip::clip(trim((string) ($slot['source'] ?? '')), 60),
         ];
     }
 
@@ -4884,7 +5057,7 @@ class ShotListValidator
             foreach ((array) $raw as $r) {
                 $r = trim((string) $r);
                 if ($r !== '') {
-                    $out[] = mb_substr($r, 0, 48);
+                    $out[] = TextClip::clip($r, 48);
                 }
                 if (count($out) >= 4) {
                     break;
@@ -4907,9 +5080,9 @@ class ShotListValidator
             'content_type' => 'proscons',
             'pros' => $pros,
             'cons' => $cons,
-            'pros_label' => mb_substr(trim((string) ($slot['pros_label'] ?? '')), 0, 14) ?: null,
-            'cons_label' => mb_substr(trim((string) ($slot['cons_label'] ?? '')), 0, 14) ?: null,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
+            'pros_label' => TextClip::clip(trim((string) ($slot['pros_label'] ?? '')), 14) ?: null,
+            'cons_label' => TextClip::clip(trim((string) ($slot['cons_label'] ?? '')), 14) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -4923,7 +5096,7 @@ class ShotListValidator
                 continue;
             }
             $icon = trim((string) ($raw['icon'] ?? ''));
-            $label = mb_substr(trim((string) ($raw['label'] ?? '')), 0, 18);
+            $label = TextClip::clip(trim((string) ($raw['label'] ?? '')), 18);
             if ($icon === '' && $label === '') {
                 continue;
             }
@@ -4949,7 +5122,7 @@ class ShotListValidator
             'content_type' => 'icons',
             'items' => $items,
             'highlight_index' => $highlight,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -5110,7 +5283,7 @@ class ShotListValidator
             $step = ['expr' => mb_substr($expr, 0, 80)];
             $note = $this->linearizeMathSymbols(trim((string) ($raw['note'] ?? '')));
             if ($note !== '') {
-                $step['note'] = mb_substr($note, 0, 36);
+                $step['note'] = TextClip::clip($note, 36);
             }
 
             // The "as we know…" citation for THIS line: the formula or law that
@@ -5120,7 +5293,7 @@ class ShotListValidator
             // writes to the right of the step.
             $ref = $this->linearizeMathSymbols(trim((string) ($raw['ref'] ?? '')));
             if ($ref !== '') {
-                $step['ref'] = mb_substr($ref, 0, 48);
+                $step['ref'] = TextClip::clip($ref, 48);
             }
 
             // Operation arrows: the pen strokes from atoms of the PREVIOUS
@@ -5136,7 +5309,7 @@ class ShotListValidator
                 if ($from === '' || $to === '') {
                     continue;
                 }
-                $arrows[] = ['from' => mb_substr($from, 0, 12), 'to' => mb_substr($to, 0, 12)];
+                $arrows[] = ['from' => TextClip::clip($from, 12), 'to' => TextClip::clip($to, 12)];
                 if (count($arrows) >= 3) {
                     break;
                 }
@@ -5245,20 +5418,20 @@ class ShotListValidator
             if ($label === '') {
                 continue;
             }
-            $entity = ['label' => mb_substr($label, 0, 16)];
+            $entity = ['label' => TextClip::clip($label, 16)];
             $icon = trim((string) (is_scalar($raw['icon'] ?? null) ? $raw['icon'] : ''));
             if ($icon !== '' && in_array($icon, $icons, true)) {
                 $entity['icon'] = $icon;
             }
             $value = str_replace('\\', '', trim((string) (is_scalar($raw['value'] ?? null) ? $raw['value'] : '')));
             if ($value !== '') {
-                $entity['value'] = mb_substr($value, 0, 24);
+                $entity['value'] = TextClip::clip($value, 24);
             }
             // Drawable subject for the AI cut-out sprite — replaces the icon
             // box with the object itself when generation succeeds.
             $sprite = trim((string) (is_scalar($raw['sprite'] ?? null) ? $raw['sprite'] : ''));
             if ($sprite !== '') {
-                $entity['sprite'] = mb_substr($sprite, 0, 70);
+                $entity['sprite'] = TextClip::clip($sprite, 70);
             }
             // Emphasis lifts one actor out of the crowd (the FIND, the winner,
             // the pay-off branch) with an accent frame in the renderer.
@@ -5283,16 +5456,16 @@ class ShotListValidator
             $style = (string) ($raw['style'] ?? 'arrow');
             $connectors[] = array_filter([
                 'style' => in_array($style, ['arrow', 'line', 'both'], true) ? $style : 'arrow',
-                'label' => mb_substr(str_replace('\\', '', trim((string) (is_scalar($raw['label'] ?? null) ? $raw['label'] : ''))), 0, 24) ?: null,
-                'sub' => mb_substr(str_replace('\\', '', trim((string) (is_scalar($raw['sub'] ?? null) ? $raw['sub'] : ''))), 0, 20) ?: null,
+                'label' => TextClip::clip(str_replace('\\', '', trim((string) (is_scalar($raw['label'] ?? null) ? $raw['label'] : ''))), 24) ?: null,
+                'sub' => TextClip::clip(str_replace('\\', '', trim((string) (is_scalar($raw['sub'] ?? null) ? $raw['sub'] : ''))), 20) ?: null,
             ], fn ($v) => $v !== null);
             if (count($connectors) >= count($entities) - 1) {
                 break;
             }
         }
 
-        $question = mb_substr(str_replace('\\', '', trim((string) ($slot['question'] ?? ''))), 0, 24);
-        $heading = mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60);
+        $question = TextClip::clip(str_replace('\\', '', trim((string) ($slot['question'] ?? ''))), 24);
+        $heading = TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60);
 
         // The sketch's shape: explicit when legal, else inferred from every
         // word the scenario carries (plus the narration — "reaches its peak"
@@ -5333,7 +5506,7 @@ class ShotListValidator
             return null;
         }
 
-        $rule = ['name' => mb_substr($name, 0, 40)];
+        $rule = ['name' => TextClip::clip($name, 40)];
 
         // Same LaTeX habits as the step exprs — the panel typesets the same
         // linear notation, so it needs the same de-LaTeXing.
@@ -5346,7 +5519,7 @@ class ShotListValidator
 
         $why = $this->linearizeMathSymbols(trim((string) (is_scalar($raw['why'] ?? null) ? $raw['why'] : '')));
         if ($why !== '') {
-            $rule['why'] = mb_substr($why, 0, 120);
+            $rule['why'] = TextClip::clip($why, 120);
         }
 
         return $rule;
@@ -5399,7 +5572,7 @@ class ShotListValidator
                 ];
                 $label = trim((string) ($raw['label'] ?? ''));
                 if ($label !== '') {
-                    $pt['label'] = mb_substr($label, 0, 12);
+                    $pt['label'] = TextClip::clip($label, 12);
                 }
                 $points[] = $pt;
                 if (count($points) >= 8) {
@@ -5429,7 +5602,7 @@ class ShotListValidator
 
         $sideLabels = [];
         foreach ((array) ($slot['side_labels'] ?? []) as $l) {
-            $sideLabels[] = mb_substr(trim((string) $l), 0, 14);
+            $sideLabels[] = TextClip::clip(trim((string) $l), 14);
             if (count($sideLabels) >= max(1, $edgeCount)) {
                 break;
             }
@@ -5450,7 +5623,7 @@ class ShotListValidator
             $mark = ['at' => $at];
             $label = trim((string) ($m['label'] ?? ''));
             if ($label !== '') {
-                $mark['label'] = mb_substr($label, 0, 10);
+                $mark['label'] = TextClip::clip($label, 10);
             }
             if (!empty($m['right'])) {
                 $mark['right'] = true;
@@ -5489,7 +5662,7 @@ class ShotListValidator
         $sideSquares = [];
         if ($shape !== 'angle') {
             foreach ((array) ($slot['side_squares'] ?? []) as $s) {
-                $sideSquares[] = mb_substr(trim((string) (is_scalar($s) ? $s : '')), 0, 10);
+                $sideSquares[] = TextClip::clip(trim((string) (is_scalar($s) ? $s : '')), 10);
                 if (count($sideSquares) >= max(1, $edgeCount)) {
                     break;
                 }
@@ -5510,10 +5683,10 @@ class ShotListValidator
             if ($from === '' || $to === '') {
                 continue;
             }
-            $line = ['from' => mb_substr($from, 0, 12), 'to' => mb_substr($to, 0, 12)];
+            $line = ['from' => TextClip::clip($from, 12), 'to' => TextClip::clip($to, 12)];
             $lbl = trim((string) ($seg['label'] ?? ''));
             if ($lbl !== '') {
-                $line['label'] = mb_substr($lbl, 0, 14);
+                $line['label'] = TextClip::clip($lbl, 14);
             }
             if (!empty($seg['dashed'])) {
                 $line['dashed'] = true;
@@ -5573,7 +5746,7 @@ class ShotListValidator
             ];
             $label = trim((string) ($ep['label'] ?? ''));
             if ($label !== '') {
-                $point['label'] = mb_substr($label, 0, 12);
+                $point['label'] = TextClip::clip($label, 12);
             }
             $extraPoints[] = $point;
             if (count($extraPoints) >= 6) {
@@ -5597,12 +5770,12 @@ class ShotListValidator
             'reveal_start_frac' => $revealStartFrac,
             'reveal_fracs' => $revealFracs !== [] ? $revealFracs : null,
             'extra_points' => $extraPoints ?: null,
-            'radius_label' => $shape === 'circle' ? (mb_substr(trim((string) ($slot['radius_label'] ?? '')), 0, 14) ?: null) : null,
-            'center_label' => $shape === 'circle' ? (mb_substr(trim((string) ($slot['center_label'] ?? '')), 0, 6) ?: null) : null,
+            'radius_label' => $shape === 'circle' ? (TextClip::clip(trim((string) ($slot['radius_label'] ?? '')), 14) ?: null) : null,
+            'center_label' => $shape === 'circle' ? (TextClip::clip(trim((string) ($slot['center_label'] ?? '')), 6) ?: null) : null,
             'fill' => !empty($slot['fill']) ? true : null,
             'highlight_side' => $highlight,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
-            'caption' => mb_substr(trim((string) ($slot['caption'] ?? '')), 0, 80) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
+            'caption' => TextClip::clip(trim((string) ($slot['caption'] ?? '')), 80) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -5621,7 +5794,7 @@ class ShotListValidator
             $mark = ['x' => round((float) $m['x'], 4)];
             $label = trim((string) ($m['label'] ?? ''));
             if ($label !== '') {
-                $mark['label'] = mb_substr($label, 0, 16);
+                $mark['label'] = TextClip::clip($label, 16);
             }
             $marks[] = $mark;
             if (count($marks) >= 6) {
@@ -5656,8 +5829,8 @@ class ShotListValidator
             'segment' => $segment,
             'x_min' => $xMin,
             'x_max' => $xMax,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
-            'caption' => mb_substr(trim((string) ($slot['caption'] ?? '')), 0, 80) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
+            'caption' => TextClip::clip(trim((string) ($slot['caption'] ?? '')), 80) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -5672,7 +5845,7 @@ class ShotListValidator
             $point = ['x' => round((float) $c['x'], 4), 'y' => round((float) $c['y'], 4)];
             $label = trim((string) ($c['label'] ?? ''));
             if ($label !== '') {
-                $point['label'] = mb_substr($label, 0, 16);
+                $point['label'] = TextClip::clip($label, 16);
             }
             $coords[] = $point;
             if (count($coords) >= 6) {
@@ -5705,8 +5878,8 @@ class ShotListValidator
             // The slope triangle: dashed Δx/Δy legs between the two line
             // points — only meaningful when there IS a line through two.
             'rise_run' => $lineThrough !== null && !empty($slot['rise_run']) ? true : null,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
-            'caption' => mb_substr(trim((string) ($slot['caption'] ?? '')), 0, 80) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
+            'caption' => TextClip::clip(trim((string) ($slot['caption'] ?? '')), 80) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -5741,12 +5914,12 @@ class ShotListValidator
             'shape' => 'unit_circle',
             'angle_deg' => $wrap($slot['angle_deg'] ?? null),
             'angle2_deg' => $wrap($slot['angle2_deg'] ?? null),
-            'angle_label' => mb_substr(trim((string) (is_scalar($slot['angle_label'] ?? null) ? $slot['angle_label'] : '')), 0, 14) ?: null,
-            'angle2_label' => mb_substr(trim((string) (is_scalar($slot['angle2_label'] ?? null) ? $slot['angle2_label'] : '')), 0, 14) ?: null,
-            'point_label' => mb_substr(trim((string) (is_scalar($slot['point_label'] ?? null) ? $slot['point_label'] : '')), 0, 24) ?: null,
+            'angle_label' => TextClip::clip(trim((string) (is_scalar($slot['angle_label'] ?? null) ? $slot['angle_label'] : '')), 14) ?: null,
+            'angle2_label' => TextClip::clip(trim((string) (is_scalar($slot['angle2_label'] ?? null) ? $slot['angle2_label'] : '')), 14) ?: null,
+            'point_label' => TextClip::clip(trim((string) (is_scalar($slot['point_label'] ?? null) ? $slot['point_label'] : '')), 24) ?: null,
             'show_coords' => !empty($slot['show_coords']) ? true : null,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
-            'caption' => mb_substr(trim((string) ($slot['caption'] ?? '')), 0, 80) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
+            'caption' => TextClip::clip(trim((string) ($slot['caption'] ?? '')), 80) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -5764,8 +5937,8 @@ class ShotListValidator
             'shape' => 'fraction_bar',
             'numerator' => $num,
             'denominator' => $den,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
-            'caption' => mb_substr(trim((string) ($slot['caption'] ?? '')), 0, 80) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
+            'caption' => TextClip::clip(trim((string) ($slot['caption'] ?? '')), 80) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -5776,7 +5949,7 @@ class ShotListValidator
         $clean = function ($arr): array {
             $out = [];
             foreach ((array) $arr as $t) {
-                $s = mb_substr(trim((string) (is_scalar($t) ? $t : '')), 0, 10);
+                $s = TextClip::clip(trim((string) (is_scalar($t) ? $t : '')), 10);
                 if ($s !== '') {
                     $out[] = $s;
                 }
@@ -5798,8 +5971,8 @@ class ShotListValidator
             'shape' => 'area_model',
             'terms' => $terms,
             'col_terms' => $cols !== [] ? $cols : null,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
-            'caption' => mb_substr(trim((string) ($slot['caption'] ?? '')), 0, 80) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
+            'caption' => TextClip::clip(trim((string) ($slot['caption'] ?? '')), 80) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -5852,7 +6025,7 @@ class ShotListValidator
             $mark = ['x' => round($x, 4)];
             $label = trim((string) ($m['label'] ?? ''));
             if ($label !== '') {
-                $mark['label'] = mb_substr($label, 0, 18);
+                $mark['label'] = TextClip::clip($label, 18);
             }
             $marks[] = $mark;
             if (count($marks) >= 3) {
@@ -5889,8 +6062,8 @@ class ShotListValidator
             'marks' => $marks ?: null,
             'tangent_at' => $tangent,
             'shade' => $shade,
-            'heading' => mb_substr(trim((string) ($slot['heading'] ?? '')), 0, 60) ?: null,
-            'caption' => mb_substr(trim((string) ($slot['caption'] ?? '')), 0, 80) ?: null,
+            'heading' => TextClip::clip(trim((string) ($slot['heading'] ?? '')), 60) ?: null,
+            'caption' => TextClip::clip(trim((string) ($slot['caption'] ?? '')), 80) ?: null,
         ], fn ($v) => $v !== null);
     }
 
@@ -6108,7 +6281,7 @@ class ShotListValidator
                 // photo_stack prints under its prints.
                 $renumbered = [];
                 foreach ($cells as $i => $cell) {
-                    $cell['label'] = mb_substr(trim((string) ($cell['label'] ?? '')), 0, 24);
+                    $cell['label'] = TextClip::clip(trim((string) ($cell['label'] ?? '')), 24);
                     $renumbered['slot_image_' . ($i + 1)] = $cell;
                 }
                 $scene['slots'] = $renumbered;
@@ -6240,7 +6413,7 @@ class ShotListValidator
                     }
                     return $degradeToText(
                         $this->mathMode ? 'scenario needs at least 2 named entities' : 'scenario_diagram outside a maths video',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: 'The setup',
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: 'The setup',
                         array_slice($labels, 0, 4)
                     );
                 }
@@ -6286,7 +6459,7 @@ class ShotListValidator
                     }
                     return $degradeToText(
                         'decision tree without two resolved branches',
-                        mb_substr(trim((string) ($raw['question'] ?? $raw['heading'] ?? '')), 0, 60) ?: null,
+                        TextClip::clip(trim((string) ($raw['question'] ?? $raw['heading'] ?? '')), 60) ?: null,
                         array_slice($lines, 0, 5)
                     );
                 }
@@ -6318,7 +6491,7 @@ class ShotListValidator
                     }
                     return $degradeToText(
                         'hierarchy without a root and two branches',
-                        mb_substr(trim((string) ($raw['root'] ?? $raw['heading'] ?? '')), 0, 60) ?: null,
+                        TextClip::clip(trim((string) ($raw['root'] ?? $raw['heading'] ?? '')), 60) ?: null,
                         array_slice($lines, 0, 5)
                     );
                 }
@@ -6343,7 +6516,7 @@ class ShotListValidator
                     }
                     return $degradeToText(
                         'receipt below 2 numeric rows',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null,
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
                         array_slice($lines, 0, 5)
                     );
                 }
@@ -6368,8 +6541,8 @@ class ShotListValidator
                     $why = trim((string) ($raw['why'] ?? ''));
                     return $degradeToText(
                         $note ?? 'mistake card without both lines',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null,
-                        $why !== '' ? [mb_substr($why, 0, 100)] : []
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
+                        $why !== '' ? [TextClip::clip($why, 100)] : []
                     );
                 }
                 $scene['slots'] = ['slot_mistake' => $mistake];
@@ -6390,8 +6563,8 @@ class ShotListValidator
                         $note !== null
                             ? "{$note} -> answer withheld"
                             : 'practice without both a problem and its answer',
-                        $prompt !== '' ? mb_substr($prompt, 0, 60) : null,
-                        $hint !== '' ? [mb_substr($hint, 0, 70)] : []
+                        $prompt !== '' ? TextClip::clip($prompt, 60) : null,
+                        $hint !== '' ? [TextClip::clip($hint, 70)] : []
                     );
                 }
                 $scene['slots'] = ['slot_practice' => $practice];
@@ -6407,8 +6580,8 @@ class ShotListValidator
                     $meaning = trim((string) ($raw['definition'] ?? ''));
                     return $degradeToText(
                         'term without both the word and its definition',
-                        $word !== '' ? mb_substr($word, 0, 60) : null,
-                        $meaning !== '' ? [mb_substr($meaning, 0, 120)] : []
+                        $word !== '' ? TextClip::clip($word, 60) : null,
+                        $meaning !== '' ? [TextClip::clip($meaning, 120)] : []
                     );
                 }
                 $scene['slots'] = ['slot_term' => $term];
@@ -6428,11 +6601,25 @@ class ShotListValidator
                     }
                     return $degradeToText(
                         'venn below 2 sets',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null,
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
                         array_slice($labels, 0, 5)
                     );
                 }
                 $scene['slots'] = ['slot_venn' => $venn];
+                return $scene;
+            }
+
+            case 'interface_morph': {
+                $raw = is_array($slots['slot_ui'] ?? null) ? $slots['slot_ui'] : [];
+                $ui = $this->clampInterfaceContent($raw);
+                if ($ui === null) {
+                    return $degradeToText(
+                        'interface without 2 usable states',
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
+                        $this->interfaceBullets($raw)
+                    );
+                }
+                $scene['slots'] = ['slot_ui' => $ui];
                 return $scene;
             }
 
@@ -6449,7 +6636,7 @@ class ShotListValidator
                     }
                     return $degradeToText(
                         'spectrum without both poles and 2 items',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null,
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
                         array_slice($labels, 0, 5)
                     );
                 }
@@ -6470,7 +6657,7 @@ class ShotListValidator
                     }
                     return $degradeToText(
                         'quadrant without all four poles and 3 items',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null,
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
                         array_slice($labels, 0, 6)
                     );
                 }
@@ -6494,7 +6681,7 @@ class ShotListValidator
                     }
                     return $degradeToText(
                         'scale comparison below 2 measurable things',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null,
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
                         array_slice($lines, 0, 5)
                     );
                 }
@@ -6512,8 +6699,8 @@ class ShotListValidator
                     $finding = trim((string) ($raw['finding'] ?? $raw['claim'] ?? $raw['fact'] ?? ''));
                     return $degradeToText(
                         'evidence without a nameable source',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null,
-                        $finding !== '' ? [mb_substr($finding, 0, 160)] : []
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
+                        $finding !== '' ? [TextClip::clip($finding, 160)] : []
                     );
                 }
                 $scene['slots'] = ['slot_evidence' => $evidence];
@@ -6537,7 +6724,7 @@ class ShotListValidator
                     }
                     return $degradeToText(
                         'proportion below 2 positive branches',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null,
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
                         array_slice($lines, 0, 5)
                     );
                 }
@@ -6565,7 +6752,7 @@ class ShotListValidator
                     // Order preserved even in the degrade — it is the content.
                     return $degradeToText(
                         'stack below 3 layers',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null,
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
                         array_slice($labels, 0, 5)
                     );
                 }
@@ -6596,7 +6783,7 @@ class ShotListValidator
                     // rather than a blank frame.
                     return $degradeToText(
                         'custom card had no usable html',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null
                     );
                 }
                 $scene['slots'] = ['slot_custom' => $clean];
@@ -6617,7 +6804,7 @@ class ShotListValidator
                     }
                     return $degradeToText(
                         'cycle below 3 stages',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: 'The loop',
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: 'The loop',
                         array_slice($labels, 0, 4)
                     );
                 }
@@ -6655,7 +6842,7 @@ class ShotListValidator
                     $fact = trim((string) ($raw['fact'] ?? ''));
                     return $degradeToText(
                         'myth/fact pair incomplete',
-                        mb_substr(trim((string) ($raw['heading'] ?? '')), 0, 60) ?: null,
+                        TextClip::clip(trim((string) ($raw['heading'] ?? '')), 60) ?: null,
                         array_values(array_filter([
                             $myth !== '' ? 'Myth: ' . $myth : '',
                             $fact !== '' ? 'Fact: ' . $fact : '',
@@ -6812,7 +6999,7 @@ class ShotListValidator
             foreach ($slot['callout_suggestions'] as $s) {
                 $s = trim((string) $s);
                 if ($s !== '') {
-                    $suggestions[] = mb_substr($s, 0, 80);
+                    $suggestions[] = TextClip::clip($s, 80);
                 }
                 if (count($suggestions) >= 4) {
                     break;
@@ -6855,7 +7042,7 @@ class ShotListValidator
         // other media slots, which simply never render it).
         $heading = trim((string) ($slot['heading'] ?? ''));
         if ($heading !== '') {
-            $clean['heading'] = mb_substr($heading, 0, 60);
+            $clean['heading'] = TextClip::clip($heading, 60);
         }
 
         // Auto-fetched stock b-roll marker (§8) — survives re-validation.
@@ -6894,7 +7081,7 @@ class ShotListValidator
             $clean[] = [
                 'x' => max(0.0, min(1.0, (float) ($callout['x'] ?? 0.5))),
                 'y' => max(0.0, min(1.0, (float) ($callout['y'] ?? 0.5))),
-                'text' => mb_substr($text, 0, 80),
+                'text' => TextClip::clip($text, 80),
                 'anchor' => $anchor,
             ];
             if (count($clean) >= 6) {
@@ -7043,7 +7230,7 @@ class ShotListValidator
         return [
             'content_type' => 'explanation_box',
             'heading' => $heading !== '' ? $heading : 'Note',
-            'body' => mb_substr($body, 0, 220),
+            'body' => TextClip::clip($body, 220),
         ];
     }
 
@@ -7173,7 +7360,7 @@ class ShotListValidator
             return '';
         }
         $parts = preg_split('/(?<=[.!?])\s+/', $text);
-        return mb_substr($parts[0] ?? $text, 0, 120);
+        return TextClip::clip($parts[0] ?? $text, 120);
     }
 
     private function warn(string $message): void

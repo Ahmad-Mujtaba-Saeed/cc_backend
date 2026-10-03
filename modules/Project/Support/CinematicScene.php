@@ -356,7 +356,7 @@ class CinematicScene
     {
         $s = trim(strtolower(preg_replace('/[^a-zA-Z0-9]+/', '-', $id) ?? ''), '-');
 
-        return $s !== '' && preg_match('/^[a-z0-9]/', $s) ? mb_substr($s, 0, 24) : '';
+        return $s !== '' && preg_match('/^[a-z0-9]/', $s) ? TextClip::clip($s, 24) : '';
     }
 
     /** The first word of a cue, normalised the way the renderer matches it. */
@@ -367,7 +367,7 @@ class CinematicScene
         foreach (preg_split('/\s+/', trim($word)) ?: [] as $token) {
             $n = strtolower(preg_replace('/[^a-zA-Z0-9-]/', '', $token) ?? '');
             if (strlen($n) >= 3) {
-                return mb_substr($n, 0, 24);
+                return TextClip::clip($n, 24);
             }
         }
 

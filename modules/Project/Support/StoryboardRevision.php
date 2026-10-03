@@ -79,7 +79,7 @@ final class StoryboardRevision
 
             $narration = trim(self::narrationOf($scene));
             if ($narration !== '') {
-                $out .= '   says: "' . mb_substr($narration, 0, 260) . "\"\n";
+                $out .= '   says: "' . TextClip::clip($narration, 260) . "\"\n";
             }
 
             foreach ((array) ($scene['slots'] ?? []) as $key => $slot) {
@@ -91,7 +91,7 @@ final class StoryboardRevision
                     // The single most important fact for the planner: rewriting
                     // this card throws the user's own file away.
                     $out .= '      ^ THE USER UPLOADED A FILE HERE ("'
-                        . mb_substr($uploads[$id . '::' . $key], 0, 60) . "\")\n";
+                        . TextClip::clip($uploads[$id . '::' . $key], 60) . "\")\n";
                 }
             }
         }
@@ -119,7 +119,7 @@ final class StoryboardRevision
         unset($body['content_type'], $body['dock'], $body['width_pct'], $body['camera_move']);
         $json = json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        return $type . ' — ' . mb_substr((string) $json, 0, 260);
+        return $type . ' — ' . TextClip::clip((string) $json, 260);
     }
 
     /** The full body of one scene, for the call that rewrites it. */
@@ -757,7 +757,7 @@ final class StoryboardRevision
             if ($description === '') {
                 continue; // nothing honest to say; leave the placeholder alone
             }
-            $slot['asset_request'] = ['description' => mb_substr($description, 0, 160)];
+            $slot['asset_request'] = ['description' => TextClip::clip($description, 160)];
             $scene['slots'][$key] = $slot;
         }
 

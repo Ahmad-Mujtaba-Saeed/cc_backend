@@ -167,7 +167,7 @@ check('isPending: staged is not pending', !CinematicScene::isPending($good));
 
 echo "\n== 7. registry ==\n";
 $reg = ExplainerRegistry::all();
-check('registry version bumped to 51', (int) $reg['version'] === 51);
+check('registry version is at least 51', (int) $reg['version'] >= 51);
 check('the depth rig has its levels + a default', ExplainerRegistry::motionDepthNames() === ['off', 'subtle', 'full']
     && ExplainerRegistry::defaultMotionDepth() === 'subtle', implode('|', ExplainerRegistry::motionDepthNames()));
 check('cinematic_card template exists with slot_cinematic', isset($reg['templates']['cinematic_card']['slots']['slot_cinematic']));

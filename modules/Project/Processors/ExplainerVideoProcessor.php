@@ -711,6 +711,15 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
      */
     protected function generateSceneIllustrations(bool $dedupe = true): bool
     {
+        // OFF (2026-09-29). This drew a picture beside single_focus copy that
+        // the storyboard never shows — the exact "AI image the user was not
+        // told about" the single_focus rule forbids — and the model lettered
+        // them (project 211: gibberish timelines, an empty frame when a draw
+        // failed). A beat that wants a picture is cast to a picture card; a
+        // single_focus that wants a drawing carries a visible vector_motif.
+        if (!config('services.explainer.hidden_illustrations', false)) {
+            return true;
+        }
         try {
             $textOnly = $this->project->explainerScenes()->get()
                 ->filter(fn ($s) => empty($s->requiredAssetSlots()) && $s->layout_template === 'single_focus')

@@ -93,12 +93,25 @@ class RemotionRenderService
         // never less than the configured floor and never past the job's own
         // 4h ceiling (ProcessVideoJob::$timeout).
         $videoSeconds = array_sum(array_map(fn ($s) => (float) ($s['duration_seconds'] ?? 6), $scenes));
-        $timeout = (int) min(14000, max($this->timeout, (int) ceil($videoSeconds * 6)));
+        // 60fps on this hardware measured ~8.5s per second of video (project
+        // 211: 845s of video, 119 minutes), so 6s/s timed out a render that
+        // then finished half an hour later. 10s/s, same 4h ceiling.
+        $timeout = (int) min(14000, max($this->timeout, (int) ceil($videoSeconds * 10)));
+        $dispatchedAt = time();
 
         try {
             $response = Http::timeout($timeout)->post("{$this->baseUrl}/render", $payload);
         } catch (\Throwable $e) {
             Log::error('RemotionRenderService: request threw', ['error' => $e->getMessage()]);
+            // The HTTP wait giving up does not stop the render server: it
+            // keeps rendering and writes the MP4 when done. Wait for the file
+            // (within the job's remaining budget) instead of failing a render
+            // that is still progressing.
+            if (str_contains($e->getMessage(), 'cURL error 28')
+                && $this->awaitOutput($outputAbsolutePath, $dispatchedAt, 14000 - (time() - $dispatchedAt))) {
+                Log::info('RemotionRenderService: output landed after the HTTP timeout', ['project_id' => $project->id]);
+                return ['success' => true, 'output_path' => $outputRelativePath];
+            }
             return ['success' => false, 'error' => 'Render service unreachable: ' . $e->getMessage()];
         }
 
@@ -116,6 +129,30 @@ class RemotionRenderService
         }
 
         return ['success' => true, 'output_path' => $outputRelativePath];
+    }
+
+    /**
+     * Wait for a render the server is still finishing: the file must be newer
+     * than the dispatch and its size unchanged across two polls (the final
+     * mux writes it in one go, but a half-written file must never pass).
+     */
+    private function awaitOutput(string $path, int $since, int $budgetSeconds): bool
+    {
+        $deadline = time() + max(0, $budgetSeconds);
+        $lastSize = -1;
+        while (time() < $deadline) {
+            clearstatcache(true, $path);
+            if (is_file($path) && filemtime($path) >= $since) {
+                $size = filesize($path);
+                if ($size > 0 && $size === $lastSize) {
+                    return true;
+                }
+                $lastSize = $size;
+            }
+            sleep(20);
+        }
+
+        return false;
     }
 
     /**

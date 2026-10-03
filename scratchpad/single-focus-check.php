@@ -65,7 +65,7 @@ $run = function (array $scenes): array {
 echo "\n== 1. the registry no longer offers a picture slot on single_focus ==\n";
 $allowed = ExplainerRegistry::allowedContentTypes('single_focus', 'slot_main');
 check('single_focus takes text or a drawn motif only', $allowed === ['text_block', 'vector_motif'], implode('|', $allowed));
-check('registry version bumped to 51', (int) ExplainerRegistry::all()['version'] === 51);
+check('registry version is at least 51', (int) ExplainerRegistry::all()['version'] >= 51);
 
 echo "\n== 2. a picture inside single_focus becomes a card that SHOWS it ==\n";
 $hidden = $scene('s1', 'single_focus', ['slot_main' => [

@@ -120,7 +120,12 @@ class ExplainerSceneAssembler
                 $scenePayload['ambient_image_path'] = $ambient->path;
             }
 
-            $illustration = $assets->get($scene->scene_id . '::__illustration__');
+            // Hidden illustrations are off (see ExplainerVideoProcessor::
+            // generateSceneIllustrations); ones already cached on older
+            // projects stay unused so a re-render matches its storyboard.
+            $illustration = config('services.explainer.hidden_illustrations', false)
+                ? $assets->get($scene->scene_id . '::__illustration__')
+                : null;
             if ($illustration) {
                 $scenePayload['illustration_image_path'] = $illustration->path;
             }
