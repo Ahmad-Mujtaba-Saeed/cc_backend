@@ -20,6 +20,7 @@ use Modules\Project\Support\SceneBudgetLinter;
 use Modules\Project\Support\ShotListValidator;
 use Modules\Project\Support\StoryboardDiff;
 use Modules\Project\Support\StoryboardRevision;
+use Modules\Project\Support\StyleRecipe;
 use Throwable;
 
 /**
@@ -247,6 +248,21 @@ class ReviseExplainerStoryboardJob implements ShouldQueue
             // the cards it changed, so the one cross-scene rule that a reorder
             // can break is re-asserted here.
             $scenes = $this->normalizeOpening($scenes, $current);
+
+            // A rebuilt card came back through the validator, which stamps the
+            // HOUSE signature cut; give the touched scenes this project's
+            // unique-look cut instead. Untouched scenes keep whatever they
+            // carry — including a cut the user picked by hand.
+            $recipe = StyleRecipe::of($this->project->settings ?? []);
+            if ($recipe !== null && is_array($recipe['signatures'] ?? null) && $touched !== []) {
+                $remapped = StyleRecipe::remapTransitions($scenes, null, $recipe['signatures']);
+                $set = array_flip($touched);
+                foreach ($scenes as $i => $scene) {
+                    if (isset($set[(string) $scene['scene_id']])) {
+                        $scenes[$i]['transition'] = $remapped[$i]['transition'];
+                    }
+                }
+            }
 
             $this->persist($scenes, $result['removed']);
             $this->rehomeAssets($scenes, $current, $result['removed'], $assetRows);

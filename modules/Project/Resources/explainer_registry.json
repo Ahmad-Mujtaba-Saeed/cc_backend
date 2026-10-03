@@ -1,5 +1,5 @@
 {
-  "version": 52,
+  "version": 53,
   "motion_styles": {
     "default": "auto",
     "styles": {
@@ -774,6 +774,325 @@
         "use_when": "technical, data-heavy, analytical topics"
       }
     }
+  },
+  "style_recipe": {
+    "version": 1,
+    "use_when": "Every new video gets its own seeded look (palette, type trio, motion tuning, signature cuts, backdrop) so no two videos share one house style. Explicit user picks always win; projects without a recipe render exactly as before.",
+    "fonts": {
+      "display": {
+        "bricolage-grotesque": {
+          "label": "Bricolage Grotesque",
+          "tags": [
+            "grotesque",
+            "expressive"
+          ]
+        },
+        "fraunces": {
+          "label": "Fraunces",
+          "tags": [
+            "serif"
+          ]
+        },
+        "space-grotesk": {
+          "label": "Space Grotesk",
+          "tags": [
+            "grotesque",
+            "tech"
+          ]
+        },
+        "manrope": {
+          "label": "Manrope",
+          "tags": [
+            "geometric",
+            "tech"
+          ]
+        },
+        "sora": {
+          "label": "Sora",
+          "tags": [
+            "geometric",
+            "tech"
+          ]
+        },
+        "outfit": {
+          "label": "Outfit",
+          "tags": [
+            "geometric"
+          ]
+        },
+        "plus-jakarta-sans": {
+          "label": "Plus Jakarta Sans",
+          "tags": [
+            "geometric"
+          ]
+        },
+        "syne": {
+          "label": "Syne",
+          "tags": [
+            "expressive"
+          ]
+        },
+        "unbounded": {
+          "label": "Unbounded",
+          "tags": [
+            "expressive",
+            "wide"
+          ]
+        },
+        "archivo": {
+          "label": "Archivo",
+          "tags": [
+            "grotesque",
+            "tech"
+          ]
+        },
+        "epilogue": {
+          "label": "Epilogue",
+          "tags": [
+            "grotesque"
+          ]
+        },
+        "red-hat-display": {
+          "label": "Red Hat Display",
+          "tags": [
+            "grotesque",
+            "tech"
+          ]
+        },
+        "lexend": {
+          "label": "Lexend",
+          "tags": [
+            "geometric"
+          ]
+        },
+        "playfair-display": {
+          "label": "Playfair Display",
+          "tags": [
+            "serif"
+          ]
+        },
+        "newsreader": {
+          "label": "Newsreader",
+          "tags": [
+            "serif"
+          ]
+        },
+        "big-shoulders-display": {
+          "label": "Big Shoulders Display",
+          "tags": [
+            "condensed",
+            "expressive"
+          ]
+        },
+        "schibsted-grotesk": {
+          "label": "Schibsted Grotesk",
+          "tags": [
+            "grotesque",
+            "tech"
+          ]
+        },
+        "familjen-grotesk": {
+          "label": "Familjen Grotesk",
+          "tags": [
+            "grotesque"
+          ]
+        },
+        "figtree": {
+          "label": "Figtree",
+          "tags": [
+            "geometric"
+          ]
+        },
+        "onest": {
+          "label": "Onest",
+          "tags": [
+            "grotesque",
+            "tech"
+          ]
+        },
+        "hanken-grotesk": {
+          "label": "Hanken Grotesk",
+          "tags": [
+            "grotesque"
+          ]
+        },
+        "urbanist": {
+          "label": "Urbanist",
+          "tags": [
+            "geometric"
+          ]
+        },
+        "bitter": {
+          "label": "Bitter",
+          "tags": [
+            "slab",
+            "serif"
+          ]
+        },
+        "roboto-slab": {
+          "label": "Roboto Slab",
+          "tags": [
+            "slab"
+          ]
+        },
+        "josefin-sans": {
+          "label": "Josefin Sans",
+          "tags": [
+            "geometric",
+            "elegant"
+          ]
+        },
+        "oswald": {
+          "label": "Oswald",
+          "tags": [
+            "condensed"
+          ]
+        },
+        "literata": {
+          "label": "Literata",
+          "tags": [
+            "serif"
+          ]
+        }
+      },
+      "body": {
+        "instrument-sans": {
+          "label": "Instrument Sans"
+        },
+        "inter": {
+          "label": "Inter"
+        },
+        "dm-sans": {
+          "label": "DM Sans"
+        },
+        "work-sans": {
+          "label": "Work Sans"
+        },
+        "public-sans": {
+          "label": "Public Sans"
+        },
+        "source-sans-3": {
+          "label": "Source Sans 3"
+        },
+        "nunito-sans": {
+          "label": "Nunito Sans"
+        },
+        "karla": {
+          "label": "Karla"
+        },
+        "ibm-plex-sans": {
+          "label": "IBM Plex Sans"
+        },
+        "albert-sans": {
+          "label": "Albert Sans"
+        },
+        "figtree": {
+          "label": "Figtree"
+        },
+        "manrope": {
+          "label": "Manrope"
+        },
+        "hanken-grotesk": {
+          "label": "Hanken Grotesk"
+        },
+        "onest": {
+          "label": "Onest"
+        }
+      },
+      "mono": {
+        "space-mono": {
+          "label": "Space Mono"
+        },
+        "jetbrains-mono": {
+          "label": "JetBrains Mono"
+        },
+        "ibm-plex-mono": {
+          "label": "IBM Plex Mono"
+        },
+        "fira-code": {
+          "label": "Fira Code"
+        },
+        "roboto-mono": {
+          "label": "Roboto Mono"
+        },
+        "martian-mono": {
+          "label": "Martian Mono"
+        },
+        "source-code-pro": {
+          "label": "Source Code Pro"
+        },
+        "red-hat-mono": {
+          "label": "Red Hat Mono"
+        },
+        "geist-mono": {
+          "label": "Geist Mono"
+        }
+      }
+    },
+    "signature_options": {
+      "continues": [
+        "stack_push",
+        "push_left",
+        "wipe",
+        "column_reveal",
+        "mask_wipe_diagonal"
+      ],
+      "elaborates": [
+        "mask_wipe_circle",
+        "zoom_through",
+        "wipe_up",
+        "push_up"
+      ],
+      "consequence": [
+        "whip_pan",
+        "push_left",
+        "zoom_through",
+        "mask_wipe_diagonal"
+      ],
+      "contrast": [
+        "split_slide",
+        "whip_pan",
+        "push_right",
+        "wipe"
+      ],
+      "callback": [
+        "match_dissolve",
+        "fade",
+        "zoom_out_in"
+      ],
+      "new_chapter": [
+        "line_sweep",
+        "zoom_out_in",
+        "column_reveal",
+        "wipe_up"
+      ]
+    },
+    "backdrop_kinds": {
+      "order": [
+        "grid",
+        "dots",
+        "plus",
+        "rules"
+      ],
+      "drive": [
+        "hatch",
+        "rules",
+        "grid"
+      ],
+      "buoyant": [
+        "dots",
+        "plus",
+        "grid"
+      ]
+    },
+    "eases": [
+      "expo_out",
+      "quint_out",
+      "cubic_out",
+      "sine_in_out",
+      "quint_in_out",
+      "spring_pop"
+    ]
   },
   "moods": [
     "neutral",

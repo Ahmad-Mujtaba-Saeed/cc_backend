@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Modules\Project\Models\Project;
 use Modules\Project\Support\ExplainerRegistry;
+use Modules\Project\Support\StyleRecipe;
 use Symfony\Component\Process\Process;
 
 /**
@@ -207,9 +208,14 @@ class RemotionRenderService
                 // texture on the flat colour field, keyed per scene mood.
                 // Default on; the renderer only obeys an explicit true, so
                 // pre-field payloads render byte-identically.
-                'backdrop' => [
+                'backdrop' => array_filter([
                     'enabled' => ($settings['backdrop_enabled'] ?? true) !== false,
-                ],
+                    // The unique look (Support\StyleRecipe) picks which texture
+                    // each mood group wears and how big; absent = mood defaults.
+                    'kinds' => StyleRecipe::backdrop($settings)['kinds'] ?? null,
+                    'scale' => StyleRecipe::backdrop($settings)['scale'] ?? null,
+                    'drift' => StyleRecipe::backdrop($settings)['drift'] ?? null,
+                ], fn ($v) => $v !== null),
                 // Camera motion blur (§2.10): stacked shutter samples of the
                 // canvas world on fast flights. On by default — the strobe it
                 // removes is a defect, not a taste.
@@ -237,6 +243,12 @@ class RemotionRenderService
                         : ExplainerRegistry::defaultMotionDepth()),
                 'skin' => self::resolveSkin($settings),
                 'font_pack' => $this->resolveFontPack($settings),
+                // The unique look's type trio and motion tuning. Each is null
+                // whenever the user chose that knob themselves (or the skin /
+                // board dictates type), and the renderer then reads exactly
+                // the pack and the preset above — old payloads are unchanged.
+                'fonts' => StyleRecipe::fonts($settings, self::resolveSkin($settings)),
+                'motion_tuning' => StyleRecipe::motion($settings),
                 // Cinematic canvas journey: mode + the director's world plan.
                 // When the plan is missing in canvas mode, the renderer builds
                 // a deterministic layout itself, so old projects still work.
@@ -397,6 +409,7 @@ class RemotionRenderService
             'hero_cutout' => $heroIsCutout,
             'equation' => $equation ?: null,
             'font_pack' => $this->resolveFontPack($settings),
+            'fonts' => StyleRecipe::fonts($settings, self::resolveSkin($settings)),
         ];
 
         $out = [];
@@ -481,6 +494,14 @@ class RemotionRenderService
         $explicit = (string) ($settings['motion_style'] ?? ExplainerRegistry::defaultMotionStyle());
         if (in_array($explicit, $names, true)) {
             return $explicit;
+        }
+
+        // A unique look re-tunes one preset; it ships that preset's name so
+        // every style-keyed table in the renderer (springs, rise, sustain)
+        // still reads the editor it was tuned from.
+        $tuned = StyleRecipe::motion($settings);
+        if ($tuned !== null) {
+            return (string) $tuned['base'];
         }
 
         $auto = (string) ($settings['motion_style_auto'] ?? '');

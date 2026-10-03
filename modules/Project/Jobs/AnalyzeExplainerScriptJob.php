@@ -18,6 +18,7 @@ use Modules\Project\Support\CanvasPlanValidator;
 use Modules\Project\Support\ChapterPlanValidator;
 use Modules\Project\Support\ExplainerRegistry;
 use Modules\Project\Support\ShotListValidator;
+use Modules\Project\Support\StyleRecipe;
 use Throwable;
 
 /**
@@ -474,7 +475,26 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                 array_values($hints)
             );
 
-            $settings['color_scheme'] = $suggested['color_scheme'] ?? ExplainerRegistry::randomColorSchemeName();
+            // Unique look (Support\StyleRecipe): the first analysis draws this
+            // project's own palette, type trio, motion tuning, signature cuts
+            // and backdrop, steered by the same topic signals the auto-theme
+            // just produced. A re-analysis keeps the recipe it already has —
+            // the look must not change because the script was re-read — and
+            // keeps whatever scheme the user is on.
+            $freshRecipe = false;
+            if (StyleRecipe::of($settings) === null && config('services.openai.explainer_unique_look', true)) {
+                $settings['style_recipe'] = StyleRecipe::generate(
+                    StyleRecipe::newSeed(),
+                    StyleRecipe::contextFrom($suggested, $dominantMood, $mathTopic !== [])
+                );
+                $freshRecipe = true;
+            }
+            if ($freshRecipe) {
+                $settings['color_scheme'] = StyleRecipe::SCHEME;
+                unset($settings['theme_override']);
+            } elseif (StyleRecipe::of($settings) === null) {
+                $settings['color_scheme'] = $suggested['color_scheme'] ?? ExplainerRegistry::randomColorSchemeName();
+            }
             $settings['motion_style_auto'] = $suggested['motion_style'] ?? ExplainerRegistry::motionStyleForMood($dominantMood);
             $settings['font_pack_auto'] = $suggested['font_pack'] ?? null;
             $settings['skin_auto'] = $suggested['skin'] ?? ExplainerRegistry::defaultSkin();
@@ -664,6 +684,14 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                     'original_name' => (string) $a->original_name,
                 ])->all()
             );
+
+            // The unique look's signature cuts: every scene still carrying its
+            // relation's HOUSE cut takes this project's cut for that relation
+            // instead (a deliberate other choice by the planner is left alone).
+            $recipe = StyleRecipe::of($settings);
+            if ($recipe !== null && is_array($recipe['signatures'] ?? null)) {
+                $scenes = StyleRecipe::remapTransitions(array_values($scenes), null, $recipe['signatures']);
+            }
 
             $this->project->explainerScenes()->delete();
 

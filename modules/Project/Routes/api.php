@@ -89,6 +89,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/explainer/projects/{project}/revise', [ExplainerController::class, 'revise'])->middleware('throttle:20,1');
     Route::post('/explainer/projects/{project}/render', [ExplainerController::class, 'render']);
     Route::post('/explainer/projects/{project}/shuffle-theme', [ExplainerController::class, 'shuffleTheme']);
+    Route::post('/explainer/projects/{project}/unique-look', [ExplainerController::class, 'uniqueLook']);
     // Pick the palette outright, instead of shuffling until one turns up.
     Route::post('/explainer/projects/{project}/color-scheme', [ExplainerController::class, 'setColorScheme']);
     // A user's OWN palettes: listed with the built-ins, created and deleted

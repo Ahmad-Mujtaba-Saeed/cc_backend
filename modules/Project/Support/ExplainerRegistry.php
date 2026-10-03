@@ -657,12 +657,21 @@ class ExplainerRegistry
      *
      * Everything else (the validator, the renderer, the thumbnail) reads the
      * result and cannot tell a custom scheme from a built-in one.
+     *
+     * The scheme name `unique` means the project's own generated palette
+     * (Support\StyleRecipe) — stored in its settings, so it resolves here
+     * with no lookup at all.
      */
     public static function themeFor(array $settings): array
     {
         $override = $settings['theme_override'] ?? null;
         if (is_array($override) && !empty($override['name']) && !empty($override['accent'])) {
             return $override;
+        }
+
+        $unique = StyleRecipe::theme($settings);
+        if ($unique !== null) {
+            return $unique;
         }
 
         return self::colorScheme($settings['color_scheme'] ?? null);

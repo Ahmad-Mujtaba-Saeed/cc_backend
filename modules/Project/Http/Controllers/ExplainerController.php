@@ -27,6 +27,7 @@ use Modules\Project\Support\ChapterPlanValidator;
 use Modules\Project\Support\ElementEdits;
 use Modules\Project\Support\ExplainerRegistry;
 use Modules\Project\Support\ShotListValidator;
+use Modules\Project\Support\StyleRecipe;
 use Modules\Billing\Services\CreditService;
 use Modules\Project\Support\ExplainerBilling;
 use Modules\Billing\Exceptions\InsufficientCreditsException;
@@ -997,6 +998,22 @@ class ExplainerController extends Controller
         $settings = $project->settings ?? [];
         $current = $settings['color_scheme'] ?? null;
 
+        // A project with a unique look shuffles into a NEW generated palette
+        // (an endless supply) rather than back into the 17 shared schemes —
+        // the shared schemes are exactly what makes videos look alike.
+        $recipe = StyleRecipe::of($settings);
+        if ($recipe !== null) {
+            $settings['style_recipe'] = StyleRecipe::withNewPalette($recipe, StyleRecipe::newSeed());
+            $settings['color_scheme'] = StyleRecipe::SCHEME;
+            unset($settings['theme_override']);
+            $project->update(['settings' => $settings]);
+
+            return response()->json([
+                'success' => true,
+                'data' => ['color_scheme' => StyleRecipe::SCHEME, 'theme' => ExplainerRegistry::themeFor($settings)],
+            ]);
+        }
+
         // Pick a new scheme different from the current one.
         $names = ExplainerRegistry::colorSchemeNames();
         $candidates = array_values(array_filter($names, fn ($n) => $n !== $current));
@@ -1799,7 +1816,10 @@ class ExplainerController extends Controller
         $name = (string) $request->input('scheme', '');
         $settings = $project->settings ?? [];
 
-        if (in_array($name, ExplainerRegistry::colorSchemeNames(), true)) {
+        if ($name === StyleRecipe::SCHEME && StyleRecipe::of($settings) !== null) {
+            $settings['color_scheme'] = $name;
+            unset($settings['theme_override']);
+        } elseif (in_array($name, ExplainerRegistry::colorSchemeNames(), true)) {
             $settings['color_scheme'] = $name;
             unset($settings['theme_override']);
         } else {
@@ -1816,6 +1836,93 @@ class ExplainerController extends Controller
         return response()->json([
             'success' => true,
             'data' => ['color_scheme' => $name, 'theme' => ExplainerRegistry::themeFor($settings)],
+        ]);
+    }
+
+    /**
+     * The scheme list a project's picker shows: its own generated palette
+     * first (when it has a unique look), then the shared and the user's own.
+     */
+    private static function schemesForProject(Project $project): array
+    {
+        $schemes = self::schemesFor($project->user_id);
+        $recipe = StyleRecipe::of($project->settings ?? []);
+        if ($recipe === null) {
+            return $schemes;
+        }
+
+        return array_merge([array_merge($recipe['palette'], [
+            'label' => 'Unique · ' . ($recipe['palette']['label'] ?? 'this video'),
+            'unique' => true,
+        ])], $schemes);
+    }
+
+    /**
+     * Re-roll the whole unique look: a new palette, type trio, motion tuning,
+     * signature cuts and backdrop, all at once — and hand every look knob
+     * back to it (scheme → unique, typeface and motion style → auto).
+     *
+     * Also how an OLDER project (made before unique looks existed) gets one.
+     * Scene cuts move from the old signatures (the previous recipe's, or the
+     * house table's) to the new ones; a cut the user picked by hand is some
+     * other transition and stays where it is.
+     */
+    public function uniqueLook(Project $project): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+        if ($this->revisionRunning($project)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'A revision is being applied — wait for it to finish before changing the look.',
+            ], 409);
+        }
+
+        $settings = $project->settings ?? [];
+        $rows = $project->explainerScenes()->orderBy('order')->get();
+        $old = StyleRecipe::of($settings);
+
+        if ($old !== null && is_array($old['ctx'] ?? null)) {
+            $ctx = $old['ctx'];
+        } else {
+            $moods = array_count_values($rows->map(fn ($r) => (string) ($r->mood ?? 'neutral'))->all());
+            arsort($moods);
+            $ctx = StyleRecipe::contextFrom([
+                'color_scheme' => $settings['color_scheme'] ?? null,
+                'motion_style' => $settings['motion_style_auto'] ?? null,
+                'font_pack' => $settings['font_pack_auto'] ?? null,
+            ], (string) (array_key_first($moods) ?? 'neutral'), !empty($settings['math_topic']));
+        }
+
+        $recipe = StyleRecipe::generate(StyleRecipe::newSeed(), $ctx);
+
+        $scenes = $rows->map(fn ($r) => [
+            'scene_id' => (string) $r->scene_id,
+            'transition' => (string) $r->transition,
+            'relation' => $r->relation,
+        ])->values()->all();
+        $remapped = StyleRecipe::remapTransitions($scenes, $old['signatures'] ?? null, $recipe['signatures']);
+        foreach ($rows->values() as $i => $row) {
+            if ($remapped[$i]['transition'] !== $scenes[$i]['transition']) {
+                $row->update(['transition' => $remapped[$i]['transition']]);
+            }
+        }
+
+        $settings['style_recipe'] = $recipe;
+        $settings['color_scheme'] = StyleRecipe::SCHEME;
+        unset($settings['theme_override']);
+        $settings['font_pack'] = 'auto';
+        $settings['motion_style'] = 'auto';
+        $project->update(['settings' => $settings]);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'color_scheme' => StyleRecipe::SCHEME,
+                'theme' => ExplainerRegistry::themeFor($settings),
+                'style_recipe' => StyleRecipe::summary($settings),
+            ],
         ]);
     }
 
@@ -2408,7 +2515,11 @@ class ExplainerController extends Controller
             // picker carries its own plain-mechanics line for the rest.
             'transition_meanings' => ExplainerRegistry::transitionMeanings(),
             'moods' => ExplainerRegistry::moods(),
-            'color_schemes' => self::schemesFor($project->user_id),
+            'color_schemes' => self::schemesForProject($project),
+            // The unique look (Support\StyleRecipe): labels of this project's
+            // own palette, type trio and motion tuning, and which of them are
+            // live (an explicit pick of that knob takes it out of play).
+            'style_recipe' => StyleRecipe::summary($project->settings ?? []),
             'narration_enabled' => $project->settings['narration_enabled'] ?? true,
             // The narrator, changeable from the storyboard's Sound section.
             // Empty = the engine's default for this template.

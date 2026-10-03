@@ -146,6 +146,12 @@ class ExplainerPreviewService
         if (array_key_exists('motion_blur_enabled', $settings)) {
             $payload['motion_blur'] = (bool) $settings['motion_blur_enabled'];
         }
+        // The unique look, on the same conditional terms: only a project that
+        // HAS a recipe hashes it (a re-roll or a palette shuffle must miss the
+        // cache and mark the MP4 stale; nothing else's hash may move).
+        if (!empty($settings['style_recipe'])) {
+            $payload['style_recipe'] = md5(json_encode($settings['style_recipe']));
+        }
 
         return substr(md5(json_encode($payload, JSON_UNESCAPED_UNICODE)), 0, 20);
     }

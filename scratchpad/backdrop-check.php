@@ -39,7 +39,8 @@ check('unset → on (new videos get the field)', $flag([]) === true);
 check('explicit false → off', $flag(['backdrop_enabled' => false]) === false);
 check('explicit true → on', $flag(['backdrop_enabled' => true]) === true);
 $src = file_get_contents(__DIR__ . '/../modules/Project/Services/RemotionRenderService.php');
-check('buildRenderPayload ships the backdrop block', str_contains($src, "'backdrop' => ["));
+// array_filter since the unique look (StyleRecipe) adds optional kinds/scale/drift.
+check('buildRenderPayload ships the backdrop block', str_contains($src, "'backdrop' => [") || str_contains($src, "'backdrop' => array_filter(["));
 check("payload uses the default-on expression", str_contains($src, "(\$settings['backdrop_enabled'] ?? true) !== false"));
 
 // 2. Toggle endpoint routed.

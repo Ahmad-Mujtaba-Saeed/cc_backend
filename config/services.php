@@ -106,6 +106,12 @@ return [
         // narration for meta-talk, screen descriptions, repeats and
         // placeholder junk. EXPLAINER_TEXT_PASS=false disables it.
         'explainer_text_pass' => env('EXPLAINER_TEXT_PASS', true),
+        // Unique look (Support\StyleRecipe): every NEW explainer draws its own
+        // seeded palette / type trio / motion tuning / signature cuts /
+        // backdrop, so no two videos share one house style. Projects that
+        // already exist keep rendering as before. EXPLAINER_UNIQUE_LOOK=false
+        // goes back to the curated schemes for new projects.
+        'explainer_unique_look' => env('EXPLAINER_UNIQUE_LOOK', true),
         // Geometry figure synthesis (iter 40): a focused per-scene call that
         // REBUILDS a geometry_diagram whose slot came back thin — a bare shape
         // name with no points/labels/marks while the narration clearly
