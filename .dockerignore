@@ -1,10 +1,24 @@
+# Build context = what `docker build` uploads and what `COPY .` bakes in.
+# storage/ alone is ~7.5 GB of renders and uploads; it is mounted at runtime,
+# never copied.
 /vendor
 /node_modules
 .env
 .git
 .gitignore
-storage/logs
-storage/framework/cache
-storage/framework/sessions
-public/storage
-public/storage/**
+.config
+
+/storage
+/scratchpad
+/public/storage
+/bootstrap/cache/*.php
+
+*.sql
+*.stackdump
+*.png
+!/public/**/*.png
+**/__pycache__
+temp_test.py
+
+*.md
+!/modules/**/*.md

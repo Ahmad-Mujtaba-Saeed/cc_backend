@@ -19,6 +19,7 @@ use Modules\Project\Support\ChapterPlanValidator;
 use Modules\Project\Support\ExplainerRegistry;
 use Modules\Project\Support\ShotListValidator;
 use Modules\Project\Support\StyleRecipe;
+use Modules\Project\Support\HeroScenes;
 use Throwable;
 
 /**
@@ -754,6 +755,21 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
                 unset($settings['revision']['last'], $settings['revision']['started_at']);
             }
 
+            // Hero scenes survive a re-analysis only where their scene did,
+            // word for word — a hero written for different narration would
+            // animate the wrong thing.
+            if (!empty($settings['hero_scenes'])) {
+                $hashes = [];
+                foreach ($scenes as $s) {
+                    $hashes[(string) $s['scene_id']] = HeroScenes::contentHash($s);
+                }
+                $settings['hero_scenes'] = array_filter(
+                    (array) $settings['hero_scenes'],
+                    fn ($entry, $id) => isset($hashes[$id]) && ($entry['content_hash'] ?? null) === $hashes[$id],
+                    ARRAY_FILTER_USE_BOTH
+                );
+            }
+
             $this->project->update([
                 'status' => 'storyboard_ready',
                 'progress' => 100,
@@ -762,6 +778,15 @@ class AnalyzeExplainerScriptJob implements ShouldQueue
             ]);
 
             $pusher->sendProgress($this->project->id, 100, 'Storyboard ready — upload your assets.');
+
+            // AI hero scenes: written in the background once the storyboard is
+            // usable (they take minutes and the user can work meanwhile). Off
+            // unless EXPLAINER_HERO_SCENES is on, and per project unless the
+            // user switched them off.
+            if (config('services.openai.explainer_hero_scenes', false) && ($settings['hero_auto'] ?? true) !== false
+                && ($settings['composition_mode'] ?? '') !== 'math_board') {
+                GenerateHeroScenesJob::dispatch($this->project);
+            }
 
             Log::info('AnalyzeExplainerScriptJob: storyboard ready', [
                 'project_id' => $this->project->id,

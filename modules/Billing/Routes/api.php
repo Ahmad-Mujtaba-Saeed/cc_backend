@@ -1,23 +1,25 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\Billing\Http\Controllers\Gateways\SafepayController;
-use Modules\Billing\Http\Controllers\Gateways\SafepayWebhookController;
+use Modules\Billing\Http\Controllers\Gateways\StripeController;
+use Modules\Billing\Http\Controllers\Gateways\StripeWebhookController;
 
 // Include admin routes
 require __DIR__ . '/plans.php';
 
 Route::middleware(['auth:sanctum'])->prefix('/billing')
     ->group(function () {
-        Route::get('/me', [SafepayController::class, 'me']);
-        Route::get('/safepay/create-subscription-session/{planId}', [SafepayController::class, 'createSubscriptionSession']);
-        // Called when Safepay redirects the customer back from hosted checkout.
-        Route::get('/safepay/sync', [SafepayController::class, 'syncCheckout']);
-        Route::get('/subscription/details', [SafepayController::class, 'getSubscriptionDetails']);
-        Route::post('/subscription/cancel', [SafepayController::class, 'cancelSubscription']);
-        Route::post('/subscription/change-plan/{planId}', [SafepayController::class, 'changePlan']);
+        Route::get('/me', [StripeController::class, 'me']);
+        Route::post('/stripe/checkout/{planId}', [StripeController::class, 'createSubscriptionSession'])
+            ->middleware('throttle:10,1');
+        // Called when Stripe Checkout redirects the customer back.
+        Route::get('/stripe/sync', [StripeController::class, 'syncCheckout']);
+        Route::post('/stripe/portal', [StripeController::class, 'portal'])->middleware('throttle:10,1');
+        Route::get('/subscription/details', [StripeController::class, 'getSubscriptionDetails']);
+        Route::post('/subscription/cancel', [StripeController::class, 'cancelSubscription']);
+        Route::post('/subscription/change-plan/{planId}', [StripeController::class, 'changePlan'])
+            ->middleware('throttle:10,1');
     });
 
-// Public: Safepay posts events here. Configure this URL under
-// Developers > Endpoints in the Safepay dashboard.
-Route::post('/billing/safepay/webhook', [SafepayWebhookController::class, 'handle']);
+// Public: Stripe posts events here (signature-verified). Setup: config/stripe.php.
+Route::post('/billing/stripe/webhook', [StripeWebhookController::class, 'handle']);

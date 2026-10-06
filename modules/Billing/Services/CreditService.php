@@ -74,6 +74,41 @@ class CreditService
     }
 
     /**
+     * Mid-day upgrade: add the difference between the new and old daily
+     * allotment to today's balance. syncDailyGrant() only runs once a day, so
+     * without this an upgrade (paid immediately) gave nothing until tomorrow.
+     * Downgrades keep today's balance. Once per user, day and plan.
+     */
+    public function topUpForPlanChange(User $user, int $oldDaily, int $newDaily, int $planId): void
+    {
+        $extra = $newDaily - $oldDaily;
+        $today = now()->toDateString();
+
+        if ($extra <= 0) {
+            return;
+        }
+
+        DB::transaction(function () use ($user, $extra, $today, $planId) {
+            $locked = User::whereKey($user->getKey())->lockForUpdate()->first();
+
+            // Not granted today yet: today's grant will already use the new plan.
+            if (!$locked || !$locked->credits_refreshed_on || $locked->credits_refreshed_on->toDateString() !== $today) {
+                return;
+            }
+
+            $reference = 'upgrade:' . $locked->id . ':' . $today . ':' . $planId;
+            if (CreditTransaction::where('reference', $reference)->exists()) {
+                return;
+            }
+
+            $locked->forceFill(['credits' => (int) $locked->credits + $extra])->save();
+            $this->log($locked, 'grant', $extra, $locked->credits, null, null, 'Plan upgrade top-up', $reference);
+
+            $user->setRawAttributes($locked->getAttributes(), true);
+        });
+    }
+
+    /**
      * Credit cost for a template type.
      */
     public function costFor(string $templateType): int

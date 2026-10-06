@@ -152,6 +152,14 @@ class ExplainerPreviewService
         if (!empty($settings['style_recipe'])) {
             $payload['style_recipe'] = md5(json_encode($settings['style_recipe']));
         }
+        // Hero scenes replace whole cards, so a hero written, redone or
+        // removed changes frames exactly like a content edit does.
+        if (!empty($settings['hero_scenes'])) {
+            $payload['hero_scenes'] = md5(json_encode(array_map(
+                fn ($h) => [$h['status'] ?? null, $h['updated_at'] ?? null],
+                (array) $settings['hero_scenes']
+            )));
+        }
 
         return substr(md5(json_encode($payload, JSON_UNESCAPED_UNICODE)), 0, 20);
     }

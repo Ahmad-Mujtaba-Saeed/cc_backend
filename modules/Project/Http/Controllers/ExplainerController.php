@@ -1926,6 +1926,91 @@ class ExplainerController extends Controller
         ]);
     }
 
+    /**
+     * Each scene's hero state, for the storyboard: status, the stills from its
+     * acceptance test, the reviewer's score, and whether the scene has been
+     * edited since the hero was written (stale).
+     */
+    private static function heroSummary(Project $project): array
+    {
+        $entries = (array) ($project->settings['hero_scenes'] ?? []);
+        if ($entries === []) {
+            return [];
+        }
+        $hashes = [];
+        foreach ($project->explainerScenes()->get() as $row) {
+            $hashes[(string) $row->scene_id] = \Modules\Project\Support\HeroScenes::contentHash([
+                'narration' => ['text' => (string) $row->narration],
+                'slots' => $row->slots ?? [],
+            ]);
+        }
+        $out = [];
+        foreach ($entries as $id => $e) {
+            if (!is_array($e)) {
+                continue;
+            }
+            $out[$id] = [
+                'status' => (string) ($e['status'] ?? 'failed'),
+                'model' => $e['model'] ?? null,
+                'score' => $e['review']['score'] ?? null,
+                'stills' => array_map(fn ($p) => Storage::disk('public')->url((string) $p), array_slice((array) ($e['stills'] ?? []), 0, 5)),
+                'stale' => isset($e['content_hash'], $hashes[$id]) && $e['content_hash'] !== $hashes[$id],
+                'error' => $e['error'] ?? null,
+                'updated_at' => $e['updated_at'] ?? null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Make, redo or remove one scene's AI hero scene.
+     *
+     * make/redo queue GenerateHeroScenesJob for just that scene (minutes: a
+     * code model writes it, then it is compiled, test-rendered and reviewed);
+     * remove drops it, and the scene plays its own card again.
+     */
+    public function heroScene(Request $request, Project $project, string $sceneId): JsonResponse
+    {
+        if ($denied = $this->guard($project)) {
+            return $denied;
+        }
+        if (!config('services.openai.explainer_hero_scenes', false)) {
+            return response()->json(['success' => false, 'message' => 'AI scenes are not enabled on this server.'], 403);
+        }
+        $action = (string) $request->input('action', 'make');
+        $settings = $project->settings ?? [];
+        if (($settings['composition_mode'] ?? '') === 'math_board') {
+            return response()->json(['success' => false, 'message' => 'The maths board draws its own scenes.'], 422);
+        }
+        if (!$project->explainerScenes()->where('scene_id', $sceneId)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Unknown scene'], 404);
+        }
+
+        if ($action === 'remove') {
+            $file = $settings['hero_scenes'][$sceneId]['file'] ?? null;
+            unset($settings['hero_scenes'][$sceneId]);
+            $project->update(['settings' => $settings]);
+            if (is_string($file) && $file !== '') {
+                Storage::disk('public')->delete($file);
+            }
+
+            return response()->json(['success' => true, 'data' => ['hero_scenes' => self::heroSummary($project)]]);
+        }
+        if (!in_array($action, ['make', 'redo'], true)) {
+            return response()->json(['success' => false, 'message' => 'Unknown action'], 422);
+        }
+        if ((($settings['hero_scenes'][$sceneId]['status'] ?? null) === 'pending')) {
+            return response()->json(['success' => false, 'message' => 'This scene is already being made.'], 409);
+        }
+
+        $settings['hero_scenes'][$sceneId] = ['status' => 'pending', 'updated_at' => now()->toIso8601String()];
+        $project->update(['settings' => $settings]);
+        \Modules\Project\Jobs\GenerateHeroScenesJob::dispatch($project, [$sceneId]);
+
+        return response()->json(['success' => true, 'data' => ['hero_scenes' => self::heroSummary($project)]]);
+    }
+
     /** This user's own palettes, alongside the built-in ones. */
     public function colorSchemes(): JsonResponse
     {
@@ -2520,6 +2605,11 @@ class ExplainerController extends Controller
             // own palette, type trio and motion tuning, and which of them are
             // live (an explicit pick of that knob takes it out of play).
             'style_recipe' => StyleRecipe::summary($project->settings ?? []),
+            // AI hero scenes (Support\HeroScenes): whether the feature is on
+            // for this install, and each scene's hero state for the inspector.
+            'hero_available' => (bool) config('services.openai.explainer_hero_scenes', false)
+                && ($project->settings['composition_mode'] ?? '') !== 'math_board',
+            'hero_scenes' => self::heroSummary($project),
             'narration_enabled' => $project->settings['narration_enabled'] ?? true,
             // The narrator, changeable from the storyboard's Sound section.
             // Empty = the engine's default for this template.

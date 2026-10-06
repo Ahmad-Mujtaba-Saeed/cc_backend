@@ -57,25 +57,6 @@ class PythonAIService
     }
 
     /**
-     * Upload file to Python service
-     */
-    public function uploadFile($file): array
-    {
-        try {
-            $response = Http::timeout(300)->attach(
-                'file',
-                file_get_contents($file->getPathname()),
-                $file->getClientOriginalName()
-            )->post("{$this->baseUrl}/upload");
-
-            return $response->json();
-        } catch (Exception $e) {
-            Log::error('File upload to Python service failed: ' . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-
-    /**
      * Transcribe video. Pass $wordTimestamps=true to get per-word timings in
      * each segment's `words` array (used for karaoke captions).
      */
@@ -1141,21 +1122,6 @@ class PythonAIService
     }
 
     /**
-     * Delete file from Python service storage
-     */
-    public function deleteFile(string $filePath): array
-    {
-        try {
-            $response = Http::timeout(60)->delete("{$this->baseUrl}/files/" . ltrim($filePath, '/'));
-
-            return $response->json();
-        } catch (Exception $e) {
-            Log::error('File deletion failed: ' . $e->getMessage());
-            return ['success' => false, 'error' => $e->getMessage()];
-        }
-    }
-
-    /**
      * Generic request to Python AI service.
      *
      * @param string $method HTTP method (GET, POST, PUT, DELETE)
@@ -1202,14 +1168,6 @@ class PythonAIService
             Log::error('PythonAIService makeRequest exception', ['exception' => $e->getMessage()]);
             return ['success' => false, 'error' => $e->getMessage()];
         }
-    }
-
-    /**
-     * Get file URL from Python service
-     */
-    public function getFileUrl(string $filePath): string
-    {
-        return "{$this->baseUrl}/files/" . ltrim($filePath, '/');
     }
 
     /**

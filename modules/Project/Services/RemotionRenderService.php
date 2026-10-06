@@ -266,6 +266,15 @@ class RemotionRenderService
             ],
         ];
 
+        // Hero scenes (Support\HeroScenes): each ready, AI-written scene
+        // module rides on its scene; the card stays as the renderer's fallback.
+        $payload['shot_list']['scenes'] = \Modules\Project\Support\HeroScenes::attach(
+            $payload['shot_list']['scenes'],
+            $settings,
+            (bool) $payload['shot_list']['captions']['enabled'],
+            fn (string $path) => $this->publicUrl($path)
+        );
+
         // Per-chapter accent shift (§11.4, default off): each chapter after
         // the first gets the accent hue-rotated ±20° (alternating direction,
         // so successive chapters never drift monotonically off-palette),

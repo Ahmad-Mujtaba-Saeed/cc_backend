@@ -13,7 +13,6 @@ import shutil
 import tempfile
 import subprocess
 from pathlib import Path
-from faster_whisper import WhisperModel
 
 # Try to import psutil for memory monitoring
 try:
@@ -191,8 +190,29 @@ def transcribe_chunked(model, source, word_timestamps):
     return out, _Info(lang, prob, total)
 
 
-def transcribe_video(video_path, word_timestamps=False):
-    """Transcribe video using faster-whisper"""
+def load_model():
+    """The faster-whisper model (base, int8).
+
+    Local cache first: a plain WhisperModel("base") asks the Hugging Face hub
+    for the latest revision on every load, which cost ~20 s per call. Only a
+    machine that has never downloaded it goes to the network.
+    """
+    from faster_whisper import WhisperModel as FWModel
+    try:
+        return FWModel("base", compute_type="int8", local_files_only=True)
+    except Exception:
+        logger.info("Whisper model not cached yet, downloading...")
+        return FWModel("base", compute_type="int8")
+
+
+def transcribe_video(video_path, word_timestamps=False, model=None):
+    """Transcribe video using faster-whisper.
+
+    `model`: an already-loaded model to reuse (the AI service keeps one
+    resident). Without it the model is loaded for this call and freed after,
+    which is what the command-line entry point does.
+    """
+    owns_model = model is None
     try:
         logger.info(f"Starting transcribe_video()")
         logger.info(f"Video path: {video_path}")
@@ -210,30 +230,37 @@ def transcribe_video(video_path, word_timestamps=False):
             logger.error(f"File check error: {str(file_err)}", exc_info=True)
             raise
         
-        # Extract audio from video (much more memory efficient)
+        # Extract audio from video (much more memory efficient). A small file
+        # that is already audio (a scene's narration) is read as-is: the ffmpeg
+        # pass cost several seconds per call and saves nothing there.
         audio_path = None
-        try:
-            # Create temp audio file in /tmp
-            # Unique per run: a fixed name collided when two transcriptions ran
-            # at once (the per-clip word-timing pass runs this script too).
-            audio_path = f"/tmp/extracted_audio_{os.getpid()}_{int(time.time() * 1000)}.ogg"
-            if os.path.exists(audio_path):
-                os.remove(audio_path)
-            
-            logger.info("Extracting audio from video for memory efficiency...")
-            extracted = extract_audio(video_path, audio_path)
-            if extracted:
-                logger.info("Using extracted audio for transcription")
-                # Use the path actually written by ffmpeg
-                audio_path = extracted
-                transcribe_source = extracted
-            else:
-                logger.warning("Audio extraction failed, falling back to video")
-                transcribe_source = video_path
-        except Exception as extract_err:
-            logger.error(f"Audio extraction error: {str(extract_err)}")
-            logger.info("Falling back to transcribing video directly")
-            transcribe_source = video_path
+        transcribe_source = video_path
+        is_small_audio = (
+            os.path.splitext(video_path)[1].lower() in ('.wav', '.mp3', '.ogg', '.opus', '.m4a', '.flac', '.aac')
+            and file_size_mb < 50
+        )
+        if is_small_audio:
+            logger.info("Small audio file, transcribing directly (no extraction)")
+        else:
+            try:
+                # Unique per run: a fixed name collided when two transcriptions
+                # ran at once (the per-clip word-timing pass runs this too).
+                audio_path = f"/tmp/extracted_audio_{os.getpid()}_{int(time.time() * 1000)}.ogg"
+                if os.path.exists(audio_path):
+                    os.remove(audio_path)
+
+                logger.info("Extracting audio from video for memory efficiency...")
+                extracted = extract_audio(video_path, audio_path)
+                if extracted:
+                    logger.info("Using extracted audio for transcription")
+                    # Use the path actually written by ffmpeg
+                    audio_path = extracted
+                    transcribe_source = extracted
+                else:
+                    logger.warning("Audio extraction failed, falling back to video")
+            except Exception as extract_err:
+                logger.error(f"Audio extraction error: {str(extract_err)}")
+                logger.info("Falling back to transcribing video directly")
         
         # Log initial memory
         try:
@@ -244,17 +271,14 @@ def transcribe_video(video_path, word_timestamps=False):
             logger.error(f"Memory check error: {str(mem_err)}", exc_info=True)
             # Don't fail on memory check, just log
         
-        # Load the Whisper model
-        logger.info("Loading Whisper model (base, int8 quantized for better stability)...")
-        try:
-            logger.info("Importing faster_whisper...")
-            from faster_whisper import WhisperModel as FWModel
-            logger.info("Creating WhisperModel instance with base model...")
-            model = FWModel("base", compute_type="int8")  # base model ~142MB, int8 reduces size
-            logger.info("Whisper model loaded successfully")
-        except Exception as model_err:
-            logger.error(f"Failed to load Whisper model: {str(model_err)}", exc_info=True)
-            raise
+        if owns_model:
+            logger.info("Loading Whisper model (base, int8 quantized for better stability)...")
+            try:
+                model = load_model()
+                logger.info("Whisper model loaded successfully")
+            except Exception as model_err:
+                logger.error(f"Failed to load Whisper model: {str(model_err)}", exc_info=True)
+                raise
         
         # Log memory after model load
         try:
@@ -328,10 +352,11 @@ def transcribe_video(video_path, word_timestamps=False):
         
         logger.info(f"Converted {segment_count} segments")
         
-        # Clean up model to free memory
+        # Free this call's memory. A model passed in by the caller stays loaded.
         try:
             import gc
-            del model
+            if owns_model:
+                del model
             del segments
             del info
             gc.collect()

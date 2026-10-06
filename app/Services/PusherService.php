@@ -280,39 +280,4 @@ class PusherService
             return false;
         }
     }
-
-    /**
-     * Send generic event.
-     * 
-     * @param int $projectId
-     * @param string $eventName
-     * @param array $eventData
-     * @return bool
-     */
-    public function sendEvent(int $projectId, string $eventName, array $eventData = []): bool
-    {
-        try {
-            $channel = "project.{$projectId}";
-            
-            $data = array_merge([
-                'timestamp' => now()->toIso8601String(),
-            ], $eventData);
-
-            $this->pusher->trigger($channel, $eventName, $data);
-
-            Log::info('Pusher event sent', [
-                'project_id' => $projectId,
-                'event' => $eventName,
-                'channel' => $channel,
-            ]);
-
-            return true;
-        } catch (\Exception $e) {
-            Log::error('Pusher event failed: ' . $e->getMessage(), [
-                'project_id' => $projectId,
-                'event' => $eventName,
-            ]);
-            return false;
-        }
-    }
 }

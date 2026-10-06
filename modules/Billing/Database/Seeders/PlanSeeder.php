@@ -4,14 +4,17 @@ namespace Modules\Billing\Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use Modules\Billing\Models\Plan;
-use Modules\Billing\Services\Safepay\SafepayException;
-use Modules\Billing\Services\SafepayPlanService;
+use Modules\Billing\Services\StripePlanService;
+use Stripe\Exception\ApiErrorException;
 
 class PlanSeeder extends Seeder
 {
     /**
      * Three credit tiers, each offered monthly and yearly. Yearly = 25% off the
      * monthly price × 12, with the same daily credit allotment.
+     *
+     * Safe to re-run: an existing Stripe price is reused unless the amount
+     * changed, in which case a new price is created and the old one retired.
      */
     public function run()
     {
@@ -67,58 +70,36 @@ class PlanSeeder extends Seeder
         ];
 
         $unpublished = [];
-        $safepayService = app(SafepayPlanService::class);
-        $safepayEnabled = $safepayService->enabled();
-        $currency = config('safepay.currency', 'USD');
+        $stripe = app(StripePlanService::class);
+        $stripeEnabled = $stripe->enabled();
+        $currency = strtoupper(config('stripe.currency', 'usd'));
 
-        if (!$safepayEnabled) {
-            $this->command->warn('SAFEPAY_SECRET_KEY not configured — seeding plans WITHOUT Safepay plan ids.');
+        if (!$stripeEnabled) {
+            $this->command->warn('STRIPE_SECRET not configured — seeding plans WITHOUT Stripe price ids.');
         }
 
         // Retire any legacy plans that predate the credit tiers so they don't
         // appear alongside the new ladder. (Existing subscribers keep their
-        // Safepay subscription; only the catalog entry is hidden.)
+        // Stripe subscription; only the catalog entry is hidden.)
         $retired = Plan::whereNull('tier')->update(['is_active' => false]);
         if ($retired) {
             $this->command->info("Deactivated {$retired} legacy plan(s) without a credit tier.");
         }
 
         foreach ($tiers as $tier) {
-            // Build the monthly + yearly variant for this tier.
             $variants = [
-                [
-                    'interval' => 'month',
-                    'interval_count' => 1,
-                    'price' => $tier['monthly_price'],
-                ],
-                [
-                    'interval' => 'year',
-                    'interval_count' => 1,
-                    // 25% saving vs paying monthly for a year.
-                    'price' => round($tier['monthly_price'] * 12 * 0.75, 2),
-                ],
+                ['interval' => 'month', 'interval_count' => 1, 'price' => $tier['monthly_price']],
+                // 25% saving vs paying monthly for a year.
+                ['interval' => 'year', 'interval_count' => 1, 'price' => round($tier['monthly_price'] * 12 * 0.75, 2)],
             ];
 
             foreach ($variants as $variant) {
                 $name = $tier['name'] . ' (' . ($variant['interval'] === 'year' ? 'Yearly' : 'Monthly') . ')';
 
-                $safepayPlanId = null;
-                if ($safepayEnabled) {
-                    try {
-                        $safepayPlanId = $safepayService->createPlan([
-                            'name' => $name,
-                            'price' => $variant['price'],
-                            'currency' => $currency,
-                            'interval' => $variant['interval'],
-                            'interval_count' => $variant['interval_count'],
-                            'subdesc' => $tier['subdesc'],
-                        ])['plan_id'];
-                    } catch (SafepayException $e) {
-                        $this->command->error("Safepay plan creation failed for {$name}: " . $e->getMessage());
-                    }
-                }
+                $plan = Plan::firstOrNew(['tier' => $tier['tier'], 'interval' => $variant['interval']]);
+                $priceChanged = $plan->exists && (float) $plan->price !== (float) $variant['price'];
 
-                $attributes = [
+                $plan->fill([
                     'name' => $name,
                     'price' => $variant['price'],
                     'daily_credits' => $tier['daily_credits'],
@@ -128,27 +109,36 @@ class PlanSeeder extends Seeder
                     'subdesc' => $tier['subdesc'],
                     'features' => $tier['features'],
                     'is_active' => true,
-                ];
+                ]);
 
-                // Only (over)write the Safepay id when we actually created a
-                // fresh plan, so re-running without keys preserves existing ids.
-                if ($safepayPlanId) {
-                    $attributes['safepay_plan_id'] = $safepayPlanId;
+                if ($stripeEnabled && (!$plan->stripe_price_id || $priceChanged)) {
+                    try {
+                        $oldPrice = $plan->stripe_price_id;
+                        $payload = $plan->only(['name', 'price', 'currency', 'interval', 'interval_count', 'subdesc']);
+
+                        if ($plan->stripe_product_id) {
+                            $plan->stripe_price_id = $stripe->createPrice($plan->stripe_product_id, $payload);
+                        } else {
+                            $created = $stripe->createPlan($payload);
+                            $plan->stripe_product_id = $created['product_id'];
+                            $plan->stripe_price_id = $created['price_id'];
+                        }
+
+                        if ($oldPrice) {
+                            $stripe->deactivatePrice($oldPrice);
+                        }
+                    } catch (ApiErrorException $e) {
+                        $this->command->error("Stripe price creation failed for {$name}: " . $e->getMessage());
+                    }
                 }
 
-                $plan = Plan::updateOrCreate(
-                    [
-                        'tier' => $tier['tier'],
-                        'interval' => $variant['interval'],
-                    ],
-                    $attributes
-                );
+                $plan->save();
 
-                if ($plan->safepay_plan_id) {
-                    $this->command->info("Seeded plan: {$plan->name} ({$tier['daily_credits']} credits/day, {$currency} {$variant['price']}) -> {$plan->safepay_plan_id}");
+                if ($plan->stripe_price_id) {
+                    $this->command->info("Seeded plan: {$plan->name} ({$tier['daily_credits']} credits/day, {$currency} {$variant['price']}) -> {$plan->stripe_price_id}");
                 } else {
                     $unpublished[] = $plan->name;
-                    $this->command->warn("Seeded plan WITHOUT a Safepay id: {$plan->name} - nobody can subscribe to it yet.");
+                    $this->command->warn("Seeded plan WITHOUT a Stripe price: {$plan->name} - nobody can subscribe to it yet.");
                 }
             }
         }
@@ -156,11 +146,11 @@ class PlanSeeder extends Seeder
         if ($unpublished) {
             $this->command->newLine();
             $this->command->error(
-                count($unpublished) . ' plan(s) were not published to Safepay: ' . implode(', ', $unpublished)
+                count($unpublished) . ' plan(s) were not published to Stripe: ' . implode(', ', $unpublished)
             );
             $this->command->warn(
-                'Checkout will reject these with a 422 until they have a safepay_plan_id. '
-                . 'Fix the cause above and re-run this seeder - it back-fills the ids in place.'
+                'Checkout will reject these with a 422 until they have a stripe_price_id. '
+                . 'Set STRIPE_SECRET and re-run this seeder - it back-fills the ids in place.'
             );
         }
     }

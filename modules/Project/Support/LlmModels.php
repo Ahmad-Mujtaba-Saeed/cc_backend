@@ -74,6 +74,9 @@ class LlmModels
         'general' => ['services.openai.general_model', 'gpt-4o-mini'],
         // Mechanical work — see LIGHT_ALLOWED.
         'light' => ['services.openai.light_model', 'gpt-4o-mini'],
+        // Hero scenes (HeroSceneService): writes a Remotion component per
+        // scene. A CODE job, picked by the hero bench — see for().
+        'hero' => ['services.openai.hero_model', 'gpt-5.6-luna'],
     ];
 
     /**
@@ -146,6 +149,13 @@ class LlmModels
      */
     public static function for(string $role): string
     {
+        // The hero role writes code, and was chosen per model by measuring
+        // (scratchpad/hero-bench.php); the admin's global text-model switch
+        // (picked for prose and planning) must not silently reassign it.
+        if ($role === 'hero') {
+            return self::configured('hero');
+        }
+
         $override = self::selected();
 
         if ($override !== self::AUTO) {

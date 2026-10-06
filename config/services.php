@@ -112,6 +112,14 @@ return [
         // already exist keep rendering as before. EXPLAINER_UNIQUE_LOOK=false
         // goes back to the curated schemes for new projects.
         'explainer_unique_look' => env('EXPLAINER_UNIQUE_LOOK', true),
+        // Hero scenes (HeroSceneService): a code model writes a bespoke
+        // Remotion component for 1-2 key beats per video. gpt-5.6-luna was the
+        // user's pick (2026-10-03) pending the hero bench. EXPLAINER_HERO_SCENES
+        // gates the automatic pass after analysis; it costs real money per
+        // video, so it ships OFF until the bench has picked the model.
+        'hero_model' => env('OPENAI_HERO_MODEL', 'gpt-5.6-luna'),
+        'explainer_hero_scenes' => env('EXPLAINER_HERO_SCENES', false),
+        'hero_max_per_video' => (int) env('EXPLAINER_HERO_MAX', 2),
         // Geometry figure synthesis (iter 40): a focused per-scene call that
         // REBUILDS a geometry_diagram whose slot came back thin — a bare shape
         // name with no points/labels/marks while the narration clearly

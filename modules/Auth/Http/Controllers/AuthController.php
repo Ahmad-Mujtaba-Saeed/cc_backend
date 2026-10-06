@@ -28,9 +28,8 @@ class AuthController extends Controller
         ]);
 
 
-        // Safepay has no customer to create up front: the shopper record is
-        // created inside hosted checkout, and its token lands on the user via
-        // the subscription webhook.
+        // No Stripe customer here: it is created on the user's first checkout
+        // (StripeController::customerFor), so signing up never waits on Stripe.
         $user = User::create([
             'name' => $request->name,
             'phone' => $request->phone,

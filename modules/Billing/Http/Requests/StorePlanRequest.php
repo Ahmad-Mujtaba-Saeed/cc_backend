@@ -19,7 +19,7 @@ class StorePlanRequest extends FormRequest
             'daily_credits' => 'sometimes|integer|min:0',
             'tier' => 'sometimes|nullable|string',
             'is_popular' => 'sometimes|boolean',
-            // Safepay applies the free trial at the plan level.
+            // Free trial offered at checkout, once per user.
             'trial_period_days' => 'sometimes|integer|min:0|max:365',
         ];
     }

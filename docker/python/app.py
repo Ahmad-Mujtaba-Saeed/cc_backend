@@ -131,6 +131,13 @@ except Exception as e:
     video_editing_service = None
     audio_separation_service = None
 
+# Load Whisper in the background so the first word-timing call of a render
+# doesn't pay for it. WHISPER_PRELOAD=0 skips this (it then loads on first use).
+if transcription_service is not None and hasattr(TranscriptionService, "warm") \
+        and os.environ.get("WHISPER_PRELOAD", "1") != "0":
+    import threading
+    threading.Thread(target=TranscriptionService.warm, name="whisper-warmup", daemon=True).start()
+
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint"""
@@ -815,64 +822,6 @@ async def assemble_scenes(request: AssembleScenesRequest):
     except Exception as e:
         logger.error(f"assemble-scenes error: {str(e)}")
         return AssembleScenesResponse(success=False, error=str(e))
-
-
-@app.post("/upload")
-async def upload_file(file: UploadFile = File(...)):
-    """Upload file to shared storage"""
-    try:
-        # Generate unique filename
-        file_extension = os.path.splitext(file.filename)[1]
-        filename = f"{file.filename}_{int(asyncio.get_event_loop().time())}{file_extension}"
-        file_path = os.path.join(UPLOADS_DIR, filename)
-        
-        # Save file
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-        
-        return {
-            "success": True,
-            "filename": filename,
-            "path": f"uploads/{filename}",
-            "size": os.path.getsize(file_path)
-        }
-        
-    except Exception as e:
-        logger.error(f"Upload error: {str(e)}")
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-@app.get("/files/{file_path:path}")
-async def get_file(file_path: str):
-    """Serve files from shared storage"""
-    try:
-        full_path = os.path.join(SHARED_STORAGE, file_path)
-        if not os.path.exists(full_path):
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        return FileResponse(full_path)
-        
-    except Exception as e:
-        logger.error(f"File serving error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/files/{file_path:path}")
-async def delete_file(file_path: str):
-    """Delete file from shared storage"""
-    try:
-        full_path = os.path.join(SHARED_STORAGE, file_path)
-        if not os.path.exists(full_path):
-            raise HTTPException(status_code=404, detail="File not found")
-        
-        os.remove(full_path)
-        return {"success": True, "message": "File deleted"}
-        
-    except Exception as e:
-        logger.error(f"File deletion error: {str(e)}")
-        return {"success": False, "error": str(e)}
 
 
 # ─── YT + Gameplay Short: Pydantic models ──────────────────────────────────

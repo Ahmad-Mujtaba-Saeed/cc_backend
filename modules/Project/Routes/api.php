@@ -137,6 +137,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('throttle:30,1');
     Route::delete('/explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}/asset', [ExplainerController::class, 'deleteAsset']);
     Route::patch('/explainer/projects/{project}/scenes/{sceneId}/slots/{slotKey}', [ExplainerController::class, 'updateSlot']);
+    Route::post('/explainer/projects/{project}/scenes/{sceneId}/hero', [ExplainerController::class, 'heroScene']);
     // Hand edits from the preview stage (the whole map for one scene).
     Route::put('/explainer/projects/{project}/scenes/{sceneId}/element-edits', [ExplainerController::class, 'updateElementEdits'])
         ->middleware('throttle:120,1');

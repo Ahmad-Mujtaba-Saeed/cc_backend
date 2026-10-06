@@ -19,7 +19,8 @@ class Plan extends Model implements Auditable
         'currency',
         'interval',
         'interval_count',
-        'safepay_plan_id',
+        'stripe_product_id',
+        'stripe_price_id',
         'trial_period_days',
         'features',
         'is_active',
@@ -36,6 +37,7 @@ class Plan extends Model implements Auditable
 
     public function subscriptions()
     {
-        return $this->hasMany(Subscription::class);
+        // Subscriptions point at their plan through `type_id`, not `plan_id`.
+        return $this->hasMany(Subscription::class, 'type_id');
     }
 }

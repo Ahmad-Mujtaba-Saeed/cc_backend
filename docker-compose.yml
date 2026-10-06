@@ -1,31 +1,51 @@
-version: "3.9"
+# What starts:
+#   docker compose up -d                     core: nginx, app, worker, mysql, redis
+#                                            (+ every profile listed in COMPOSE_PROFILES in .env)
+#   docker compose --profile ai up -d        + ai      (whisper timings, demucs, faces, ffmpeg tools —
+#                                                      renders and the shorts templates need it)
+#   docker compose --profile voice up -d     + voice cloning (voice + voice-worker, ~3 GB RAM)
+#   docker compose --profile tools up -d     + phpmyadmin
+# .env ships COMPOSE_PROFILES=ai so a plain `up` can render; blank it to run
+# just the API (dashboard/storyboard work) on a small machine.
+
+# One PHP image for app, worker and voice-worker: built once, not once each.
+x-php: &php
+  image: viralforge-php:latest
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  volumes:
+    - .:/var/www
+    - ./storage:/var/www/storage
+    # vendor/ lives in a Linux volume, NOT the Windows bind mount: a file stat
+    # across the mount costs ~1 ms vs ~0.01 ms here, and Laravel touches
+    # ~1,500 vendor files a request (measured: a bare 401 took 3-4 s). The
+    # volume is filled from the image on first start. After changing
+    # composer.json/lock run:  docker compose exec app composer install
+    - vendor:/var/www/vendor
+  dns:
+    - 8.8.8.8
+    - 1.1.1.1
+  networks:
+    - app_net
 
 services:
   app:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
-    volumes:
-      - .:/var/www
-      - ./storage:/var/www/storage
+    <<: *php
     environment:
       - PYTHON_AI_SERVICE_URL=http://ai:8000
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # No depends_on `ai`: the API serves without it, and depending on it forced
+    # the 13 GB AI container up just to load the dashboard.
     depends_on:
-      - mysql
-      - redis
-      - ai
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    networks:
-      - app_net
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   worker:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
+    <<: *php
     # Run as www-data — the SAME user php-fpm serves web requests as.
     #
     # Both processes write into storage/app/public, and Laravel creates
@@ -39,49 +59,33 @@ services:
     # reap-stale runs on boot because a worker restart is the most common way a
     # project is orphaned mid-render, and this stack has no scheduler process.
     # `|| true` so a reap failure can never stop the queue from starting.
-    command: sh -c "sleep 20 && php artisan migrate --force && (php artisan projects:reap-stale || true) && php artisan queue:work --queue=video-processing --sleep=1 --tries=3"
-    volumes:
-      - .:/var/www
-      - ./storage:/var/www/storage
+    # (Waits on mysql's healthcheck instead of the old `sleep 20`.)
+    command: sh -c "php artisan migrate --force && (php artisan projects:reap-stale || true) && php artisan queue:work --queue=video-processing --sleep=1 --tries=3"
     environment:
       - PYTHON_AI_SERVICE_URL=http://ai:8000
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      - mysql
-      - redis
-      - ai
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    networks:
-      - app_net
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   # Cloning + stand-alone text-to-speech jobs ("My Voices") on their own queue
   # connection, so a long render never makes a user wait for their voice and
   # a slow CPU synthesis never holds up a render.
   voice-worker:
-    # Same image as `worker` (compose's default name for it), so an existing
-    # worker image is reused instead of a second full PHP build; a fresh
-    # machine builds it once for both.
-    image: viralforgebackend-worker:latest
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
+    <<: *php
+    profiles: ["voice"]
     user: www-data
-    command: sh -c "sleep 25 && php artisan queue:work voice --queue=voice --sleep=2 --tries=1 --timeout=3000"
-    volumes:
-      - .:/var/www
-      - ./storage:/var/www/storage
+    command: sh -c "php artisan queue:work voice --queue=voice --sleep=2 --tries=1 --timeout=3000"
     depends_on:
-      - mysql
-      - redis
-      - voice
-    dns:
-      - 8.8.8.8
-      - 1.1.1.1
-    networks:
-      - app_net
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      voice:
+        condition: service_started
 
   # Voice cloning TTS: Chatterbox-Nano (Resemble AI, MIT). Its own image
   # because chatterbox-tts pins torch/transformers versions the `ai` image
@@ -89,6 +93,7 @@ services:
   # file paths pass through unchanged; app.py is mounted so edits apply on a
   # restart without a rebuild.
   voice:
+    profiles: ["voice"]
     build:
       context: ./docker/voice
     volumes:
@@ -105,6 +110,7 @@ services:
       - app_net
 
   ai:
+    profiles: ["ai"]
     build:
       context: .
       dockerfile: docker/python/Dockerfile
@@ -151,16 +157,30 @@ services:
     command: --default-authentication-plugin=mysql_native_password
     volumes:
       - mysql_data:/var/lib/mysql
+    # 127.0.0.1 (TCP), not localhost (socket): during first-boot init MySQL
+    # answers on the socket before it accepts the network connections the app uses.
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 10s
     networks:
       - app_net
 
+  # Holds the queue, cache and sessions: persisted so recreating the
+  # container doesn't drop queued renders or log everyone out.
   redis:
     image: redis:alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
     networks:
       - app_net
 
   phpmyadmin:
     image: phpmyadmin/phpmyadmin
+    profiles: ["tools"]
     container_name: phpmyadmin
     restart: unless-stopped
     ports:
@@ -177,6 +197,8 @@ services:
 
 volumes:
   mysql_data:
+  redis_data:
+  vendor:
   hf_cache:
   torch_cache:
 
