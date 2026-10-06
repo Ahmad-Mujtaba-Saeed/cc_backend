@@ -65,7 +65,12 @@ services:
       - PYTHON_AI_SERVICE_URL=http://ai:8000
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    # `app` first: both mount the empty `vendor` volume and Docker fills it from
+    # the image on first mount — created together, they race and one dies with
+    # "mkdir …/vendor/_data/aws: file exists" (every fresh machine hit this).
     depends_on:
+      app:
+        condition: service_started
       mysql:
         condition: service_healthy
       redis:
@@ -80,6 +85,8 @@ services:
     user: www-data
     command: sh -c "php artisan queue:work voice --queue=voice --sleep=2 --tries=1 --timeout=3000"
     depends_on:
+      app:
+        condition: service_started
       mysql:
         condition: service_healthy
       redis:
