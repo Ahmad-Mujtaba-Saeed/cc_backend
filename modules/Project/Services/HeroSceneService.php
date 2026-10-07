@@ -137,7 +137,12 @@ class HeroSceneService
             }
             $attempts[] = ['attempt' => $attempt, 'stage' => 'pass', 'score' => $review['score'] ?? null];
 
-            return ['ok' => true, 'entry' => $this->store($project, $scene, $code, $compiled['js'], $test['stills'], $review, $attempts, $started)];
+            $entry = $this->store($project, $scene, $code, $compiled['js'], $test['stills'], $review, $attempts, $started);
+            if ($this->tag === null) {
+                $entry += $this->renderClip($project, $sceneId, $compiled['js'], $payloadScene, $shotList, $fps, $width, $height) ?? [];
+            }
+
+            return ['ok' => true, 'entry' => $entry];
         }
 
         return ['ok' => false, 'entry' => [
@@ -311,28 +316,79 @@ class HeroSceneService
      *
      * @return array{problems: string[], stills: string[], layout: string[]}
      */
-    private function test(Project $project, string $sceneId, int $attempt, string $js, array $payloadScene, array $shotList, int $fps, int $width, int $height): array
+    /**
+     * The hero's scene ALONE, in the project's real look: what the acceptance
+     * test and the preview clip both render.
+     */
+    public static function miniShotList(string $js, array $payloadScene, array $shotList, bool $audit): array
     {
         $scene = $payloadScene;
         if (empty($scene['narration_words'])) {
             $scene['narration_words'] = self::estimateWords((string) ($scene['narration']['text'] ?? ''), (float) ($scene['duration_seconds'] ?? 8));
         }
-        $scene['hero'] = [
+        $scene['hero'] = array_filter([
             'js' => $js,
             'captions' => (bool) ($shotList['captions']['enabled'] ?? false),
             'assets' => array_filter(['illustration' => $payloadScene['illustration_url'] ?? null]),
-            // Measure the hero's text in every test frame (remotion-render hero/audit.tsx).
-            'audit' => true,
-        ];
+            'audit' => $audit ?: null,
+        ], fn ($v) => $v !== null);
         $scene['transition'] = 'none';
         unset($scene['punchline']);
-        $mini = array_merge($shotList, [
+
+        return array_merge($shotList, [
             'composition_mode' => 'slides',
             'canvas' => null,
             'chapters' => null,
             'music' => null,
             'scenes' => [$scene],
         ]);
+    }
+
+    /**
+     * Record the hero as a small silent MP4 (POST /hero/clip) — what the
+     * dashboard's Play tab shows in its place, since hero code never runs in
+     * the dashboard. Captions are left off the clip (the Player draws its own
+     * on top) while the hero still keeps clear of them. Never throws: a hero
+     * without a clip just shows its card in the Play tab, as before.
+     *
+     * @return array{clip: string, clip_frames: int}|null
+     */
+    public function renderClip(Project $project, string $sceneId, string $js, array $payloadScene, array $shotList, int $fps, int $width, int $height): ?array
+    {
+        $mini = self::miniShotList($js, $payloadScene, $shotList, false);
+        $mini['captions'] = array_merge((array) ($mini['captions'] ?? []), ['enabled' => false]);
+        $rel = $this->dir($project) . '/' . preg_replace('/[^A-Za-z0-9_-]/', '_', $sceneId) . '-' . substr(md5($js), 0, 8) . '.mp4';
+        Storage::disk('public')->makeDirectory(dirname($rel));
+
+        try {
+            $r = Http::timeout(300)->post("{$this->renderUrl}/hero/clip", [
+                'shot_list' => $mini,
+                'output_path' => Storage::disk('public')->path($rel),
+                'fps' => $fps,
+                'width' => $width,
+                'height' => $height,
+                'scale' => 0.5,
+            ]);
+        } catch (Throwable $e) {
+            Log::warning('HeroSceneService: clip render could not run', ['project_id' => $project->id, 'scene_id' => $sceneId, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+        $json = (array) $r->json();
+        if (!($json['success'] ?? false) || !Storage::disk('public')->exists($rel)) {
+            Log::warning('HeroSceneService: clip render failed', ['project_id' => $project->id, 'scene_id' => $sceneId, 'error' => $json['error'] ?? null]);
+
+            return null;
+        }
+
+        return ['clip' => $rel, 'clip_frames' => (int) ($json['frames'] ?? 0)];
+    }
+
+    private function test(Project $project, string $sceneId, int $attempt, string $js, array $payloadScene, array $shotList, int $fps, int $width, int $height): array
+    {
+        // Measure the hero's text in every test frame (remotion-render hero/audit.tsx).
+        $mini = self::miniShotList($js, $payloadScene, $shotList, true);
+        $scene = $mini['scenes'][0];
         $frames = (int) max(30, round(((float) ($scene['duration_seconds'] ?? 8)) * $fps));
         $at = array_map(fn ($f) => (int) round($f * ($frames - 1)), [0.06, 0.3, 0.55, 0.8, 0.97]);
 

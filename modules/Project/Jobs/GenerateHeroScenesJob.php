@@ -39,8 +39,12 @@ class GenerateHeroScenesJob implements ShouldQueue
     /** Up to ~3 writes + 3 test renders per scene, two scenes. */
     public int $timeout = 1800;
 
-    /** @param  string[]|null  $sceneIds */
-    public function __construct(public Project $project, public ?array $sceneIds = null)
+    /**
+     * @param  string[]|null  $sceneIds
+     * @param  bool  $clipsOnly  write nothing new: record the Play-tab preview
+     *                           clip of every ready hero that has none yet
+     */
+    public function __construct(public Project $project, public ?array $sceneIds = null, public bool $clipsOnly = false)
     {
         $this->onQueue('video-processing');
     }
@@ -59,13 +63,19 @@ class GenerateHeroScenesJob implements ShouldQueue
             return;
         }
 
-        $ids = $this->sceneIds ?? HeroScenes::cast(
+        if ($this->clipsOnly) {
+            $ids = array_keys(array_filter((array) ($settings['hero_scenes'] ?? []), fn ($e) => is_array($e)
+                && ($e['status'] ?? null) === 'ready' && empty($e['clip'])));
+            $ids = $this->sceneIds !== null ? array_values(array_intersect($ids, $this->sceneIds)) : $ids;
+        } else {
+            $ids = $this->sceneIds ?? HeroScenes::cast(
             $scenes,
             (int) config('services.openai.hero_max_per_video', 2),
             (string) ($settings['composition_mode'] ?? '')
-        );
+            );
+        }
         // When casting, a hero already written for this exact scene is kept.
-        if ($this->sceneIds === null) {
+        if ($this->sceneIds === null && !$this->clipsOnly) {
             $ids = array_values(array_filter($ids, function ($id) use ($settings, $scenes) {
                 $entry = $settings['hero_scenes'][$id] ?? null;
                 if (!is_array($entry) || ($entry['status'] ?? null) !== 'ready') {
@@ -108,6 +118,21 @@ class GenerateHeroScenesJob implements ShouldQueue
                 }
             }
             if ($scene === null || !isset($byId[$sceneId])) {
+                continue;
+            }
+
+            if ($this->clipsOnly) {
+                $module = HeroScenes::module($settings, (string) $sceneId);
+                $clip = $module === null ? null
+                    : (new HeroSceneService())->renderClip($this->project, (string) $sceneId, (string) $module['js'], $byId[$sceneId], $shotList, $fps, $width, $height);
+                if ($clip !== null) {
+                    $this->project->refresh();
+                    $entry = $this->project->settings['hero_scenes'][$sceneId] ?? null;
+                    if (is_array($entry) && ($entry['status'] ?? null) === 'ready') {
+                        $this->put($sceneId, array_merge($entry, $clip));
+                    }
+                }
+                Log::info('GenerateHeroScenesJob: preview clip', ['project_id' => $this->project->id, 'scene_id' => $sceneId, 'ok' => $clip !== null]);
                 continue;
             }
 

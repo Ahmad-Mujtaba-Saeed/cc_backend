@@ -1955,6 +1955,8 @@ class ExplainerController extends Controller
                 'score' => $e['review']['score'] ?? null,
                 'stills' => array_map(fn ($p) => Storage::disk('public')->url((string) $p), array_slice((array) ($e['stills'] ?? []), 0, 5)),
                 'stale' => isset($e['content_hash'], $hashes[$id]) && $e['content_hash'] !== $hashes[$id],
+                // The Play tab has a recorded clip to show (HeroSceneService::renderClip).
+                'has_clip' => !empty($e['clip']),
                 'error' => $e['error'] ?? null,
                 'updated_at' => $e['updated_at'] ?? null,
             ];
@@ -1988,11 +1990,13 @@ class ExplainerController extends Controller
         }
 
         if ($action === 'remove') {
-            $file = $settings['hero_scenes'][$sceneId]['file'] ?? null;
+            $files = [$settings['hero_scenes'][$sceneId]['file'] ?? null, $settings['hero_scenes'][$sceneId]['clip'] ?? null];
             unset($settings['hero_scenes'][$sceneId]);
             $project->update(['settings' => $settings]);
-            if (is_string($file) && $file !== '') {
-                Storage::disk('public')->delete($file);
+            foreach ($files as $file) {
+                if (is_string($file) && $file !== '') {
+                    Storage::disk('public')->delete($file);
+                }
             }
 
             return response()->json(['success' => true, 'data' => ['hero_scenes' => self::heroSummary($project)]]);

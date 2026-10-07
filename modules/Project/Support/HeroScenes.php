@@ -212,6 +212,12 @@ final class HeroScenes
                 $assets['illustration'] = (string) $scene['illustration_url'];
             }
             $scenes[$i]['hero'] = ['js' => (string) $module['js'], 'captions' => $captions, 'assets' => $assets];
+            // The recorded clip the dashboard Player shows in the hero's place.
+            $clip = (string) ($settings['hero_scenes'][(string) $scene['scene_id']]['clip'] ?? '');
+            if ($clip !== '' && Storage::disk('public')->exists($clip)) {
+                $scenes[$i]['hero']['preview_url'] = $publicUrl($clip);
+                $scenes[$i]['hero']['preview_frames'] = (int) ($settings['hero_scenes'][(string) $scene['scene_id']]['clip_frames'] ?? 0);
+            }
             // The hero owns the frame: the word-synced punchline overlay would
             // land on top of a composition that did not plan for it.
             unset($scenes[$i]['punchline']);
