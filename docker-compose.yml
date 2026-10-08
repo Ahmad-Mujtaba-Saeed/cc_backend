@@ -8,12 +8,17 @@
 # .env ships COMPOSE_PROFILES=ai so a plain `up` can render; blank it to run
 # just the API (dashboard/storyboard work) on a small machine.
 
-# One PHP image for app, worker and voice-worker: built once, not once each.
+# One PHP image for app, worker, mcp-worker, scheduler and voice-worker, built
+# ONCE — by `app` only. Every other PHP service just runs that image.
+#
+# Do not put `build:` back in this anchor: with several services building the
+# same tag, newer Compose (Bake) builds them in parallel and the second export
+# fails with `image "viralforge-php:latest": already exists`. `pull_policy:
+# never` stops Compose looking for the image on Docker Hub (it is local-only);
+# it is created by app's build earlier in the same `up --build`.
 x-php: &php
   image: viralforge-php:latest
-  build:
-    context: .
-    dockerfile: docker/php/Dockerfile
+  pull_policy: never
   volumes:
     - .:/var/www
     - ./storage:/var/www/storage
@@ -32,6 +37,10 @@ x-php: &php
 services:
   app:
     <<: *php
+    # The only service that builds the shared PHP image (see x-php above).
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
     environment:
       - PYTHON_AI_SERVICE_URL=http://ai:8000
     extra_hosts:
