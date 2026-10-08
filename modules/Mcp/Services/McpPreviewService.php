@@ -82,7 +82,8 @@ final class McpPreviewService
         // Full-size stills for the human (the model gets the sheet above).
         $urls = array_map(fn ($s) => Storage::disk('public')->url($s['path']), $run['stills']);
         if ($urls !== []) {
-            $lines[] = 'Full-size frames (for the user to open): ' . implode(' ', $urls);
+            $lines[] = 'Full-size frames (for the user to open; kept for this scene\'s last '
+                . self::KEEP_PREVIEWS_PER_SCENE . ' previews, up to a few days): ' . implode(' ', $urls);
         }
 
         $result = ToolResult::text(implode("\n\n", $lines));
@@ -285,15 +286,29 @@ final class McpPreviewService
         });
     }
 
+    /**
+     * Keep the newest few preview folders of this scene, not just the latest:
+     * the full-size links handed back are opened later (by the user, or by
+     * the model comparing before/after), and deleting every older folder on
+     * the next preview turned all of them into 404s mid-conversation. The
+     * daily mcp:prune still clears folders older than a few days.
+     */
+    private const KEEP_PREVIEWS_PER_SCENE = 5;
+
     private function prune(Project $project, string $sceneId, string $keep): void
     {
         $disk = Storage::disk('public');
         $base = "explainer/{$project->id}/mcp_preview";
         $prefix = $base . '/' . preg_replace('/[^A-Za-z0-9_-]/', '_', $sceneId) . '-';
+        $mine = [];
         foreach ($disk->directories($base) as $d) {
             if (str_starts_with($d, $prefix) && $d !== $keep) {
-                $disk->deleteDirectory($d);
+                $mine[$d] = (int) @filemtime($disk->path($d));
             }
+        }
+        arsort($mine);
+        foreach (array_slice(array_keys($mine), self::KEEP_PREVIEWS_PER_SCENE - 1) as $d) {
+            $disk->deleteDirectory($d);
         }
     }
 
