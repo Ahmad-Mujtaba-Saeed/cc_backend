@@ -209,6 +209,18 @@ final class McpPreviewService
             $stills[] = ['frame' => (int) ($s['frame'] ?? 0), 'path' => $rel . '/' . basename((string) ($s['output_path'] ?? ''))];
             $slowest = max($slowest, (int) ($s['ms'] ?? 0));
         }
+        // The render server is a host process that maps /var/www/storage to its
+        // own HOST_STORAGE_PREFIX. Mis-set, it "succeeds" while writing the
+        // stills to a folder this app never sees — the sheet then can't be
+        // built and every link 404s. Say so plainly instead.
+        $missing = array_filter($stills, fn ($s) => !is_file(Storage::disk('public')->path($s['path'])));
+        if ($stills !== [] && count($missing) === count($stills)) {
+            \Illuminate\Support\Facades\Log::error('MCP preview: render server wrote stills outside app storage', [
+                'output_dir' => Storage::disk('public')->path($rel),
+                'render_url' => $url,
+            ]);
+            throw new ToolException('The preview frames were drawn but not saved where the studio can read them (a server setup problem: the render server\'s storage path does not match the app\'s). Tell the user; this cannot be fixed from scene code.');
+        }
         if (count($stills) < count($at)) {
             $hard[] = (count($at) - count($stills)) . ' frame(s) could not be drawn at all.';
         }
