@@ -29,7 +29,7 @@ Write a scene plan (in your own reasoning or show it to the user if they want to
 For each scene, in order:
 
 1. `upsert_scene` with `narration` + `code` (or `card`). Code compiles on the spot — fix any refusal and resend the whole module with the same `scene_id`.
-2. `preview_scene` — this records the voice (so the scene gets its real length and real word timings) and returns frames as images. **Look at them.** Fix every MUST FIX; fix SHOULD FIX unless you have a reason; and judge the design honestly: is the idea instantly clear? Is the type big? Does the motion land on the words? Is anything clipped, crowded, or empty?
+2. `preview_scene` — this records the voice (so the scene gets its real length and real word timings) and returns the frames as ONE labelled contact sheet (tile label = frame number, % of the scene, frame index). To inspect one moment up close, preview again with a single `at` value — that comes back as one larger frame. The result also lists full-size frame links you can pass to the user. **Look at the frames.** Fix every MUST FIX; fix SHOULD FIX unless you have a reason; and judge the design honestly: is the idea instantly clear? Is the type big? Does the motion land on the words? Is anything clipped, crowded, or empty?
 3. Iterate until it is good, then move on. Two or three passes per scene is normal for the important ones (the hook, the big reveal, the ending).
 
 Tips:

@@ -54,22 +54,40 @@ final class McpPreviewService
         if ($run['soft'] !== []) {
             $lines[] = "SHOULD FIX:\n- " . implode("\n- ", array_slice($run['soft'], 0, 10));
         }
-        $lines[] = 'Frames below, in order: ' . implode(', ', array_map(
-            fn ($f, $fr) => sprintf('%d%% (frame %d)', round($f * 100), $fr),
-            $run['fractions'],
-            $run['at']
-        )) . '.';
-        $lines[] = $run['status'] === 'passed'
-            ? 'Judge them as a viewer would: is the idea instantly clear, is the type big and calm, does it move with the words, is anything clipped or crowded? If it is merely OK, improve it; otherwise move on.'
-            : 'Fix the points above (upsert_scene with the whole corrected code), then preview again.';
+        // ONE image, sized to fit the client's tool-result cap: several frames
+        // become a labelled contact sheet; a single requested moment comes
+        // back larger. (Full-size frames individually blew past Claude.ai's
+        // ~150k-character cap and the client dropped every one of them.)
+        $items = [];
+        $order = [];
+        foreach ($run['stills'] as $i => $s) {
+            $abs = Storage::disk('public')->path($s['path']);
+            $pct = (int) round(($run['fractions'][$i] ?? 0) * 100);
+            $items[] = ['path' => $abs, 'label' => sprintf('%d  %d%%  f%d', $i + 1, $pct, $s['frame'])];
+            $order[] = sprintf('%d) %d%% (frame %d)', $i + 1, $pct, $s['frame']);
+        }
+        $image = $items === [] ? null : \Modules\Mcp\Support\McpImages::sheet($items, null, count($items) === 1 ? 1280 : 1400);
+
+        if ($image !== null) {
+            $lines[] = count($items) === 1
+                ? 'Attached: the frame at ' . $order[0] . '.'
+                : 'Attached: ONE contact sheet of ' . count($items) . ' frames, left to right then top to bottom — ' . implode(', ', $order)
+                    . '. Each tile is labelled. For a closer look at one moment, call preview_scene with a single `at` value.';
+            $lines[] = $run['status'] === 'passed'
+                ? 'Judge it as a viewer would: is the idea instantly clear, is the type big and calm, does it move with the words, is anything clipped or crowded? If it is merely OK, improve it; otherwise move on.'
+                : 'Fix the points above (upsert_scene with the whole corrected code), then preview again.';
+        } else {
+            $lines[] = 'NO IMAGE could be attached this time (the frames rendered but could not be encoded). Rely on the measured problems above, and tell the user they can open the frames below.';
+        }
+        // Full-size stills for the human (the model gets the sheet above).
+        $urls = array_map(fn ($s) => Storage::disk('public')->url($s['path']), $run['stills']);
+        if ($urls !== []) {
+            $lines[] = 'Full-size frames (for the user to open): ' . implode(' ', $urls);
+        }
 
         $result = ToolResult::text(implode("\n\n", $lines));
-        foreach ($run['stills'] as $s) {
-            $abs = Storage::disk('public')->path($s['path']);
-            $jpeg = is_file($abs) ? McpScenes::toJpeg((string) file_get_contents($abs), 960, 80) : null;
-            if ($jpeg !== null) {
-                $result->addImage($jpeg, 'image/jpeg');
-            }
+        if ($image !== null) {
+            $result->addImage($image, 'image/jpeg');
         }
 
         return $result;
@@ -142,7 +160,7 @@ final class McpPreviewService
         }
 
         $frames = (int) max(2, round(((float) ($payloadScene['duration_seconds'] ?? 4)) * $fps));
-        $fractions = array_values(array_unique(array_map(fn ($f) => max(0.0, min(1.0, (float) $f)), $fractions ?: [0.12, 0.5, 0.92])));
+        $fractions = array_values(array_unique(array_map(fn ($f) => max(0.0, min(1.0, (float) $f)), $fractions ?: [0.08, 0.35, 0.65, 0.95])));
         $fractions = array_slice($fractions, 0, 6);
         $at = array_map(fn ($f) => (int) round($f * ($frames - 1)), $fractions);
 

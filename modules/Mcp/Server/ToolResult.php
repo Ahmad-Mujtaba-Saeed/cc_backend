@@ -62,6 +62,69 @@ final class ToolResult
         return $this->isError;
     }
 
+    public function imageCount(): int
+    {
+        return count(array_filter($this->content, fn ($c) => $c['type'] === 'image'));
+    }
+
+    /** Characters the client counts against its tool-result cap. */
+    public function totalChars(): int
+    {
+        $n = 0;
+        foreach ($this->content as $c) {
+            $n += strlen($c['type'] === 'image' ? $c['data'] : $c['text']) + 64;
+        }
+
+        return $n;
+    }
+
+    /**
+     * Keep the whole result under the client's cap (Claude.ai/Desktop drop a
+     * result over ~150k characters; their images vanish without a word to the
+     * model). Images go first — last one first — and the result SAYS so, so
+     * the model never believes in pictures it did not get.
+     */
+    public function enforceBudget(int $maxChars): self
+    {
+        $dropped = 0;
+        while ($this->totalChars() > $maxChars) {
+            $idx = null;
+            foreach ($this->content as $i => $c) {
+                if ($c['type'] === 'image') {
+                    $idx = $i;
+                }
+            }
+            if ($idx === null) {
+                break;
+            }
+            array_splice($this->content, $idx, 1);
+            $dropped++;
+        }
+        if ($dropped > 0) {
+            $this->content[] = ['type' => 'text', 'text' => "Note: {$dropped} image(s) were left out to stay under the client's tool-result size limit."];
+        }
+        // Text alone over the cap: trim the longest text block.
+        while ($this->totalChars() > $maxChars) {
+            $longest = null;
+            foreach ($this->content as $i => $c) {
+                if ($c['type'] === 'text' && ($longest === null || strlen($c['text']) > strlen($this->content[$longest]['text']))) {
+                    $longest = $i;
+                }
+            }
+            if ($longest === null) {
+                break;
+            }
+            $over = $this->totalChars() - $maxChars;
+            $keep = max(1000, strlen($this->content[$longest]['text']) - $over - 200);
+            $this->content[$longest]['text'] = mb_strcut($this->content[$longest]['text'], 0, $keep) . "\n…(cut to fit the client's size limit — ask for a narrower range)";
+            if ($keep === 1000) {
+                break;
+            }
+        }
+
+        return $this;
+    }
+
     public function toArray(): array
     {
         return ['content' => $this->content, 'isError' => $this->isError];

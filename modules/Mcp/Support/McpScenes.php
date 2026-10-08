@@ -117,16 +117,21 @@ final class McpScenes
         return $name;
     }
 
-    /** A provider thumbnail, re-encoded as a small JPEG for the model to look at. */
+    /**
+     * A provider thumbnail saved to a temp file (the caller deletes it), for
+     * the contact sheet the model looks at.
+     */
     public static function fetchThumbnail(string $url): ?string
     {
         try {
             $r = Http::timeout(8)->withHeaders(['User-Agent' => 'VreatoStudio/1.0'])->get($url);
-            if (!$r->successful() || strlen($r->body()) > 4 * 1024 * 1024) {
+            if (!$r->successful() || strlen($r->body()) > 4 * 1024 * 1024 || strlen($r->body()) < 100) {
                 return null;
             }
+            $file = sys_get_temp_dir() . '/mcpthumb_' . bin2hex(random_bytes(8));
+            file_put_contents($file, $r->body());
 
-            return self::toJpeg($r->body(), 360, 72);
+            return $file;
         } catch (\Throwable $e) {
             return null;
         }

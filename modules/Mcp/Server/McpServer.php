@@ -148,6 +148,9 @@ final class McpServer
             $arguments = [];
         }
 
+        // Images and the whole result are sized for THIS client's cap.
+        \Modules\Mcp\Support\McpImages::forClient($this->ctx->clientName());
+
         try {
             $result = $this->tools->call($name, $arguments, $this->ctx);
         } catch (ToolException $e) {
@@ -162,7 +165,8 @@ final class McpServer
             $result = ToolResult::error("The {$name} tool hit an internal error. Try again; if it keeps failing, continue with another step and tell the user.");
         }
 
-        return $result->toArray();
+        // Every result fits the client's cap (Claude.ai/Desktop ~150k chars).
+        return $result->enforceBudget(\Modules\Mcp\Support\McpImages::resultBudget())->toArray();
     }
 
     private function readResource(array $params): array

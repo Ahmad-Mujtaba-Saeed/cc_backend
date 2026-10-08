@@ -146,24 +146,24 @@ final class VideoStudioTools
                 ['video_id', 'scene_ids'], self::WRITE),
 
             $this->def('preview_scene', 'Preview a scene (see its frames)',
-                'Records the scene\'s voice (narrated mode), renders frames of it through the real renderer and returns them as IMAGES, with measured problems: '
+                'Records the scene\'s voice (narrated mode), renders frames of it through the real renderer and returns them as an IMAGE (one labelled contact sheet), with measured problems: '
                 . 'text off-frame (must fix), text too small/overlapping, code that crashed (the scene fell back to a plain card), slow or empty frames. '
                 . 'Also returns the real word timings. Look at every frame critically and fix what you see. Preview every custom scene before rendering.',
                 [
                     'video_id' => $videoId,
                     'scene_id' => ['type' => 'string'],
-                    'at' => ['type' => 'array', 'items' => ['type' => 'number'], 'description' => 'Points in the scene to render, 0–1 (max 6). Default [0.12, 0.5, 0.92].'],
+                    'at' => ['type' => 'array', 'items' => ['type' => 'number'], 'description' => 'Points in the scene to render, 0–1 (max 6). Default [0.08, 0.35, 0.65, 0.95]. Several points come back as ONE labelled contact sheet; a single point comes back as one larger frame for close inspection.'],
                 ],
                 ['video_id', 'scene_id'], ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false]),
 
             $this->def('search_media', 'Search free stock media',
-                'Search free stock photos/videos (Pexels, Pixabay, Unsplash, Openverse, Wikimedia). with_thumbnails=true returns small images so you can see them. '
+                'Search free stock photos/videos (Pexels, Pixabay, Unsplash, Openverse, Wikimedia). with_thumbnails=true returns ONE numbered contact sheet of the first 9 results so you can see them. '
                 . 'Then add_media the one you want.',
                 [
                     'video_id' => $videoId,
                     'query' => ['type' => 'string', 'description' => '2–4 plain words, e.g. "city traffic night".'],
                     'kind' => ['type' => 'string', 'enum' => ['image', 'video'], 'description' => 'Default image.'],
-                    'with_thumbnails' => ['type' => 'boolean', 'description' => 'Return up to 8 thumbnails as images. Default false.'],
+                    'with_thumbnails' => ['type' => 'boolean', 'description' => 'Attach one numbered contact sheet of up to 9 thumbnails. Default false.'],
                 ],
                 ['video_id', 'query'], ['readOnlyHint' => true, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => true]),
 
@@ -350,9 +350,12 @@ final class VideoStudioTools
                 ? 'Nothing found — try simpler words, or draw it in code.'
                 : 'add_media with the provider, id, the same query and a shelf name.',
         ]);
-        foreach ($found['thumbnails'] as $n => $jpeg) {
-            $result->addText("Thumbnail of result #{$n}:");
-            $result->addImage($jpeg);
+        if ($found['sheet'] !== null) {
+            $result->addText('Attached: ONE contact sheet of thumbnails, each tile labelled with its result number (#'
+                . implode(', #', $found['sheet_numbers']) . '), left to right then top to bottom.');
+            $result->addImage($found['sheet']);
+        } elseif ((bool) $a->bool('with_thumbnails', false) && $found['results'] !== []) {
+            $result->addText('No thumbnails could be attached this time; pick by title/size, or open thumb_url.');
         }
 
         return $result;

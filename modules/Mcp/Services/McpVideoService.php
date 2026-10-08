@@ -857,7 +857,7 @@ final class McpVideoService
     // ------------------------------------------------------------------
 
     /**
-     * @return array{results: array, thumbnails: array<int, string>}
+     * @return array{results: array, sheet: ?string, sheet_numbers: int[]}
      */
     public function searchMedia(Project $project, string $query, string $kind, bool $withThumbnails): array
     {
@@ -868,7 +868,8 @@ final class McpVideoService
         $hits = $library->search($query, $kind, McpScenes::orientation($project), [], 12);
 
         $results = [];
-        $thumbs = [];
+        $tiles = [];
+        $tmp = [];
         foreach ($hits as $i => $hit) {
             $results[] = [
                 'n' => $i + 1,
@@ -881,15 +882,26 @@ final class McpVideoService
                 'license' => $hit['license'],
                 'thumb_url' => $hit['thumb'],
             ];
-            if ($withThumbnails && $i < 8 && preg_match('#^https://#i', (string) $hit['thumb'])) {
-                $jpeg = McpScenes::fetchThumbnail((string) $hit['thumb']);
-                if ($jpeg !== null) {
-                    $thumbs[$i + 1] = $jpeg;
+            if ($withThumbnails && $i < 9 && preg_match('#^https://#i', (string) $hit['thumb'])) {
+                $file = McpScenes::fetchThumbnail((string) $hit['thumb']);
+                if ($file !== null) {
+                    $tmp[] = $file;
+                    $tiles[] = ['path' => $file, 'label' => '#' . ($i + 1), 'n' => $i + 1];
                 }
             }
         }
 
-        return ['results' => $results, 'thumbnails' => $thumbs];
+        // ONE numbered contact sheet, not one image per hit: separate images
+        // overflowed Claude.ai's ~150k-character tool-result cap and were dropped.
+        try {
+            $sheet = $tiles === [] ? null : \Modules\Mcp\Support\McpImages::sheet($tiles, null, 1200);
+        } finally {
+            foreach ($tmp as $f) {
+                @unlink($f);
+            }
+        }
+
+        return ['results' => $results, 'sheet' => $sheet, 'sheet_numbers' => array_column($tiles, 'n')];
     }
 
     public function addMedia(Project $project, string $provider, string $id, string $query, string $kind, string $name): array
