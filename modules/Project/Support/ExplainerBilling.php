@@ -151,9 +151,14 @@ class ExplainerBilling
         $theme = ExplainerRegistry::themeFor($settings);
         $retry = (array) ($settings['vlm_retry_suffix'] ?? []);
         $budget = self::slotFillBudget($project);
+        // A hero that never shows the card's picture: drawing one is waste.
+        $heroCovered = HeroScenes::coveringMedia($settings);
 
         $pending = [];
         foreach ($project->explainerScenes()->orderBy('order')->get() as $scene) {
+            if (isset($heroCovered[(string) $scene->scene_id])) {
+                continue;
+            }
             foreach ($scene->slots ?? [] as $slotKey => $slot) {
                 if (!is_array($slot) || !in_array($slot['content_type'] ?? null, ['image', 'video'], true)) {
                     continue;

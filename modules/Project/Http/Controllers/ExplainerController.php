@@ -2536,6 +2536,9 @@ class ExplainerController extends Controller
 
         $scenes = [];
         $missing = [];
+        // Scenes whose AI hero plays in place of the card's pictures: their
+        // image/video slots are never seen, so they never ask for one.
+        $heroCovered = \Modules\Project\Support\HeroScenes::coveringMedia($project->settings ?? []);
 
         // Insertion order is NOT storyboard order once scenes have been
         // spliced after the fact (lazy-inserted chapter covers get tail ids
@@ -2558,7 +2561,8 @@ class ExplainerController extends Controller
                     ] : null;
                     // Stock b-roll slots (§8) auto-fill at render time — they
                     // never block readiness.
-                    if (!$asset && !$autoVisuals && trim((string) ($slot['stock_query'] ?? '')) === '') {
+                    if (!$asset && !$autoVisuals && trim((string) ($slot['stock_query'] ?? '')) === ''
+                        && !isset($heroCovered[(string) $scene->scene_id])) {
                         $missing[] = ['scene_id' => $scene->scene_id, 'slot_key' => $slotKey];
                     }
                 }
@@ -2574,6 +2578,7 @@ class ExplainerController extends Controller
                 'transition' => $scene->transition,
                 'mood' => $scene->mood ?? 'neutral',
                 'slots' => $slots,
+                'hero_covers_media' => isset($heroCovered[(string) $scene->scene_id]),
                 // An object, never [], so the client can index it by id.
                 'element_edits' => (object) ($scene->element_edits ?? []),
             ];

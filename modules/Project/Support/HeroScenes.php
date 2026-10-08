@@ -191,6 +191,31 @@ final class HeroScenes
     }
 
     /**
+     * Scene ids whose ready hero REPLACES the card's pictures: the hero plays
+     * in the card's place and its code never draws `<Asset>`, so the card's
+     * image/video slots are never seen. Those slots must not ask for an
+     * upload, block the render or be AI-drawn (and billed) at render time.
+     * A hero that does show the scene's picture keeps its slots live.
+     *
+     * @return array<string, true>
+     */
+    public static function coveringMedia(array $settings): array
+    {
+        if (($settings['composition_mode'] ?? '') === 'math_board') {
+            return [];
+        }
+        $out = [];
+        foreach (array_keys((array) ($settings['hero_scenes'] ?? [])) as $sceneId) {
+            $module = self::module($settings, (string) $sceneId);
+            if ($module !== null && !preg_match('/<Asset\b/', (string) ($module['code'] ?? ''))) {
+                $out[(string) $sceneId] = true;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Put each ready hero onto its scene in a render payload. The maths board
      * never carries one; everything else keeps its card as the fallback.
      *
