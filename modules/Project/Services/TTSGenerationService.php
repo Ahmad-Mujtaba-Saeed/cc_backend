@@ -48,6 +48,11 @@ class TTSGenerationService
             $templateType = $context['template_type'] ?? null;
             $settings = (array) ($context['settings'] ?? []);
             $provider = TtsVoices::activeProvider();
+            // A caller may pin the engine regardless of the admin switch: MCP
+            // videos are free, so they always speak with self-hosted Kokoro.
+            if (in_array($context['force_provider'] ?? null, TtsVoices::PROVIDERS, true)) {
+                $provider = (string) $context['force_provider'];
+            }
 
             Log::info("Starting TTS generation", [
                 'provider' => $provider,

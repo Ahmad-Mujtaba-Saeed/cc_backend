@@ -1,0 +1,9 @@
+{
+  "name": "Mcp",
+  "enabled": true,
+  "version": "1.0.0",
+  "description": "Claude / MCP video studio: lets a user's own LLM build explainer videos with our tools",
+  "providers": [
+    "Modules\Mcp\ModuleServiceProvider"
+  ]
+}

@@ -2299,7 +2299,7 @@ class ExplainerController extends Controller
      */
     public function downloadLink(Request $request, Project $project, string $kind): JsonResponse
     {
-        if ($denied = $this->guard($project)) {
+        if ($denied = $this->guard($project, true)) {
             return $denied;
         }
 
@@ -2502,7 +2502,7 @@ class ExplainerController extends Controller
 
     public function status(Project $project): JsonResponse
     {
-        if ($denied = $this->guard($project)) {
+        if ($denied = $this->guard($project, true)) {
             return $denied;
         }
 
@@ -2835,10 +2835,21 @@ class ExplainerController extends Controller
         return substr(preg_replace('/[^A-Za-z0-9_-]/', '', $value) ?: 'x', 0, 60);
     }
 
-    private function guard(Project $project): ?JsonResponse
+    private function guard(Project $project, bool $allowMcp = false): ?JsonResponse
     {
         if ($project->user_id !== auth()->id()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+        // Videos the user's own LLM built over MCP are made scene by scene by
+        // that model and are never edited here — editing would also reach
+        // the paid features the free MCP studio is kept away from. Read-only
+        // endpoints (status, downloads) opt in.
+        if (!$allowMcp && \Modules\Project\Support\McpOrigin::is($project)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'mcp_project',
+                'message' => 'This video was made with Claude (MCP). Change it by asking Claude; it is not edited in the storyboard.',
+            ], 409);
         }
         return null;
     }

@@ -436,6 +436,15 @@ class ProjectController extends Controller
             ], 403);
         }
 
+        // Claude-made (MCP) videos render through the studio's own tools.
+        if (\Modules\Project\Support\McpOrigin::is($project)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'mcp_project',
+                'message' => 'This video was made with Claude (MCP). Ask Claude to render it again.',
+            ], 409);
+        }
+
         if (!$project->isReadyForProcessing()) {
             return response()->json([
                 'success' => false,
@@ -706,6 +715,15 @@ class ProjectController extends Controller
                 'success' => false,
                 'message' => 'Unauthorized access to this project'
             ], 403);
+        }
+
+        // Claude-made (MCP) videos render through the studio's own tools.
+        if (\Modules\Project\Support\McpOrigin::is($project)) {
+            return response()->json([
+                'success' => false,
+                'code' => 'mcp_project',
+                'message' => 'This video was made with Claude (MCP). Ask Claude to render it again.',
+            ], 409);
         }
 
         if ($project->status !== 'failed') {

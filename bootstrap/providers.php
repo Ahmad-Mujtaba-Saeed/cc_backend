@@ -7,4 +7,5 @@ return [
     \Modules\AccessControl\ModuleServiceProvider::class,
     \Modules\Project\ModuleServiceProvider::class,
     \Modules\User\ModuleServiceProvider::class,
+    \Modules\Mcp\ModuleServiceProvider::class,
 ];

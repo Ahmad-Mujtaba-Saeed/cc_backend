@@ -76,6 +76,43 @@ services:
       redis:
         condition: service_started
 
+  # Claude / MCP studio jobs (renders + presenter-recording prep) on their own
+  # queue connection (config/queue.php `mcp`, retry_after > the longest
+  # render), so a user's free 2-hour 60 fps render never waits in front of a
+  # paying customer's job on `worker`. One process = one studio render at a
+  # time; scale with `--scale mcp-worker=N` only if the render server can
+  # take N renders at once (or point MCP_REMOTION_URL at its own server).
+  mcp-worker:
+    <<: *php
+    user: www-data
+    command: sh -c "php artisan queue:work mcp --queue=mcp --sleep=2 --tries=1 --timeout=14400"
+    environment:
+      - PYTHON_AI_SERVICE_URL=http://ai:8000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      app:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # Laravel's scheduler (routes registered by the modules, e.g. the daily
+  # `mcp:prune` cleanup of presenter frame strips). This stack had no
+  # scheduler process before; `schedule:work` runs the minute loop itself.
+  scheduler:
+    <<: *php
+    user: www-data
+    command: sh -c "php artisan schedule:work"
+    depends_on:
+      app:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
   # Cloning + stand-alone text-to-speech jobs ("My Voices") on their own queue
   # connection, so a long render never makes a user wait for their voice and
   # a slow CPU synthesis never holds up a render.

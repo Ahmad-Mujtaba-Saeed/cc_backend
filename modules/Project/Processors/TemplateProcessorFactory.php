@@ -38,7 +38,11 @@ class TemplateProcessorFactory
             'yt_gameplay_short' => new YTGameplayShortProcessor($project),
             'yt_compilation_short' => new CompilationShortsProcessor($project),
             'ranking_moments_short' => new RankingMomentsProcessor($project),
-            'ai_explainer_video' => new ExplainerVideoProcessor($project),
+            // Videos the user's own LLM built over MCP render through the
+            // free subset of the explainer pipeline (modules/Mcp).
+            'ai_explainer_video' => \Modules\Project\Support\McpOrigin::is($project)
+                ? new \Modules\Mcp\Processors\McpExplainerProcessor($project)
+                : new ExplainerVideoProcessor($project),
             default => throw new \InvalidArgumentException("Unknown template type: {$templateType}")
         };
     }

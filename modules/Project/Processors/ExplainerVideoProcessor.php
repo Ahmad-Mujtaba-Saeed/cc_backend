@@ -11,6 +11,7 @@ use Modules\Project\Services\PunchlineService;
 use Modules\Project\Services\RemotionRenderService;
 use Modules\Project\Services\ThumbnailConceptService;
 use Modules\Project\Services\SceneStyleService;
+use Modules\Project\Services\SrtExportService;
 use Modules\Project\Services\TTSGenerationService;
 use Modules\Project\Services\VlmLabelPlacementService;
 use Modules\Project\Support\ExplainerRegistry;
@@ -330,7 +331,7 @@ class ExplainerVideoProcessor extends AbstractVideoProcessor
      */
     protected function renderVideo(array $scenes): bool
     {
-        $service = new RemotionRenderService();
+        $service = (new RemotionRenderService())->forProject($this->project);
 
         if (!$service->isAvailable()) {
             $this->project->update(['error_message' => 'Remotion render service is not reachable.']);

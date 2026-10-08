@@ -86,6 +86,20 @@ return [
             'after_commit' => false,
         ],
 
+        // Claude / MCP studio renders (modules/Mcp): their own queue and their
+        // own worker container (`mcp-worker`), so a user's free 2-hour 60 fps
+        // render never sits in front of a paying customer's job. retry_after
+        // must outlive the longest render, or redis hands the same job out a
+        // second time while the first is still rendering.
+        'mcp' => [
+            'driver' => 'redis',
+            'connection' => env('REDIS_QUEUE_CONNECTION', 'default'),
+            'queue' => env('MCP_QUEUE', 'mcp'),
+            'retry_after' => (int) env('MCP_QUEUE_RETRY_AFTER', 15000),
+            'block_for' => null,
+            'after_commit' => false,
+        ],
+
         'deferred' => [
             'driver' => 'deferred',
         ],

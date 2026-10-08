@@ -83,6 +83,31 @@ class SrtExportService
         }
     }
 
+    /**
+     * Captions straight from one absolute word track — a presenter recording's
+     * Whisper transcript (MCP studio), where the words ARE the timeline.
+     *
+     * @param  array<int, array{word: string, start: float, end: float}>  $words
+     */
+    public function exportWords(array $words, string $outputRelativeMp4): ?string
+    {
+        $words = array_values(array_filter($words, fn ($w) => is_array($w) && trim((string) ($w['word'] ?? '')) !== ''));
+        if ($words === []) {
+            return null;
+        }
+        $cues = $this->cuesFromWords($words, 0.0, PHP_FLOAT_MAX);
+        $srt = '';
+        foreach ($cues as $i => $cue) {
+            $srt .= ($i + 1) . "\n"
+                . $this->stamp($cue['start']) . ' --> ' . $this->stamp($cue['end']) . "\n"
+                . implode("\n", $cue['lines']) . "\n\n";
+        }
+        $relative = (preg_replace('/\.mp4$/i', '', $outputRelativeMp4) ?: $outputRelativeMp4) . '.srt';
+        Storage::disk('public')->put($relative, $srt);
+
+        return $relative;
+    }
+
     /** @return array<int, array{word: string, start: float, end: float}> */
     private function wordTimings(Project $project, string $sceneId): array
     {

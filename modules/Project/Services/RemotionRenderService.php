@@ -45,6 +45,8 @@ class RemotionRenderService
 
     private string $baseUrl;
     private int $timeout;
+    /** Per-project override of where the render server fetches storage from. */
+    private ?string $assetBase = null;
 
     public function __construct()
     {
@@ -72,6 +74,7 @@ class RemotionRenderService
      */
     public function render(Project $project, array $scenes, string $outputRelativePath, ?string $aspectOverride = null): array
     {
+        $this->routeFor($project);
         $aspect = $aspectOverride ?? ($project->aspect_ratio ?? '16:9');
         [$width, $height] = $this->dimensionsFor($aspect);
 
@@ -94,6 +97,8 @@ class RemotionRenderService
         // never less than the configured floor and never past the job's own
         // 4h ceiling (ProcessVideoJob::$timeout).
         $videoSeconds = array_sum(array_map(fn ($s) => (float) ($s['duration_seconds'] ?? 6), $scenes));
+        // A presenter video runs the whole recording, gaps between scenes included.
+        $videoSeconds = max($videoSeconds, (float) ($payload['shot_list']['presenter']['duration'] ?? 0));
         // 60fps on this hardware measured ~8.5s per second of video (project
         // 211: 845s of video, 119 minutes), so 6s/s timed out a render that
         // then finished half an hour later. 10s/s, same 4h ceiling.
@@ -170,6 +175,7 @@ class RemotionRenderService
         int $width,
         int $height
     ): array {
+        $this->routeFor($project);
         $settings = $project->settings ?? [];
         $theme = $this->resolveTheme($settings);
         $punchlines = is_array($settings['punchlines'] ?? null) ? $settings['punchlines'] : [];
@@ -275,6 +281,17 @@ class RemotionRenderService
             fn (string $path) => $this->publicUrl($path)
         );
 
+        // Videos built over MCP by the user's own model (modules/Mcp): their
+        // composition (slides or the presenter recording), media shelf and
+        // presenter windows. A preview frame goes through here too.
+        if (\Modules\Project\Support\McpOrigin::is($settings)) {
+            $payload['shot_list'] = \Modules\Mcp\Support\McpPayload::decorate(
+                $payload['shot_list'],
+                $project,
+                fn (string $path) => $this->publicUrl($path)
+            );
+        }
+
         // Per-chapter accent shift (§11.4, default off): each chapter after
         // the first gets the accent hue-rotated ±20° (alternating direction,
         // so successive chapters never drift monotonically off-palette),
@@ -303,6 +320,7 @@ class RemotionRenderService
      */
     public function previewStill(Project $project, array $scenes, string $outputRelativePath, int $frame, float $scale = 0.5): array
     {
+        $this->routeFor($project);
         $aspect = $project->aspect_ratio ?? '16:9';
         [$width, $height] = $this->dimensionsFor($aspect);
 
@@ -1236,11 +1254,33 @@ class RemotionRenderService
         return [null, null];
     }
 
+    /**
+     * Videos built over MCP may render on their own server (MCP_REMOTION_URL,
+     * see Modules\Mcp\Support\McpRouting) so free studio renders never
+     * compete with paid ones for the same CPU. Everything else is unchanged.
+     */
+    /** Point this client at the render server for this project (health checks included). */
+    public function forProject(Project $project): static
+    {
+        $this->routeFor($project);
+
+        return $this;
+    }
+
+    private function routeFor(Project $project): void
+    {
+        if (!\Modules\Project\Support\McpOrigin::is($project)) {
+            return;
+        }
+        $this->baseUrl = \Modules\Mcp\Support\McpRouting::renderUrl();
+        $this->assetBase = \Modules\Mcp\Support\McpRouting::assetBase();
+    }
+
     private function publicUrl(string $relativePath): string
     {
         // Prefer an explicitly configured public base (so the Node service can
         // reach Laravel even when APP_URL is an internal hostname).
-        $base = config('services.remotion.asset_base_url') ?: config('app.url');
+        $base = $this->assetBase ?: (config('services.remotion.asset_base_url') ?: config('app.url'));
         $base = rtrim((string) $base, '/');
 
         // Percent-encode each SEGMENT, keeping the slashes. Operator-dropped
